@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  NONE
+}
+
+enum CommunicationPreference {
+  CHAT_ONLY
+  CHAT_AND_CALL
+}
+
+enum ActivityStatus {
+  ACTIVE
+  AWAY
+  INACTIVE
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum Continent {
+  AFRICA
+  ASIA
+  EUROPE
+  NORTH_AMERICA
+  SOUTH_AMERICA
+  OCEANIA
+}
+
+enum LessonType {
+  GAME_REVIEW
+  LESSON
+}
+
+enum LessonRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionType {
+  DEPOSIT
+  LESSON_PAYMENT
+  LESSON_REFUND
+  PAYOUT
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  email         String?  @unique
+  passwordHash  String
+  role          UserRole @default(USER)
+
+  // Chess.com verification
+  chessComUsername    String?  @unique
+  verificationStatus VerificationStatus @default(NONE)
+
+  // Profile info
+  continent             Continent?
+  chessRating           Int?
+  coachPricePerHour     Int?      // cents
+  gameReviewPrice       Int?      // cents
+  communicationPreference CommunicationPreference @default(CHAT_ONLY)
+  chessComAccountAge    DateTime? // when the chess.com account was created
+  bio                   String?
+
+  // Stats
+  lessonsGiven   Int @default(0)
+  lessonsTaken   Int @default(0)
+  playersTaught  Int @default(0)
+
+  // Wallet & earnings
+  walletBalance      Int @default(0) // cents (student balance)
+  reservedBalance    Int @default(0) // cents (held for pending lessons)
+  pendingEarnings    Int @default(0) // cents (coach earnings awaiting payout)
+  totalEarningsAllTime Int @default(0) // cents
+
+  // Coach ELO
+  coachElo Float @default(0)
+
+  // Activity
+  lastActiveAt   DateTime @default(now())
+  activityStatus ActivityStatus @default(ACTIVE)
+
+  // Stripe
+  stripeCustomerId       String?
+  stripeConnectAccountId String?
+
+  // Password reset
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  reviewsGiven      Review[]        @relation("ReviewFrom")
+  reviewsReceived   Review[]        @relation("ReviewTo")
+  lessonRequestsAsStudent LessonRequest[] @relation("Student")
+  lessonRequestsAsCoach   LessonRequest[] @relation("Coach")
+  transactions      Transaction[]
+  payouts           Payout[]
+  earningRecords    EarningRecord[]
+
+  @@index([coachElo(sort: Desc)])
+  @@index([activityStatus])
+  @@index([verificationStatus])
+  @@index([continent])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5
+  comment   String?
+  
+  fromUserId String
+  fromUser   User   @relation("ReviewFrom", fields: [fromUserId], references: [id])
+  
+  toUserId   String
+  toUser     User   @relation("ReviewTo", fields: [toUserId], references: [id])
+  
+  lessonId   String
+  lesson     LessonRequest @relation(fields: [lessonId], references: [id])
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([fromUserId, lessonId]) // one review per user per lesson
+  @@index([toUserId])
+}
+
+model LessonRequest {
+  id        String   @id @default(cuid())
+  
+  studentId String
+  student   User   @relation("Student", fields: [studentId], references: [id])
+  
+  coachId   String
+  coach     User   @relation("Coach", fields: [coachId], references: [id])
+  
+  type            LessonType
+  durationMinutes Int
+  estimatedCost   Int       // cents
+  
+  status          LessonRequestStatus @default(PENDING)
+  studentConfirmed Boolean @default(false)
+  coachConfirmed   Boolean @default(false)
+  
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+  completedAt DateTime?
+  
+  reviews Review[]
+  transactions Transaction[]
+  
+  @@index([studentId])
+  @@index([coachId])
+  @@index([status])
+}
+
+model Transaction {
+  id     String   @id @default(cuid())
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  type   TransactionType
+  amount Int     // cents (positive = credit, negative = debit)
+  
+  lessonRequestId String?
+  lessonRequest   LessonRequest? @relation(fields: [lessonRequestId], references: [id])
+  
+  stripePaymentIntentId String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([type])
+}
+
+model Payout {
+  id      String   @id @default(cuid())
+  
+  coachId String
+  coach   User   @relation(fields: [coachId], references: [id])
+  
+  amount  Int     // cents
+  status  PayoutStatus @default(PENDING)
+  
+  stripeTransferId String?
+  periodStart      DateTime
+  periodEnd        DateTime
+  
+  createdAt DateTime @default(now())
+  
+  @@index([coachId])
+}
+
+// For ELO decay calculation - tracks individual earning events
+model EarningRecord {
+  id      String   @id @default(cuid())
+  
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+  
+  amount  Int     // cents
+  earnedAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([earnedAt])
+}

@@ -1,0 +1,90 @@
+import { prisma } from "@/lib/prisma";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+
+export default async function LeaderboardPage() {
+  const coaches = await prisma.user.findMany({
+    where: {
+      verificationStatus: "VERIFIED",
+    },
+    orderBy: { coachElo: "desc" },
+    take: 100,
+    select: {
+      username: true,
+      coachElo: true,
+      chessRating: true,
+      lessonsGiven: true,
+      playersTaught: true,
+      activityStatus: true,
+    },
+  });
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <h1 className="text-3xl font-bold mb-2">Coach Leaderboard</h1>
+      <p className="text-muted-foreground mb-8">
+        Rankings based on coaching earnings with time decay. More recent earnings count more.
+      </p>
+
+      {coaches.length === 0 ? (
+        <p className="text-center text-muted-foreground py-12">
+          No coaches on the leaderboard yet.
+        </p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">#</TableHead>
+              <TableHead>Coach</TableHead>
+              <TableHead className="text-right">ELO</TableHead>
+              <TableHead className="text-right">Chess Rating</TableHead>
+              <TableHead className="text-right">Lessons</TableHead>
+              <TableHead className="text-right">Students</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {coaches.map((coach, i) => (
+              <TableRow key={coach.username}>
+                <TableCell className="font-bold">{i + 1}</TableCell>
+                <TableCell>
+                  <Link
+                    href={`/profile/${coach.username}`}
+                    className="hover:underline font-medium"
+                  >
+                    {coach.username}
+                  </Link>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ♟ {coach.chessRating ?? "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right font-mono font-medium">
+                  {Math.round(coach.coachElo)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {coach.chessRating ?? "—"}
+                </TableCell>
+                <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
+                <TableCell className="text-right">{coach.playersTaught}</TableCell>
+                <TableCell className="text-center">
+                  <Badge
+                    variant={
+                      coach.activityStatus === "ACTIVE"
+                        ? "default"
+                        : coach.activityStatus === "AWAY"
+                        ? "secondary"
+                        : "outline"
+                    }
+                  >
+                    {coach.activityStatus}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
