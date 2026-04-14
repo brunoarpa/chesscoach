@@ -21,7 +21,7 @@ export default async function HowItWorksPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
         <Card className="text-center">
           <CardContent className="pt-6">
-            <div className="text-3xl mb-2">1️⃣</div>
+            <div className="text-3xl font-bold mb-2">1.</div>
             <h3 className="font-semibold mb-1">Sign Up &amp; Verify</h3>
             <p className="text-sm text-muted-foreground">
               Create an account and link your chess.com profile
@@ -30,7 +30,7 @@ export default async function HowItWorksPage() {
         </Card>
         <Card className="text-center">
           <CardContent className="pt-6">
-            <div className="text-3xl mb-2">2️⃣</div>
+            <div className="text-3xl font-bold mb-2">2.</div>
             <h3 className="font-semibold mb-1">Find or Become a Coach</h3>
             <p className="text-sm text-muted-foreground">
               Browse coaches or set your own prices to start teaching
@@ -39,7 +39,7 @@ export default async function HowItWorksPage() {
         </Card>
         <Card className="text-center">
           <CardContent className="pt-6">
-            <div className="text-3xl mb-2">3️⃣</div>
+            <div className="text-3xl font-bold mb-2">3.</div>
             <h3 className="font-semibold mb-1">Learn &amp; Grow</h3>
             <p className="text-sm text-muted-foreground">
               Take lessons, leave reviews, and climb the ratings
@@ -52,8 +52,8 @@ export default async function HowItWorksPage() {
 
       {/* For Students */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          📚 For Students
+        <h2 className="text-2xl font-bold mb-6">
+          For Students
         </h2>
 
         <div className="space-y-6">
@@ -136,8 +136,8 @@ export default async function HowItWorksPage() {
 
       {/* For Coaches */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          🎓 For Coaches
+        <h2 className="text-2xl font-bold mb-6">
+          For Coaches
         </h2>
 
         <div className="space-y-6">
@@ -183,13 +183,14 @@ export default async function HowItWorksPage() {
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-gray-400" />
                   <strong>Unavailable</strong>
-                  <span className="text-muted-foreground">— You&apos;re hidden from search and can&apos;t receive requests</span>
+                  <span className="text-muted-foreground">— Shown in search with unavailable status. Can&apos;t receive requests</span>
                 </div>
               </div>
               <p className="text-muted-foreground">
                 When you accept a lesson, your status automatically switches to Busy.
                 When all active lessons are completed, it switches back to Available.
-                You can also manually set your status anytime from profile settings.
+                You can also quickly toggle your status from the colored dot in the navigation bar,
+                or change it in your profile settings.
               </p>
             </CardContent>
           </Card>
@@ -222,8 +223,8 @@ export default async function HowItWorksPage() {
 
       {/* Payments & Earnings */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          💰 Payments &amp; Earnings
+        <h2 className="text-2xl font-bold mb-6">
+          Payments &amp; Earnings
         </h2>
 
         <div className="space-y-6">
@@ -287,13 +288,13 @@ export default async function HowItWorksPage() {
 
       {/* FAQ */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          ❓ Common Questions
+        <h2 className="text-2xl font-bold mb-6">
+          Common Questions
         </h2>
 
         <div className="space-y-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Can I be both a student and a coach?</h3>
               <p className="text-sm text-muted-foreground">
                 Yes! Every account can both take and give lessons. Your dashboard has separate
@@ -303,7 +304,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">What happens if a coach doesn&apos;t respond?</h3>
               <p className="text-sm text-muted-foreground">
                 Pending requests can expire after a period, and your reserved funds will be
@@ -313,7 +314,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Why do both parties need to confirm completion?</h3>
               <p className="text-sm text-muted-foreground">
                 Dual confirmation ensures both the student and coach agree the lesson took place.
@@ -323,7 +324,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">How are reviews handled?</h3>
               <p className="text-sm text-muted-foreground">
                 After a completed lesson (including free trials), both the student and coach
@@ -334,7 +335,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Is my chess.com username shared?</h3>
               <p className="text-sm text-muted-foreground">
                 Yes — during active lessons, your chess.com username is visible to the other

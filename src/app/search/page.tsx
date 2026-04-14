@@ -25,7 +25,6 @@ export default async function SearchPage({
   // Build where clause
   const where: Prisma.UserWhereInput = {
     verificationStatus: "VERIFIED",
-    coachAvailability: { in: ["AVAILABLE", "BUSY"] },
   };
 
   if (params.q) {
@@ -59,7 +58,7 @@ export default async function SearchPage({
   }
 
   if (params.availability && params.availability !== "all") {
-    where.coachAvailability = params.availability as "AVAILABLE" | "BUSY";
+    where.coachAvailability = params.availability as "AVAILABLE" | "BUSY" | "UNAVAILABLE";
   }
 
   // Build order by — always by total earnings

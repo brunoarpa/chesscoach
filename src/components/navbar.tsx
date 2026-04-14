@@ -1,11 +1,22 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AvailabilityToggle } from "@/components/availability-toggle";
 
 export async function Navbar() {
   const session = await auth();
+
+  let coachAvailability: string | null = null;
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { coachAvailability: true },
+    });
+    coachAvailability = user?.coachAvailability ?? null;
+  }
 
   return (
     <header className="border-b bg-background">
@@ -58,6 +69,7 @@ export async function Navbar() {
               </Link>
             </>
           )}
+          {coachAvailability && <AvailabilityToggle initialStatus={coachAvailability} />}
           <ThemeToggle />
         </nav>
       </div>

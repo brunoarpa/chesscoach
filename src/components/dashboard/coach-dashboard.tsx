@@ -71,7 +71,7 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
             ? "— You are accepting lesson requests"
             : coachAvailability === "BUSY"
             ? "— Students cannot send you new requests"
-            : "— Your profile is hidden from search"}
+            : "— Students cannot send you new requests"}
         </span>
       </div>
 

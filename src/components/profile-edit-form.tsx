@@ -136,7 +136,7 @@ export function ProfileEditForm(props: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Available: accepting requests. Busy: visible but not accepting requests (auto-set during lessons). Unavailable: hidden from search.
+              Available: accepting requests. Busy: visible but not accepting requests (auto-set during lessons). Unavailable: not accepting requests. You can also quickly toggle from the navigation bar.
             </p>
           </div>
 

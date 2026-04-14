@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validations";
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { chessComUsernameExists } from "@/lib/chess-com";
@@ -166,6 +167,23 @@ export async function updateProfile(formData: FormData) {
   });
 
   redirect("/profile/" + session.user.username);
+}
+
+export async function updateCoachAvailability(newStatus: "AVAILABLE" | "BUSY" | "UNAVAILABLE") {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      coachAvailability: newStatus,
+      lastActiveAt: new Date(),
+      activityStatus: "ACTIVE",
+    },
+  });
+
+  revalidatePath("/dashboard");
+  return { success: true, status: newStatus };
 }
 
 export async function submitChessComUsername(formData: FormData) {
