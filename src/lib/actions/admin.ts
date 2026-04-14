@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
 
 async function requireAdmin() {
   const session = await auth();
@@ -17,15 +18,28 @@ async function requireAdmin() {
   return session.user.id;
 }
 
-export async function verifyUser(userId: string, chessRating: number, chessComAccountAge: string) {
+export async function verifyUser(userId: string) {
   await requireAdmin();
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { chessComUsername: true },
+  });
+
+  if (!user?.chessComUsername) throw new Error("No chess.com username");
+
+  // Auto-fetch rating and profile from chess.com API
+  const [rating, profile] = await Promise.all([
+    fetchChessComRating(user.chessComUsername),
+    fetchChessComProfile(user.chessComUsername),
+  ]);
 
   await prisma.user.update({
     where: { id: userId },
     data: {
       verificationStatus: "VERIFIED",
-      chessRating,
-      chessComAccountAge: new Date(chessComAccountAge),
+      chessRating: rating,
+      chessComAccountAge: profile?.joined ?? null,
     },
   });
 

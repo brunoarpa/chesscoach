@@ -100,6 +100,9 @@ model User {
   // Coach ELO
   coachElo Float @default(0)
 
+  // Coaching availability
+  coachingEnabled Boolean @default(true)
+
   // Activity
   lastActiveAt   DateTime @default(now())
   activityStatus ActivityStatus @default(ACTIVE)

@@ -3,6 +3,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
+function formatLastSeen(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
 export default async function LeaderboardPage() {
   const coaches = await prisma.user.findMany({
     where: {
@@ -17,6 +29,8 @@ export default async function LeaderboardPage() {
       lessonsGiven: true,
       playersTaught: true,
       activityStatus: true,
+      coachingEnabled: true,
+      lastActiveAt: true,
     },
   });
 
@@ -42,6 +56,7 @@ export default async function LeaderboardPage() {
               <TableHead className="text-right">Lessons</TableHead>
               <TableHead className="text-right">Students</TableHead>
               <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-right">Last Seen</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -68,17 +83,24 @@ export default async function LeaderboardPage() {
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">
-                  <Badge
-                    variant={
-                      coach.activityStatus === "ACTIVE"
-                        ? "default"
-                        : coach.activityStatus === "AWAY"
-                        ? "secondary"
-                        : "outline"
-                    }
-                  >
-                    {coach.activityStatus}
-                  </Badge>
+                  {coach.coachingEnabled ? (
+                    <Badge
+                      variant={
+                        coach.activityStatus === "ACTIVE"
+                          ? "default"
+                          : coach.activityStatus === "AWAY"
+                          ? "secondary"
+                          : "outline"
+                      }
+                    >
+                      {coach.activityStatus}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Not Coaching</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">
+                  {formatLastSeen(coach.lastActiveAt)}
                 </TableCell>
               </TableRow>
             ))}

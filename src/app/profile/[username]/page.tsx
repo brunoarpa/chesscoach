@@ -25,6 +25,19 @@ const activityColors: Record<string, string> = {
   INACTIVE: "bg-gray-400",
 };
 
+function formatLastSeen(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
 export default async function ProfilePage({
   params,
 }: {
@@ -81,7 +94,13 @@ export default async function ProfilePage({
             {user.verificationStatus === "PENDING" && (
               <Badge variant="secondary">Pending Verification</Badge>
             )}
+            {user.verificationStatus === "VERIFIED" && !user.coachingEnabled && (
+              <Badge variant="outline">Not Coaching</Badge>
+            )}
           </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Last seen: {formatLastSeen(user.lastActiveAt)}
+          </p>
         </div>
 
         {isOwnProfile && (
@@ -204,6 +223,16 @@ export default async function ProfilePage({
                 <span className="text-muted-foreground">Status:</span>{" "}
                 {user.activityStatus}
               </div>
+              <div>
+                <span className="text-muted-foreground">Last seen:</span>{" "}
+                {formatLastSeen(user.lastActiveAt)}
+              </div>
+              {user.verificationStatus === "VERIFIED" && (
+                <div>
+                  <span className="text-muted-foreground">Coaching:</span>{" "}
+                  {user.coachingEnabled ? "Available" : "Not taking students"}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -216,12 +245,22 @@ export default async function ProfilePage({
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
+            user.coachingEnabled &&
             (user.coachPricePerHour || user.gameReviewPrice) && (
               <LessonRequestForm
                 coachId={user.id}
                 coachPricePerHour={user.coachPricePerHour}
                 gameReviewPrice={user.gameReviewPrice}
               />
+            )}
+          {!isOwnProfile &&
+            user.verificationStatus === "VERIFIED" &&
+            !user.coachingEnabled && (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  This coach is not currently taking students.
+                </CardContent>
+              </Card>
             )}
         </div>
       </div>

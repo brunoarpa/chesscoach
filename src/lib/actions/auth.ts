@@ -7,6 +7,7 @@ import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { rateLimit } from "@/lib/rate-limit";
+import { chessComUsernameExists } from "@/lib/chess-com";
 
 async function getClientIp() {
   const h = await headers();
@@ -114,6 +115,7 @@ export async function updateProfile(formData: FormData) {
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
     bio: (formData.get("bio") as string) || undefined,
+    coachingEnabled: formData.get("coachingEnabled") === "true",
   };
 
   await prisma.user.update({
@@ -128,6 +130,7 @@ export async function updateProfile(formData: FormData) {
         : null,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,
+      coachingEnabled: raw.coachingEnabled,
       lastActiveAt: new Date(),
       activityStatus: "ACTIVE",
     },
@@ -160,6 +163,12 @@ export async function submitChessComUsername(formData: FormData) {
   const chessComUsername = formData.get("chessComUsername") as string;
   if (!chessComUsername) {
     return { error: "Chess.com username is required" };
+  }
+
+  // Validate that the chess.com username exists
+  const exists = await chessComUsernameExists(chessComUsername);
+  if (!exists) {
+    return { error: "This chess.com username was not found. Please check the spelling." };
   }
 
   // Check if already taken

@@ -23,6 +23,7 @@ interface Props {
   gameReviewPrice?: number;
   communicationPreference: string;
   bio?: string;
+  coachingEnabled: boolean;
 }
 
 export function ProfileEditForm(props: Props) {
@@ -102,6 +103,25 @@ export function ProfileEditForm(props: Props) {
                 <SelectItem value="CHAT_AND_CALL">Chat &amp; Call</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Coaching Availability</Label>
+            <Select
+              name="coachingEnabled"
+              defaultValue={props.coachingEnabled ? "true" : "false"}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Available for coaching</SelectItem>
+                <SelectItem value="false">Not taking students</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              When disabled, your profile will show as unavailable and you won&apos;t receive lesson requests.
+            </p>
           </div>
 
           <Button type="submit" className="w-full">

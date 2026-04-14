@@ -127,6 +127,8 @@ export default async function SearchPage({
                     communicationPreference={coach.communicationPreference}
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
+                    coachingEnabled={coach.coachingEnabled}
+                    lastActiveAt={coach.lastActiveAt.toISOString()}
                     avgRating={avgRating}
                     reviewCount={coach.reviewsReceived.length}
                     lessonsGiven={coach.lessonsGiven}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recalculateAllElos } from "@/lib/elo";
 import { updateActivityStatuses, expirePendingRequests } from "@/lib/activity";
+import { refreshAllChessComRatings } from "@/lib/chess-com";
 
 // This endpoint should be called daily by a cron job
 // In Vercel, configure in vercel.json: { "crons": [{ "path": "/api/cron/daily", "schedule": "0 6 * * *" }] }
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
       recalculateAllElos(),
       updateActivityStatuses(),
       expirePendingRequests(),
+      refreshAllChessComRatings(),
     ]);
 
     return NextResponse.json({ success: true, timestamp: new Date().toISOString() });

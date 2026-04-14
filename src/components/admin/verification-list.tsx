@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { verifyUser, rejectUser } from "@/lib/actions/admin";
 import { toast } from "sonner";
@@ -29,21 +28,15 @@ export function VerificationList({ users }: { users: User[] }) {
 }
 
 function VerificationCard({ user }: { user: User }) {
-  const [rating, setRating] = useState("");
-  const [accountAge, setAccountAge] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleVerify() {
-    if (!rating || !accountAge) {
-      toast.error("Please fill in chess rating and account age");
-      return;
-    }
     setLoading(true);
     try {
-      await verifyUser(user.id, Number(rating), accountAge);
-      toast.success(`Verified ${user.username}`);
+      await verifyUser(user.id);
+      toast.success(`Verified ${user.username} — rating and account age fetched from chess.com`);
     } catch {
-      toast.error("Failed to verify");
+      toast.error("Failed to verify. Check if the chess.com username is valid.");
     }
     setLoading(false);
   }
@@ -79,33 +72,18 @@ function VerificationCard({ user }: { user: User }) {
             <div className="text-xs text-muted-foreground mt-1">
               Joined: {new Date(user.createdAt).toLocaleDateString()}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Rating and account age will be auto-fetched from chess.com
+            </p>
           </div>
 
-          <div className="flex flex-col gap-2 items-end">
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Chess Rating"
-                value={rating}
-                onChange={(e) => setRating(e.target.value)}
-                className="w-32"
-              />
-              <Input
-                type="date"
-                placeholder="Account Created"
-                value={accountAge}
-                onChange={(e) => setAccountAge(e.target.value)}
-                className="w-40"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleVerify} disabled={loading}>
-                Verify
-              </Button>
-              <Button size="sm" variant="destructive" onClick={handleReject} disabled={loading}>
-                Reject
-              </Button>
-            </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleVerify} disabled={loading}>
+              Verify
+            </Button>
+            <Button size="sm" variant="destructive" onClick={handleReject} disabled={loading}>
+              Reject
+            </Button>
           </div>
         </div>
       </CardContent>

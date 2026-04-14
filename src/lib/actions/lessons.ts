@@ -28,12 +28,16 @@ export async function createLessonRequest(formData: FormData) {
       gameReviewPrice: true,
       verificationStatus: true,
       activityStatus: true,
+      coachingEnabled: true,
     },
   });
 
   if (!coach) return { error: "Coach not found" };
   if (coach.verificationStatus !== "VERIFIED") {
     return { error: "Coach is not verified" };
+  }
+  if (!coach.coachingEnabled) {
+    return { error: "This coach is not currently accepting students" };
   }
 
   // Calculate cost
