@@ -9,6 +9,7 @@ import { LessonRequestForm } from "@/components/lesson-request-form";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const continentLabels: Record<string, string> = {
   AFRICA: "Africa",
@@ -71,9 +72,12 @@ export default async function ProfilePage({
     where: { username },
     include: {
       reviewsReceived: {
-        include: { fromUser: { select: { username: true } } },
+        include: {
+          fromUser: { select: { username: true } },
+          lesson: { select: { studentId: true, coachId: true, estimatedCost: true } },
+        },
         orderBy: { createdAt: "desc" },
-        take: 20,
+        take: 50,
       },
     },
   });
@@ -83,12 +87,38 @@ export default async function ProfilePage({
   const session = await auth();
   const isOwnProfile = session?.user?.id === user.id;
 
-  // Calculate average rating
-  const avgRating =
-    user.reviewsReceived.length > 0
-      ? user.reviewsReceived.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) /
-        user.reviewsReceived.length
+  // Separate reviews: as coach (from students) vs as student (from coaches)
+  const coachReviews = user.reviewsReceived.filter(
+    (r) => r.lesson.coachId === user.id
+  );
+  const studentReviews = user.reviewsReceived.filter(
+    (r) => r.lesson.studentId === user.id
+  );
+
+  const avgCoachRating =
+    coachReviews.length > 0
+      ? coachReviews.reduce((sum, r) => sum + r.rating, 0) / coachReviews.length
       : null;
+
+  const avgStudentRating =
+    studentReviews.length > 0
+      ? studentReviews.reduce((sum, r) => sum + r.rating, 0) / studentReviews.length
+      : null;
+
+  // Calculate total paid by each student reviewing (for coach reviews)
+  const studentTotals: Record<string, number> = {};
+  if (coachReviews.length > 0) {
+    const completedLessons = await prisma.lessonRequest.findMany({
+      where: {
+        coachId: user.id,
+        status: "COMPLETED",
+      },
+      select: { studentId: true, estimatedCost: true },
+    });
+    for (const lesson of completedLessons) {
+      studentTotals[lesson.studentId] = (studentTotals[lesson.studentId] || 0) + lesson.estimatedCost;
+    }
+  }
 
   const websiteAge = Math.round(
     (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
@@ -212,10 +242,31 @@ export default async function ProfilePage({
           <Separator />
 
           <div>
-            <h2 className="text-xl font-semibold mb-4">
-              Reviews {avgRating !== null && `(${avgRating.toFixed(1)} ★)`}
-            </h2>
-            <ReviewList reviews={user.reviewsReceived} />
+            <Tabs defaultValue="coach-reviews">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Reviews</h2>
+                <TabsList>
+                  <TabsTrigger value="coach-reviews">
+                    As Coach {avgCoachRating !== null && `(${avgCoachRating.toFixed(1)} ★)`}
+                  </TabsTrigger>
+                  <TabsTrigger value="student-reviews">
+                    As Student {avgStudentRating !== null && `(${avgStudentRating.toFixed(1)} ★)`}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="coach-reviews">
+                <ReviewList
+                  reviews={coachReviews.map((r) => ({
+                    ...r,
+                    totalPaid: studentTotals[r.fromUserId] || 0,
+                  }))}
+                  showTotalPaid
+                />
+              </TabsContent>
+              <TabsContent value="student-reviews">
+                <ReviewList reviews={studentReviews} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
 
@@ -233,10 +284,16 @@ export default async function ProfilePage({
                   {chessComAgeStr}
                 </div>
               )}
-              {avgRating !== null && (
+              {avgCoachRating !== null && (
                 <div>
-                  <span className="text-muted-foreground">Rating:</span>{" "}
-                  {avgRating.toFixed(1)} ★ ({user.reviewsReceived.length} reviews)
+                  <span className="text-muted-foreground">Coach Rating:</span>{" "}
+                  {avgCoachRating.toFixed(1)} ★ ({coachReviews.length} reviews)
+                </div>
+              )}
+              {avgStudentRating !== null && (
+                <div>
+                  <span className="text-muted-foreground">Student Rating:</span>{" "}
+                  {avgStudentRating.toFixed(1)} ★ ({studentReviews.length} reviews)
                 </div>
               )}
               <div>

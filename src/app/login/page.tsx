@@ -17,7 +17,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle>Log in</CardTitle>
           <CardDescription>
-            Welcome back to ChessConnect
+            Welcome back to ChessCoach
           </CardDescription>
         </CardHeader>
         <CardContent>

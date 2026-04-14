@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/auth";
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth();
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 px-4">
       <div className="text-center space-y-4 max-w-2xl">
         <h1 className="text-5xl font-bold tracking-tight">
-          ♟ ChessConnect
+          ♟ ChessCoach
         </h1>
         <p className="text-xl text-muted-foreground">
           Find the perfect chess coach, or share your knowledge.
@@ -18,11 +21,19 @@ export default function Home() {
         <Link href="/search">
           <Button size="lg">Find a Coach</Button>
         </Link>
-        <Link href="/signup">
-          <Button size="lg" variant="outline">
-            Get Started
-          </Button>
-        </Link>
+        {session?.user ? (
+          <Link href="/dashboard">
+            <Button size="lg" variant="outline">
+              Dashboard
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/signup">
+            <Button size="lg" variant="outline">
+              Get Started
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 max-w-4xl w-full">

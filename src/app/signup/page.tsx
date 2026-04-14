@@ -42,7 +42,7 @@ export default function SignupPage() {
         <CardHeader>
           <CardTitle>Create an account</CardTitle>
           <CardDescription>
-            Join ChessConnect to find coaches or start teaching
+            Join ChessCoach to find coaches or start teaching
           </CardDescription>
         </CardHeader>
         <CardContent>

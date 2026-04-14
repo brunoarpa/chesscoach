@@ -148,6 +148,7 @@ model Review {
   lesson     LessonRequest @relation(fields: [lessonId], references: [id])
   
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   
   @@unique([fromUserId, lessonId]) // one review per user per lesson
   @@index([toUserId])

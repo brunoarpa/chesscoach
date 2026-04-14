@@ -300,22 +300,23 @@ export async function submitReview(formData: FormData) {
   // Determine who we're reviewing
   const toUserId = isStudent ? lesson.coachId : lesson.studentId;
 
-  // Check for existing review
-  const existingReview = await prisma.review.findUnique({
+  // Upsert: create or update review
+  await prisma.review.upsert({
     where: { fromUserId_lessonId: { fromUserId: session.user.id, lessonId } },
-  });
-  if (existingReview) return { error: "You already reviewed this lesson" };
-
-  await prisma.review.create({
-    data: {
+    create: {
       fromUserId: session.user.id,
       toUserId,
       lessonId,
       rating,
       comment,
     },
+    update: {
+      rating,
+      comment,
+    },
   });
 
   revalidatePath("/dashboard");
+  revalidatePath(`/profile`);
   return { success: true };
 }

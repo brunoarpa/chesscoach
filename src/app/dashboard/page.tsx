@@ -21,6 +21,10 @@ export default async function DashboardPage() {
       where: { coachId: session.user.id },
       include: {
         student: { select: { username: true, chessComUsername: true } },
+        reviews: {
+          where: { fromUserId: session.user.id },
+          select: { id: true, rating: true, comment: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -29,6 +33,10 @@ export default async function DashboardPage() {
       where: { studentId: session.user.id },
       include: {
         coach: { select: { username: true, chessComUsername: true } },
+        reviews: {
+          where: { fromUserId: session.user.id },
+          select: { id: true, rating: true, comment: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),

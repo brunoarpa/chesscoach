@@ -15,7 +15,7 @@ async function main() {
     update: {},
     create: {
       username: "admin",
-      email: "admin@chessconnect.dev",
+      email: "admin@chesscoach.dev",
       passwordHash: hashedPassword,
       role: "ADMIN",
       continent: "NORTH_AMERICA",

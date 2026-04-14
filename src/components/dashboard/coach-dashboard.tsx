@@ -9,6 +9,12 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+interface MyReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+}
+
 interface Request {
   id: string;
   type: string;
@@ -19,6 +25,7 @@ interface Request {
   coachConfirmed: boolean;
   createdAt: string;
   student: { username: string; chessComUsername: string | null };
+  reviews: MyReview[];
 }
 
 const statusColors: Record<string, string> = {
@@ -163,7 +170,6 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
             <span className="text-sm text-muted-foreground ml-2">
               {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
             </span>
-            {/* Show chess.com username since request was accepted */}
             {otherUser.chessComUsername && (
               <div className="text-sm font-medium text-blue-600 mt-1">
                 Chess.com: {otherUser.chessComUsername}
@@ -187,17 +193,18 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
 }
 
 function CompletedCard({ request, otherUser }: { request: Request; otherUser: { username: string } }) {
+  const existingReview = request.reviews?.[0] ?? null;
   const [showReview, setShowReview] = useState(false);
-  const [rating, setRating] = useState("5");
-  const [comment, setComment] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [rating, setRating] = useState(existingReview?.rating?.toString() ?? "5");
+  const [comment, setComment] = useState(existingReview?.comment ?? "");
+  const [saved, setSaved] = useState(false);
 
   async function handleReview(formData: FormData) {
     const result = await submitReview(formData);
     if (result.error) toast.error(result.error);
     else {
-      toast.success("Review submitted!");
-      setSubmitted(true);
+      toast.success(existingReview ? "Review updated!" : "Review submitted!");
+      setSaved(true);
       setShowReview(false);
     }
   }
@@ -214,11 +221,15 @@ function CompletedCard({ request, otherUser }: { request: Request; otherUser: { 
           </div>
           <div className="flex items-center gap-2">
             <Badge>Completed</Badge>
-            {!submitted && (
+            {existingReview && !saved ? (
+              <Button size="sm" variant="outline" onClick={() => setShowReview(!showReview)}>
+                Edit Review
+              </Button>
+            ) : !saved ? (
               <Button size="sm" variant="outline" onClick={() => setShowReview(!showReview)}>
                 Review
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
         {showReview && (
@@ -245,7 +256,7 @@ function CompletedCard({ request, otherUser }: { request: Request; otherUser: { 
               maxLength={500}
             />
             <Button size="sm" type="submit">
-              Submit Review
+              {existingReview ? "Update Review" : "Submit Review"}
             </Button>
           </form>
         )}

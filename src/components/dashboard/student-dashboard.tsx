@@ -9,6 +9,12 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+interface MyReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+}
+
 interface Request {
   id: string;
   type: string;
@@ -19,6 +25,7 @@ interface Request {
   coachConfirmed: boolean;
   createdAt: string;
   coach: { username: string; chessComUsername: string | null };
+  reviews: MyReview[];
 }
 
 const statusColors: Record<string, string> = {
@@ -181,17 +188,18 @@ function ActiveCard({ request }: { request: Request }) {
 }
 
 function CompletedCard({ request }: { request: Request }) {
+  const existingReview = request.reviews?.[0] ?? null;
   const [showReview, setShowReview] = useState(false);
-  const [rating, setRating] = useState("5");
-  const [comment, setComment] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [rating, setRating] = useState(existingReview?.rating?.toString() ?? "5");
+  const [comment, setComment] = useState(existingReview?.comment ?? "");
+  const [saved, setSaved] = useState(false);
 
   async function handleReview(formData: FormData) {
     const result = await submitReview(formData);
     if (result.error) toast.error(result.error);
     else {
-      toast.success("Review submitted!");
-      setSubmitted(true);
+      toast.success(existingReview ? "Review updated!" : "Review submitted!");
+      setSaved(true);
       setShowReview(false);
     }
   }
@@ -208,11 +216,15 @@ function CompletedCard({ request }: { request: Request }) {
           </div>
           <div className="flex items-center gap-2">
             <Badge>Completed</Badge>
-            {!submitted && (
+            {existingReview && !saved ? (
+              <Button size="sm" variant="outline" onClick={() => setShowReview(!showReview)}>
+                Edit Review
+              </Button>
+            ) : !saved ? (
               <Button size="sm" variant="outline" onClick={() => setShowReview(!showReview)}>
                 Review
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
         {showReview && (
@@ -239,7 +251,7 @@ function CompletedCard({ request }: { request: Request }) {
               maxLength={500}
             />
             <Button size="sm" type="submit">
-              Submit Review
+              {existingReview ? "Update Review" : "Submit Review"}
             </Button>
           </form>
         )}

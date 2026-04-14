@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         {
           price_data: {
             currency: "usd",
-            product_data: { name: "ChessConnect Wallet Deposit" },
+            product_data: { name: "ChessCoach Wallet Deposit" },
             unit_amount: amount,
           },
           quantity: 1,

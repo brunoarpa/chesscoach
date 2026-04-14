@@ -3,29 +3,28 @@ import { prisma } from "@/lib/prisma";
 /**
  * Update activity status for all users based on lastActiveAt.
  * - Active: within 24 hours
- * - Away: 2-3 days + has pending requests  
- * - Inactive: 5+ days or hasn't responded to requests in 3+ days
+ * - Away: 1-2 days + has pending requests  
+ * - Inactive: 2+ days or hasn't responded to requests in 2+ days
  */
 export async function updateActivityStatuses() {
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-  const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
 
-  // Set INACTIVE: no activity in 5+ days
+  // Set INACTIVE: no activity in 2+ days
   await prisma.user.updateMany({
     where: {
-      lastActiveAt: { lt: fiveDaysAgo },
+      lastActiveAt: { lt: twoDaysAgo },
       activityStatus: { not: "INACTIVE" },
     },
     data: { activityStatus: "INACTIVE" },
   });
 
-  // Find users with pending requests older than 3 days (unresponsive coaches)
+  // Find users with pending requests older than 2 days (unresponsive coaches)
   const unresponsiveCoachIds = await prisma.lessonRequest.findMany({
     where: {
       status: "PENDING",
-      createdAt: { lt: threeDaysAgo },
+      createdAt: { lt: twoDaysAgo },
     },
     select: { coachId: true },
     distinct: ["coachId"],
@@ -41,7 +40,7 @@ export async function updateActivityStatuses() {
     });
   }
 
-  // Set AWAY: 1-5 days inactive and has pending requests
+  // Set AWAY: 1-2 days inactive and has pending requests
   const awayCoachIds = await prisma.lessonRequest.findMany({
     where: {
       status: "PENDING",
@@ -54,7 +53,7 @@ export async function updateActivityStatuses() {
     await prisma.user.updateMany({
       where: {
         id: { in: awayCoachIds.map((r: { coachId: string }) => r.coachId) },
-        lastActiveAt: { lt: oneDayAgo, gte: fiveDaysAgo },
+        lastActiveAt: { lt: oneDayAgo, gte: twoDaysAgo },
         activityStatus: "ACTIVE",
       },
       data: { activityStatus: "AWAY" },
