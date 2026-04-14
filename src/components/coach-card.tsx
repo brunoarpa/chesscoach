@@ -64,11 +64,11 @@ export function CoachCard(props: Props) {
             <span className="flex items-center gap-1.5">
               ♟ Chess Coach
               {props.coachAvailability === "AVAILABLE" ? (
-                <span className="text-[10px] font-semibold text-green-500">Available</span>
+                <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400 text-[10px]">Available</Badge>
               ) : props.coachAvailability === "BUSY" ? (
-                <span className="text-[10px] font-semibold text-red-500">Busy</span>
+                <Badge variant="destructive" className="text-[10px]">Busy</Badge>
               ) : (
-                <span className="text-[10px] font-semibold text-muted-foreground">Unavailable</span>
+                <Badge variant="secondary" className="text-[10px]">Unavailable</Badge>
               )}
             </span>
           </p>

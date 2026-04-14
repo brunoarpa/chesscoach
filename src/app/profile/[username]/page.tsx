@@ -188,13 +188,13 @@ export default async function ProfilePage({
               <Badge variant="secondary">Pending Verification</Badge>
             )}
             {user.verificationStatus === "VERIFIED" && user.coachAvailability === "AVAILABLE" && (
-              <span className="text-sm font-semibold text-green-500">Available</span>
+              <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
             )}
             {user.verificationStatus === "VERIFIED" && user.coachAvailability === "UNAVAILABLE" && (
-              <span className="text-sm font-semibold text-muted-foreground">Unavailable</span>
+              <Badge variant="secondary">Unavailable</Badge>
             )}
             {user.verificationStatus === "VERIFIED" && user.coachAvailability === "BUSY" && (
-              <span className="text-sm font-semibold text-red-500">Busy</span>
+              <Badge variant="destructive">Busy</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">

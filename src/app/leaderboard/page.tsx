@@ -98,11 +98,11 @@ export default async function LeaderboardPage() {
                 </TableCell>
                 <TableCell className="text-center">
                   {coach.coachAvailability === "AVAILABLE" ? (
-                    <Badge variant="default">Available</Badge>
+                    <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
                   ) : coach.coachAvailability === "BUSY" ? (
                     <Badge variant="destructive">Busy</Badge>
                   ) : (
-                    <Badge variant="outline">Unavailable</Badge>
+                    <Badge variant="secondary">Unavailable</Badge>
                   )}
                 </TableCell>
               </TableRow>

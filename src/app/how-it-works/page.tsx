@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -171,15 +172,15 @@ export default async function HowItWorksPage() {
               <p>You can control your coaching availability with three statuses:</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-green-500">Available</span>
+                  <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
                   <span className="text-muted-foreground">— You appear in search and can receive lesson requests</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-red-500">Busy</span>
+                  <Badge variant="destructive">Busy</Badge>
                   <span className="text-muted-foreground">— You appear in search but students can&apos;t send requests. Auto-set during active lessons</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-muted-foreground">Unavailable</span>
+                  <Badge variant="secondary">Unavailable</Badge>
                   <span className="text-muted-foreground">— Shown in search with unavailable status. Can&apos;t receive requests</span>
                 </div>
               </div>
