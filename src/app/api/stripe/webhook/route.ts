@@ -30,12 +30,27 @@ export async function POST(request: Request) {
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as { metadata?: { userId?: string; type?: string }; amount_total?: number | null; payment_intent?: string };
+    const session = event.data.object as { metadata?: { userId?: string; type?: string }; amount_total?: number | null; payment_intent?: string; id?: string };
     const userId = session.metadata?.userId;
     const type = session.metadata?.type;
     const amount = session.amount_total;
+    const paymentIntentId = session.payment_intent as string;
 
-    if (userId && type === "deposit" && amount) {
+    if (userId && type === "deposit" && amount && paymentIntentId) {
+      // Idempotency: check if this payment was already processed
+      const existing = await prisma.transaction.findFirst({
+        where: { stripePaymentIntentId: paymentIntentId },
+      });
+      if (existing) {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      // Verify the user exists
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 400 });
+      }
+
       await prisma.$transaction([
         prisma.user.update({
           where: { id: userId },
@@ -46,7 +61,7 @@ export async function POST(request: Request) {
             userId,
             type: "DEPOSIT",
             amount,
-            stripePaymentIntentId: session.payment_intent as string,
+            stripePaymentIntentId: paymentIntentId,
           },
         }),
       ]);

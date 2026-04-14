@@ -174,7 +174,7 @@ export default async function ProfilePage({
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Last seen: {formatLastSeen(user.lastActiveAt)}
+            {user.activityStatus === "ACTIVE" ? "Active" : user.activityStatus === "AWAY" ? "Away" : "Inactive"}
           </p>
         </div>
 
@@ -325,10 +325,7 @@ export default async function ProfilePage({
                 <span className="text-muted-foreground">Status:</span>{" "}
                 {user.activityStatus}
               </div>
-              <div>
-                <span className="text-muted-foreground">Last seen:</span>{" "}
-                {formatLastSeen(user.lastActiveAt)}
-              </div>
+
               {user.verificationStatus === "VERIFIED" && (
                 <div>
                   <span className="text-muted-foreground">Coaching:</span>{" "}

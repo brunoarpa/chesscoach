@@ -131,6 +131,7 @@ model User {
   @@index([activityStatus])
   @@index([verificationStatus])
   @@index([continent])
+  @@index([resetToken])
 }
 
 model Review {
@@ -195,7 +196,7 @@ model Transaction {
   lessonRequestId String?
   lessonRequest   LessonRequest? @relation(fields: [lessonRequestId], references: [id])
   
-  stripePaymentIntentId String?
+  stripePaymentIntentId String? @unique
   
   createdAt DateTime @default(now())
   
@@ -233,4 +234,17 @@ model EarningRecord {
   
   @@index([userId])
   @@index([earnedAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String   // e.g. "VERIFY_USER", "REJECT_USER", "BAN_USER", "SET_ROLE"
+  targetId  String   // userId that was acted upon
+  details   String?  // optional extra context
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetId])
+  @@index([createdAt])
 }

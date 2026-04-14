@@ -4,6 +4,24 @@ import { NextResponse } from "next/server";
 export default authMiddleware((req) => {
   const { pathname } = req.nextUrl;
 
+  // CSRF protection: verify Origin header on mutating API requests
+  // Skip for Stripe webhook (has its own signature verification)
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/stripe/webhook") && req.method !== "GET" && req.method !== "HEAD") {
+    const origin = req.headers.get("origin");
+    const host = req.headers.get("host");
+    if (origin && host) {
+      let originHost: string;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+      }
+      if (originHost !== host) {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+      }
+    }
+  }
+
   // Protected routes that require authentication
   const protectedPaths = ["/dashboard", "/wallet", "/profile/edit"];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
@@ -25,5 +43,5 @@ export default authMiddleware((req) => {
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/wallet/:path*", "/profile/edit/:path*", "/admin/:path*"],
+  matcher: ["/dashboard/:path*", "/wallet/:path*", "/profile/edit/:path*", "/admin/:path*", "/api/:path*"],
 };

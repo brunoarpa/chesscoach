@@ -67,7 +67,19 @@ export default async function SearchPage({
     where,
     orderBy,
     take: 50,
-    include: {
+    select: {
+      id: true,
+      username: true,
+      chessRating: true,
+      continent: true,
+      coachPricePerHour: true,
+      gameReviewPrice: true,
+      communicationPreference: true,
+      coachElo: true,
+      activityStatus: true,
+      coachingEnabled: true,
+      lastActiveAt: true,
+      lessonsGiven: true,
       reviewsReceived: { select: { rating: true } },
     },
   });
@@ -106,7 +118,6 @@ export default async function SearchPage({
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
                     coachingEnabled={coach.coachingEnabled}
-                    lastActiveAt={coach.lastActiveAt.toISOString()}
                     avgRating={avgRating}
                     reviewCount={coach.reviewsReceived.length}
                     lessonsGiven={coach.lessonsGiven}

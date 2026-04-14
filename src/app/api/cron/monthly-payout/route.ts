@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 // Monthly payout cron - transfer pending earnings to coaches
 // Configure in Vercel: { "crons": [{ "path": "/api/cron/monthly-payout", "schedule": "0 0 1 * *" }] }
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (
-    process.env.CRON_SECRET &&
+    !process.env.CRON_SECRET ||
     authHeader !== `Bearer ${process.env.CRON_SECRET}`
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
             }),
           ]);
         } catch (error) {
-          console.error(`Payout failed for coach ${coach.id}:`, error);
+          console.error(`Payout failed for coach ${coach.id}:`, error instanceof Error ? error.message : "Unknown error");
           await prisma.payout.create({
             data: {
               coachId: coach.id,
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
       timestamp: now.toISOString(),
     });
   } catch (error) {
-    console.error("Monthly payout failed:", error);
+    console.error("Monthly payout failed:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "Payout failed" }, { status: 500 });
   }
 }

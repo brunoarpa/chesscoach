@@ -14,49 +14,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Minimum deposit is $5.00" }, { status: 400 });
   }
 
-  // If Stripe is configured, create a Checkout session
-  if (process.env.STRIPE_SECRET_KEY) {
-    const stripe = (await import("stripe")).default;
-    const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
-
-    const checkoutSession = await stripeClient.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: { name: "ChessCoach Wallet Deposit" },
-            unit_amount: amount,
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        userId: session.user.id,
-        type: "deposit",
-      },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/wallet?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/wallet?cancelled=true`,
-    });
-
-    return NextResponse.json({ url: checkoutSession.url });
+  if (amount > 1000000) {
+    return NextResponse.json({ error: "Maximum deposit is $10,000.00" }, { status: 400 });
   }
 
-  // Dev mode: direct deposit without Stripe
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: session.user.id },
-      data: { walletBalance: { increment: amount } },
-    }),
-    prisma.transaction.create({
-      data: {
-        userId: session.user.id,
-        type: "DEPOSIT",
-        amount: amount,
-      },
-    }),
-  ]);
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
+  }
 
-  return NextResponse.json({ success: true });
+  // Create a Stripe Checkout session
+  const stripe = (await import("stripe")).default;
+  const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
+
+  const checkoutSession = await stripeClient.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: "ChessCoach Wallet Deposit" },
+          unit_amount: amount,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      userId: session.user.id,
+      type: "deposit",
+    },
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/wallet?success=true`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/wallet?cancelled=true`,
+  });
+
+  return NextResponse.json({ url: checkoutSession.url });
 }

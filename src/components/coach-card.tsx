@@ -28,22 +28,9 @@ interface Props {
   coachElo: number;
   activityStatus: string;
   coachingEnabled: boolean;
-  lastActiveAt: string;
   avgRating: number | null;
   reviewCount: number;
   lessonsGiven: number;
-}
-
-function formatLastSeen(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
 }
 
 export function CoachCard(props: Props) {
@@ -66,7 +53,6 @@ export function CoachCard(props: Props) {
 
           <p className="text-sm text-muted-foreground mb-3">
             {props.coachingEnabled ? "♟ Chess Coach" : "♟ Not Coaching"}
-            <span className="ml-2 text-xs">· {formatLastSeen(props.lastActiveAt)}</span>
           </p>
 
           <div className="grid grid-cols-2 gap-1.5 text-xs">

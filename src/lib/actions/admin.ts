@@ -19,7 +19,7 @@ async function requireAdmin() {
 }
 
 export async function verifyUser(userId: string) {
-  await requireAdmin();
+  const adminId = await requireAdmin();
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -34,54 +34,75 @@ export async function verifyUser(userId: string) {
     fetchChessComProfile(user.chessComUsername),
   ]);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      verificationStatus: "VERIFIED",
-      chessRating: rating,
-      chessComAccountAge: profile?.joined ?? null,
-    },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationStatus: "VERIFIED",
+        chessRating: rating,
+        chessComAccountAge: profile?.joined ?? null,
+      },
+    }),
+    prisma.auditLog.create({
+      data: { adminId, action: "VERIFY_USER", targetId: userId },
+    }),
+  ]);
 
   revalidatePath("/admin");
 }
 
 export async function rejectUser(userId: string) {
-  await requireAdmin();
+  const adminId = await requireAdmin();
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      verificationStatus: "REJECTED",
-      chessComUsername: null,
-    },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationStatus: "REJECTED",
+        chessComUsername: null,
+      },
+    }),
+    prisma.auditLog.create({
+      data: { adminId, action: "REJECT_USER", targetId: userId },
+    }),
+  ]);
 
   revalidatePath("/admin");
 }
 
 export async function banUser(userId: string) {
-  await requireAdmin();
+  const adminId = await requireAdmin();
 
-  // Reset their wallet and earnings, effectively banning
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      verificationStatus: "REJECTED",
-      activityStatus: "INACTIVE",
-    },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationStatus: "REJECTED",
+        activityStatus: "INACTIVE",
+      },
+    }),
+    prisma.auditLog.create({
+      data: { adminId, action: "BAN_USER", targetId: userId },
+    }),
+  ]);
 
   revalidatePath("/admin");
 }
 
 export async function setUserRole(userId: string, role: "USER" | "ADMIN") {
-  await requireAdmin();
+  const adminId = await requireAdmin();
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { role },
-  });
+  if (role !== "USER" && role !== "ADMIN") throw new Error("Invalid role");
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { role },
+    }),
+    prisma.auditLog.create({
+      data: { adminId, action: "SET_ROLE", targetId: userId, details: `Role set to ${role}` },
+    }),
+  ]);
 
   revalidatePath("/admin");
 }

@@ -6,12 +6,12 @@ import { signupSchema } from "@/lib/validations";
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { chessComUsernameExists } from "@/lib/chess-com";
 
 async function getClientIp() {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "unknown";
+  return getClientIpFromHeaders(h);
 }
 
 export async function signup(formData: FormData) {

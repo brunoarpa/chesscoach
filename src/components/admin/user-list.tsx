@@ -20,6 +20,7 @@ interface User {
 
 export function UserList({ users }: { users: User[] }) {
   async function handleBan(userId: string) {
+    if (!confirm("Are you sure you want to ban this user? This action cannot be easily undone.")) return;
     try {
       await banUser(userId);
       toast.success("User banned");
@@ -29,6 +30,8 @@ export function UserList({ users }: { users: User[] }) {
   }
 
   async function handleToggleAdmin(userId: string, currentRole: string) {
+    const action = currentRole === "ADMIN" ? "demote" : "promote";
+    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
     try {
       await setUserRole(userId, currentRole === "ADMIN" ? "USER" : "ADMIN");
       toast.success("Role updated");

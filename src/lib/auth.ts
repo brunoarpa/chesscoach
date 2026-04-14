@@ -19,6 +19,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!user) return null;
 
+        // Block banned/rejected users from logging in
+        if (user.verificationStatus === "REJECTED" && user.activityStatus === "INACTIVE") {
+          return null;
+        }
+
         const isValid = await bcrypt.compare(
           credentials.password as string,
           user.passwordHash

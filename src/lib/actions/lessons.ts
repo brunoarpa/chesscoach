@@ -3,18 +3,29 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+const lessonRequestInputSchema = z.object({
+  coachId: z.string().cuid(),
+  type: z.enum(["GAME_REVIEW", "LESSON"]),
+  durationMinutes: z.coerce.number().int().min(5).max(480),
+});
 
 export async function createLessonRequest(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
-  const coachId = formData.get("coachId") as string;
-  const type = formData.get("type") as "GAME_REVIEW" | "LESSON";
-  const durationMinutes = Number(formData.get("durationMinutes"));
+  const parsed = lessonRequestInputSchema.safeParse({
+    coachId: formData.get("coachId"),
+    type: formData.get("type"),
+    durationMinutes: formData.get("durationMinutes"),
+  });
 
-  if (!coachId || !type || !durationMinutes) {
-    return { error: "Missing required fields" };
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
+
+  const { coachId, type, durationMinutes } = parsed.data;
 
   if (coachId === session.user.id) {
     return { error: "You cannot request a lesson from yourself" };
@@ -62,6 +73,18 @@ export async function createLessonRequest(formData: FormData) {
   const available = student.walletBalance - student.reservedBalance;
   if (available < estimatedCost) {
     return { error: `Insufficient balance. You need $${(estimatedCost / 100).toFixed(2)} but only have $${(available / 100).toFixed(2)} available.` };
+  }
+
+  // Prevent duplicate pending requests for the same coach
+  const existingPending = await prisma.lessonRequest.findFirst({
+    where: {
+      studentId: session.user.id,
+      coachId,
+      status: "PENDING",
+    },
+  });
+  if (existingPending) {
+    return { error: "You already have a pending request with this coach" };
   }
 
   // Create request and reserve funds
@@ -142,38 +165,61 @@ export async function confirmLesson(requestId: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
-  const request = await prisma.lessonRequest.findUnique({
-    where: { id: requestId },
-  });
+  if (!requestId || typeof requestId !== "string") return { error: "Invalid request ID" };
 
-  if (!request) return { error: "Request not found" };
-  if (request.status !== "ACCEPTED") return { error: "Lesson must be accepted first" };
+  // Use interactive transaction with row-level locking to prevent race conditions
+  const result = await prisma.$transaction(async (tx) => {
+    // Lock the lesson request row to prevent concurrent modifications
+    const rows = await tx.$queryRaw<Array<{
+      id: string;
+      studentId: string;
+      coachId: string;
+      status: string;
+      studentConfirmed: boolean;
+      coachConfirmed: boolean;
+      estimatedCost: number;
+      respondedAt: Date | null;
+      durationMinutes: number;
+    }>>`SELECT * FROM "LessonRequest" WHERE id = ${requestId} FOR UPDATE`;
 
-  const isStudent = request.studentId === session.user.id;
-  const isCoach = request.coachId === session.user.id;
-  if (!isStudent && !isCoach) return { error: "Not authorized" };
+    const request = rows[0];
+    if (!request) return { error: "Request not found" };
+    if (request.status !== "ACCEPTED") return { error: "Lesson must be accepted first" };
 
-  const updateData: Record<string, boolean> = {};
-  if (isStudent) updateData.studentConfirmed = true;
-  if (isCoach) updateData.coachConfirmed = true;
+    const isStudent = request.studentId === session.user.id;
+    const isCoach = request.coachId === session.user.id;
+    if (!isStudent && !isCoach) return { error: "Not authorized" };
 
-  const newStudentConfirmed = isStudent ? true : request.studentConfirmed;
-  const newCoachConfirmed = isCoach ? true : request.coachConfirmed;
-  const bothConfirmed = newStudentConfirmed && newCoachConfirmed;
+    // Cooldown: lesson must have been accepted for at least its duration (min 5 minutes)
+    if (request.respondedAt) {
+      const minCooldownMs = Math.max(request.durationMinutes * 60 * 1000, 5 * 60 * 1000);
+      const elapsed = Date.now() - new Date(request.respondedAt).getTime();
+      if (elapsed < minCooldownMs) {
+        const remaining = Math.ceil((minCooldownMs - elapsed) / 60000);
+        return { error: `Lesson cannot be confirmed yet. Please wait ${remaining} more minute(s).` };
+      }
+    }
 
-  if (bothConfirmed) {
-    // Complete the lesson: transfer money
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
+    const updateData: Record<string, boolean> = {};
+    if (isStudent) updateData.studentConfirmed = true;
+    if (isCoach) updateData.coachConfirmed = true;
+
+    const newStudentConfirmed = isStudent ? true : request.studentConfirmed;
+    const newCoachConfirmed = isCoach ? true : request.coachConfirmed;
+    const bothConfirmed = newStudentConfirmed && newCoachConfirmed;
+
+    if (bothConfirmed) {
+      // Complete the lesson: transfer money (all within the same transaction)
+      await tx.lessonRequest.update({
         where: { id: requestId },
         data: {
           ...updateData,
           status: "COMPLETED",
           completedAt: new Date(),
         },
-      }),
+      });
       // Debit student
-      prisma.user.update({
+      await tx.user.update({
         where: { id: request.studentId },
         data: {
           walletBalance: { decrement: request.estimatedCost },
@@ -182,9 +228,9 @@ export async function confirmLesson(requestId: string) {
           lastActiveAt: new Date(),
           activityStatus: "ACTIVE",
         },
-      }),
+      });
       // Credit coach
-      prisma.user.update({
+      await tx.user.update({
         where: { id: request.coachId },
         data: {
           pendingEarnings: { increment: request.estimatedCost },
@@ -193,58 +239,58 @@ export async function confirmLesson(requestId: string) {
           lastActiveAt: new Date(),
           activityStatus: "ACTIVE",
         },
-      }),
+      });
       // Record transactions
-      prisma.transaction.create({
+      await tx.transaction.create({
         data: {
           userId: request.studentId,
           type: "LESSON_PAYMENT",
           amount: -request.estimatedCost,
           lessonRequestId: requestId,
         },
-      }),
-      prisma.transaction.create({
+      });
+      await tx.transaction.create({
         data: {
           userId: request.coachId,
           type: "LESSON_PAYMENT",
           amount: request.estimatedCost,
           lessonRequestId: requestId,
         },
-      }),
+      });
       // Record earning for ELO
-      prisma.earningRecord.create({
+      await tx.earningRecord.create({
         data: {
           userId: request.coachId,
           amount: request.estimatedCost,
         },
-      }),
-    ]);
+      });
 
-    // Update players taught count (distinct students)
-    const distinctStudents = await prisma.lessonRequest.findMany({
-      where: { coachId: request.coachId, status: "COMPLETED" },
-      select: { studentId: true },
-      distinct: ["studentId"],
-    });
-    await prisma.user.update({
-      where: { id: request.coachId },
-      data: { playersTaught: distinctStudents.length },
-    });
-  } else {
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
+      // Update players taught count (distinct students) inside transaction
+      const distinctStudents = await tx.lessonRequest.findMany({
+        where: { coachId: request.coachId, status: "COMPLETED" },
+        select: { studentId: true },
+        distinct: ["studentId"],
+      });
+      await tx.user.update({
+        where: { id: request.coachId },
+        data: { playersTaught: distinctStudents.length },
+      });
+    } else {
+      await tx.lessonRequest.update({
         where: { id: requestId },
         data: updateData,
-      }),
-      prisma.user.update({
+      });
+      await tx.user.update({
         where: { id: session.user.id },
         data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-      }),
-    ]);
-  }
+      });
+    }
+
+    return { success: true };
+  });
 
   revalidatePath("/dashboard");
-  return { success: true };
+  return result;
 }
 
 export async function cancelLessonRequest(requestId: string) {
