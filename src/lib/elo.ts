@@ -1,35 +1,49 @@
 import { prisma } from "@/lib/prisma";
 
+const BASE_RATING = 100;
+const INITIAL_BONUS = 900; // so new coaches start at 1000
+const DECAY_RATE = 0.005; // half-life ≈ 139 days
+const EARNINGS_MULTIPLIER = 150;
+
 /**
- * Calculate coach ELO based on earnings with time decay.
- * Last 30 days: 100% weight
- * 30-90 days: 50% weight
- * 90+ days: 25% weight
+ * Calculate coach ELO rating.
+ *
+ * Formula: 100 + 900·e^(-0.005·daysSinceActivity) + 150·ln(1 + totalEarnings$)
+ *
+ * - Starts at 1000 for new coaches.
+ * - Decays asymptotically towards 100 without activity (slow, ~139-day half-life).
+ * - Earnings boost the rating via log so dollar amounts stay private.
  */
 export async function calculateCoachElo(userId: string): Promise<number> {
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { createdAt: true },
+  });
+
+  if (!user) return BASE_RATING + INITIAL_BONUS;
 
   const earnings = await prisma.earningRecord.findMany({
     where: { userId },
     select: { amount: true, earnedAt: true },
+    orderBy: { earnedAt: "desc" },
   });
 
-  let weightedTotal = 0;
-  for (const record of earnings) {
-    if (record.earnedAt >= thirtyDaysAgo) {
-      weightedTotal += record.amount; // 100%
-    } else if (record.earnedAt >= ninetyDaysAgo) {
-      weightedTotal += record.amount * 0.5; // 50%
-    } else {
-      weightedTotal += record.amount * 0.25; // 25%
-    }
-  }
+  const now = new Date();
 
-  // Convert cents to a meaningful ELO-like score
-  // Every $100 earned (weighted) = ~100 ELO points
-  return Math.round(weightedTotal / 100);
+  // Days since last activity: last earning, or account creation if never earned
+  const lastActivity =
+    earnings.length > 0 ? earnings[0].earnedAt : user.createdAt;
+  const daysSinceActivity =
+    (now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24);
+
+  // Total lifetime earnings in dollars
+  const totalDollars =
+    earnings.reduce((sum, e) => sum + e.amount, 0) / 100;
+
+  const decayFactor = Math.exp(-DECAY_RATE * daysSinceActivity);
+  const earningsBoost = EARNINGS_MULTIPLIER * Math.log(1 + totalDollars);
+
+  return Math.round(BASE_RATING + INITIAL_BONUS * decayFactor + earningsBoost);
 }
 
 /**

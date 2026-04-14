@@ -8,7 +8,7 @@ export default async function LeaderboardPage() {
     where: {
       verificationStatus: "VERIFIED",
     },
-    orderBy: { totalEarningsAllTime: "desc" },
+    orderBy: { coachElo: "desc" },
     take: 100,
     select: {
       username: true,
@@ -16,7 +16,6 @@ export default async function LeaderboardPage() {
       chessRating: true,
       lessonsGiven: true,
       playersTaught: true,
-      totalEarningsAllTime: true,
       activityStatus: true,
       coachingEnabled: true,
     },
@@ -26,7 +25,7 @@ export default async function LeaderboardPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <h1 className="text-3xl font-bold mb-2">Coach Leaderboard</h1>
       <p className="text-muted-foreground mb-8">
-        Rankings based on total coaching earnings.
+        Rankings based on coach rating.
       </p>
 
       {coaches.length === 0 ? (
@@ -39,7 +38,7 @@ export default async function LeaderboardPage() {
             <TableRow>
               <TableHead className="w-16">#</TableHead>
               <TableHead>Coach</TableHead>
-              <TableHead className="text-right">Total Earned</TableHead>
+              <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>
               <TableHead className="text-right">Lessons</TableHead>
               <TableHead className="text-right">Students</TableHead>
@@ -62,7 +61,7 @@ export default async function LeaderboardPage() {
                   </span>
                 </TableCell>
                 <TableCell className="text-right font-mono font-medium">
-                  ${(coach.totalEarningsAllTime / 100).toFixed(2)}
+                  {Math.round(coach.coachElo)}
                 </TableCell>
                 <TableCell className="text-right">
                   {coach.chessRating ?? "—"}

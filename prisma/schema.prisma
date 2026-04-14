@@ -98,7 +98,7 @@ model User {
   totalEarningsAllTime Int @default(0) // cents
 
   // Coach ELO
-  coachElo Float @default(0)
+  coachElo Float @default(1000)
 
   // Coaching availability
   coachingEnabled Boolean @default(true)
