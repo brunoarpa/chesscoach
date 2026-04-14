@@ -27,12 +27,6 @@ const activityColors: Record<string, string> = {
   INACTIVE: "bg-gray-400",
 };
 
-const availabilityConfig: Record<string, { color: string; label: string }> = {
-  AVAILABLE: { color: "bg-green-500", label: "Available" },
-  BUSY: { color: "bg-red-500", label: "Busy" },
-  UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
-};
-
 function formatLastSeen(date: Date): string {
   const now = Date.now();
   const diff = now - date.getTime();
@@ -193,11 +187,14 @@ export default async function ProfilePage({
             {user.verificationStatus === "PENDING" && (
               <Badge variant="secondary">Pending Verification</Badge>
             )}
+            {user.verificationStatus === "VERIFIED" && user.coachAvailability === "AVAILABLE" && (
+              <span className="text-sm font-semibold text-green-500">Available</span>
+            )}
             {user.verificationStatus === "VERIFIED" && user.coachAvailability === "UNAVAILABLE" && (
-              <Badge variant="outline">Not Coaching</Badge>
+              <span className="text-sm font-semibold text-muted-foreground">Unavailable</span>
             )}
             {user.verificationStatus === "VERIFIED" && user.coachAvailability === "BUSY" && (
-              <Badge variant="destructive">Busy</Badge>
+              <span className="text-sm font-semibold text-red-500">Busy</span>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
@@ -362,9 +359,13 @@ export default async function ProfilePage({
               {user.verificationStatus === "VERIFIED" && (
                 <div>
                   <span className="text-muted-foreground">Coaching:</span>{" "}
-                  <span className="flex items-center gap-1.5 inline-flex">
-                    <span className={`w-2 h-2 rounded-full ${availabilityConfig[user.coachAvailability]?.color ?? "bg-gray-400"}`} />
-                    {availabilityConfig[user.coachAvailability]?.label ?? "Unknown"}
+                  <span className={`font-semibold ${
+                    user.coachAvailability === "AVAILABLE" ? "text-green-500" :
+                    user.coachAvailability === "BUSY" ? "text-red-500" :
+                    "text-muted-foreground"
+                  }`}>
+                    {user.coachAvailability === "AVAILABLE" ? "Available" :
+                     user.coachAvailability === "BUSY" ? "Busy" : "Unavailable"}
                   </span>
                 </div>
               )}

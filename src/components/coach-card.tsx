@@ -12,12 +12,6 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-const availabilityConfig: Record<string, { color: string; label: string }> = {
-  AVAILABLE: { color: "bg-green-500", label: "Available" },
-  BUSY: { color: "bg-red-500", label: "Busy" },
-  UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
-};
-
 const activityColors: Record<string, string> = {
   ACTIVE: "bg-green-500",
   AWAY: "bg-yellow-500",
@@ -53,8 +47,6 @@ interface Props {
 }
 
 export function CoachCard(props: Props) {
-  const availability = availabilityConfig[props.coachAvailability] ?? availabilityConfig.UNAVAILABLE;
-
   return (
     <Link href={`/profile/${props.username}`}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -62,10 +54,6 @@ export function CoachCard(props: Props) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold">{props.username}</h3>
-              <div
-                className={`w-2.5 h-2.5 rounded-full ${availability.color}`}
-                title={availability.label}
-              />
             </div>
             {props.coachElo > 0 && (
               <Badge variant="outline">ELO {Math.round(props.coachElo)}</Badge>
@@ -75,8 +63,12 @@ export function CoachCard(props: Props) {
           <p className="text-sm text-muted-foreground mb-3">
             <span className="flex items-center gap-1.5">
               ♟ Chess Coach
-              {props.coachAvailability === "BUSY" && (
-                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Busy</Badge>
+              {props.coachAvailability === "AVAILABLE" ? (
+                <span className="text-[10px] font-semibold text-green-500">Available</span>
+              ) : props.coachAvailability === "BUSY" ? (
+                <span className="text-[10px] font-semibold text-red-500">Busy</span>
+              ) : (
+                <span className="text-[10px] font-semibold text-muted-foreground">Unavailable</span>
               )}
             </span>
           </p>

@@ -171,25 +171,22 @@ export default async function HowItWorksPage() {
               <p>You can control your coaching availability with three statuses:</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-500" />
-                  <strong>Available</strong>
+                  <span className="font-semibold text-green-500">Available</span>
                   <span className="text-muted-foreground">— You appear in search and can receive lesson requests</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-red-500" />
-                  <strong>Busy</strong>
+                  <span className="font-semibold text-red-500">Busy</span>
                   <span className="text-muted-foreground">— You appear in search but students can&apos;t send requests. Auto-set during active lessons</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-gray-400" />
-                  <strong>Unavailable</strong>
+                  <span className="font-semibold text-muted-foreground">Unavailable</span>
                   <span className="text-muted-foreground">— Shown in search with unavailable status. Can&apos;t receive requests</span>
                 </div>
               </div>
               <p className="text-muted-foreground">
                 When you accept a lesson, your status automatically switches to Busy.
                 When all active lessons are completed, it switches back to Available.
-                You can also quickly toggle your status from the colored dot in the navigation bar,
+                You can also quickly toggle your status from the navigation bar,
                 or change it in your profile settings.
               </p>
             </CardContent>
