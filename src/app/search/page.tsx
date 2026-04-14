@@ -25,23 +25,11 @@ export default async function SearchPage({
   // Build where clause
   const where: Prisma.UserWhereInput = {
     verificationStatus: "VERIFIED",
-    OR: [
-      { coachPricePerHour: { not: null } },
-      { gameReviewPrice: { not: null } },
-    ],
+    coachingEnabled: true,
   };
 
   if (params.q) {
     where.username = { contains: params.q, mode: "insensitive" };
-    // Keep the coaching requirement
-    where.AND = [
-      {
-        OR: [
-          { coachPricePerHour: { not: null } },
-          { gameReviewPrice: { not: null } },
-        ],
-      },
-    ];
   }
 
   if (params.continent && params.continent !== "all") {

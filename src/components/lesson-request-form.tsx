@@ -20,6 +20,8 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice 
   const [duration, setDuration] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const hasPricing = coachPricePerHour !== null || gameReviewPrice !== null;
+
   const estimatedCost = (() => {
     const mins = Number(duration);
     if (!mins) return 0;
@@ -43,6 +45,21 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice 
       setType("");
       setDuration("");
     }
+  }
+
+  if (!hasPricing) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Request a Lesson</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            This coach hasn&apos;t set their pricing yet. Check back later!
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

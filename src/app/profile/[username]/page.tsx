@@ -38,6 +38,29 @@ function formatLastSeen(date: Date): string {
   return date.toLocaleDateString();
 }
 
+function formatAccountAge(date: Date): string {
+  const now = new Date();
+  let years = now.getFullYear() - date.getFullYear();
+  let months = now.getMonth() - date.getMonth();
+  let days = now.getDate() - date.getDate();
+
+  if (days < 0) {
+    months--;
+    const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}mo`);
+  if (days > 0 && years === 0) parts.push(`${days}d`);
+  return parts.length > 0 ? parts.join(" ") : "< 1 day";
+}
+
 export default async function ProfilePage({
   params,
 }: {
@@ -71,11 +94,8 @@ export default async function ProfilePage({
     (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  const chessComAge = user.chessComAccountAge
-    ? Math.round(
-        (Date.now() - user.chessComAccountAge.getTime()) /
-          (1000 * 60 * 60 * 24 * 365)
-      )
+  const chessComAgeStr = user.chessComAccountAge
+    ? formatAccountAge(user.chessComAccountAge)
     : null;
 
   return (
@@ -207,10 +227,10 @@ export default async function ProfilePage({
                 <span className="text-muted-foreground">Website Age:</span>{" "}
                 {websiteAge} days
               </div>
-              {chessComAge !== null && (
+              {chessComAgeStr !== null && (
                 <div>
                   <span className="text-muted-foreground">Chess.com Age:</span>{" "}
-                  {chessComAge} years
+                  {chessComAgeStr}
                 </div>
               )}
               {avgRating !== null && (
@@ -245,8 +265,7 @@ export default async function ProfilePage({
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
-            user.coachingEnabled &&
-            (user.coachPricePerHour || user.gameReviewPrice) && (
+            user.coachingEnabled && (
               <LessonRequestForm
                 coachId={user.id}
                 coachPricePerHour={user.coachPricePerHour}
