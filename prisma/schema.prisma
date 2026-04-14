@@ -25,6 +25,12 @@ enum ActivityStatus {
   INACTIVE
 }
 
+enum CoachAvailability {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -116,7 +122,7 @@ model User {
   coachElo Float @default(1000)
 
   // Coaching availability
-  coachingEnabled Boolean @default(true)
+  coachAvailability CoachAvailability @default(AVAILABLE)
 
   // Free trials
   freeTrialsRemaining Int @default(3)

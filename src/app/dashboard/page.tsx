@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   const currentUser = await prisma.user.update({
     where: { id: session.user.id },
     data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-    select: { isSuspended: true, freeTrialsRemaining: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true },
   });
 
   const [incomingRequests, outgoingRequests] = await Promise.all([
@@ -71,7 +71,10 @@ export default async function DashboardPage() {
         </TabsList>
 
         <TabsContent value="coach">
-          <CoachDashboard requests={JSON.parse(JSON.stringify(incomingRequests))} />
+          <CoachDashboard
+            requests={JSON.parse(JSON.stringify(incomingRequests))}
+            coachAvailability={currentUser.coachAvailability}
+          />
         </TabsContent>
 
         <TabsContent value="student">

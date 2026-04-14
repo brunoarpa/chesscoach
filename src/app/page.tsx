@@ -56,6 +56,16 @@ export default async function Home() {
           </p>
         </div>
       </div>
+
+      <div className="mt-12 text-center p-8 rounded-lg border bg-muted/30 max-w-2xl w-full">
+        <h2 className="text-lg font-semibold mb-2">New here?</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Learn how to find coaches, book lessons, or start teaching — all in one guide.
+        </p>
+        <Link href="/how-it-works">
+          <Button variant="outline">How It Works →</Button>
+        </Link>
+      </div>
     </div>
   );
 }

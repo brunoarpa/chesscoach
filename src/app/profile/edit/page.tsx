@@ -15,7 +15,7 @@ export default async function ProfileEditPage() {
       gameReviewPrice: true,
       communicationPreference: true,
       bio: true,
-      coachingEnabled: true,
+      coachAvailability: true,
     },
   });
 
@@ -30,7 +30,7 @@ export default async function ProfileEditPage() {
         gameReviewPrice={user.gameReviewPrice ? user.gameReviewPrice / 100 : undefined}
         communicationPreference={user.communicationPreference}
         bio={user.bio ?? undefined}
-        coachingEnabled={user.coachingEnabled}
+        coachAvailability={user.coachAvailability}
       />
     </div>
   );

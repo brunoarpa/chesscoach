@@ -12,10 +12,10 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-const activityColors: Record<string, string> = {
-  ACTIVE: "bg-green-500",
-  AWAY: "bg-yellow-500",
-  INACTIVE: "bg-gray-400",
+const availabilityConfig: Record<string, { color: string; label: string }> = {
+  AVAILABLE: { color: "bg-green-500", label: "Available" },
+  BUSY: { color: "bg-red-500", label: "Busy" },
+  UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
 };
 
 interface Props {
@@ -27,13 +27,15 @@ interface Props {
   communicationPreference: string;
   coachElo: number;
   activityStatus: string;
-  coachingEnabled: boolean;
+  coachAvailability: string;
   avgRating: number | null;
   reviewCount: number;
   lessonsGiven: number;
 }
 
 export function CoachCard(props: Props) {
+  const availability = availabilityConfig[props.coachAvailability] ?? availabilityConfig.UNAVAILABLE;
+
   return (
     <Link href={`/profile/${props.username}`}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -42,8 +44,8 @@ export function CoachCard(props: Props) {
             <div className="flex items-center gap-2">
               <h3 className="font-semibold">{props.username}</h3>
               <div
-                className={`w-2.5 h-2.5 rounded-full ${activityColors[props.activityStatus]}`}
-                title={props.activityStatus}
+                className={`w-2.5 h-2.5 rounded-full ${availability.color}`}
+                title={availability.label}
               />
             </div>
             {props.coachElo > 0 && (
@@ -52,7 +54,12 @@ export function CoachCard(props: Props) {
           </div>
 
           <p className="text-sm text-muted-foreground mb-3">
-            {props.coachingEnabled ? "♟ Chess Coach" : "♟ Not Coaching"}
+            <span className="flex items-center gap-1.5">
+              ♟ Chess Coach
+              {props.coachAvailability === "BUSY" && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Busy</Badge>
+              )}
+            </span>
           </p>
 
           <div className="grid grid-cols-2 gap-1.5 text-xs">

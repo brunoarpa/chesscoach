@@ -27,6 +27,12 @@ const activityColors: Record<string, string> = {
   INACTIVE: "bg-gray-400",
 };
 
+const availabilityConfig: Record<string, { color: string; label: string }> = {
+  AVAILABLE: { color: "bg-green-500", label: "Available" },
+  BUSY: { color: "bg-red-500", label: "Busy" },
+  UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
+};
+
 function formatLastSeen(date: Date): string {
   const now = Date.now();
   const diff = now - date.getTime();
@@ -136,20 +142,36 @@ export default async function ProfilePage({
   // Fetch student wallet balance and free trials for lesson request form
   let studentAvailableBalance: number | null = null;
   let freeTrialsRemaining: number = 0;
+  let studentVerified = false;
   if (session?.user?.id && !isOwnProfile) {
     const studentData = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { walletBalance: true, reservedBalance: true, freeTrialsRemaining: true },
+      select: { walletBalance: true, reservedBalance: true, freeTrialsRemaining: true, verificationStatus: true },
     });
     if (studentData) {
       studentAvailableBalance = studentData.walletBalance - studentData.reservedBalance;
       freeTrialsRemaining = studentData.freeTrialsRemaining;
+      studentVerified = studentData.verificationStatus === "VERIFIED";
     }
   }
 
   const websiteAge = Math.round(
     (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
   );
+
+  // Check if coach has completed any paid lessons (for new coach warning)
+  let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
+  if (user.verificationStatus === "VERIFIED" && user.coachAvailability === "AVAILABLE") {
+    const paidCompleted = await prisma.lessonRequest.findFirst({
+      where: {
+        coachId: user.id,
+        status: "COMPLETED",
+        isTrial: false,
+      },
+      select: { id: true },
+    });
+    hasCompletedPaidLesson = !!paidCompleted;
+  }
 
   const chessComAgeStr = user.chessComAccountAge
     ? formatAccountAge(user.chessComAccountAge)
@@ -171,8 +193,11 @@ export default async function ProfilePage({
             {user.verificationStatus === "PENDING" && (
               <Badge variant="secondary">Pending Verification</Badge>
             )}
-            {user.verificationStatus === "VERIFIED" && !user.coachingEnabled && (
+            {user.verificationStatus === "VERIFIED" && user.coachAvailability === "UNAVAILABLE" && (
               <Badge variant="outline">Not Coaching</Badge>
+            )}
+            {user.verificationStatus === "VERIFIED" && user.coachAvailability === "BUSY" && (
+              <Badge variant="destructive">Busy</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
@@ -331,7 +356,10 @@ export default async function ProfilePage({
               {user.verificationStatus === "VERIFIED" && (
                 <div>
                   <span className="text-muted-foreground">Coaching:</span>{" "}
-                  {user.coachingEnabled ? "Available" : "Not taking students"}
+                  <span className="flex items-center gap-1.5 inline-flex">
+                    <span className={`w-2 h-2 rounded-full ${availabilityConfig[user.coachAvailability]?.color ?? "bg-gray-400"}`} />
+                    {availabilityConfig[user.coachAvailability]?.label ?? "Unknown"}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -346,18 +374,45 @@ export default async function ProfilePage({
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
-            user.coachingEnabled && (
+            user.coachAvailability === "AVAILABLE" &&
+            studentVerified && (
               <LessonRequestForm
                 coachId={user.id}
                 coachPricePerHour={user.coachPricePerHour}
                 gameReviewPrice={user.gameReviewPrice}
                 availableBalance={studentAvailableBalance ?? 0}
                 freeTrialsRemaining={freeTrialsRemaining}
+                hasCompletedPaidLesson={hasCompletedPaidLesson}
               />
             )}
           {!isOwnProfile &&
+            session?.user &&
             user.verificationStatus === "VERIFIED" &&
-            !user.coachingEnabled && (
+            user.coachAvailability === "AVAILABLE" &&
+            !studentVerified && (
+              <Card>
+                <CardContent className="pt-6 text-center text-sm text-muted-foreground">
+                  You must verify your chess.com account before requesting lessons.{" "}
+                  <Link href="/profile/edit" className="underline">Verify now</Link>
+                </CardContent>
+              </Card>
+            )}
+          {!isOwnProfile &&
+            user.verificationStatus === "VERIFIED" &&
+            user.coachAvailability === "BUSY" && (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <span className="font-medium">Busy</span>
+                  </div>
+                  This coach is currently busy and not accepting new lesson requests.
+                </CardContent>
+              </Card>
+            )}
+          {!isOwnProfile &&
+            user.verificationStatus === "VERIFIED" &&
+            user.coachAvailability === "UNAVAILABLE" && (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   This coach is not currently taking students.

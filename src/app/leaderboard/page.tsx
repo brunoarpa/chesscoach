@@ -17,7 +17,7 @@ export default async function LeaderboardPage() {
       lessonsGiven: true,
       playersTaught: true,
       activityStatus: true,
-      coachingEnabled: true,
+      coachAvailability: true,
     },
   });
 
@@ -69,20 +69,12 @@ export default async function LeaderboardPage() {
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">
-                  {coach.coachingEnabled ? (
-                    <Badge
-                      variant={
-                        coach.activityStatus === "ACTIVE"
-                          ? "default"
-                          : coach.activityStatus === "AWAY"
-                          ? "secondary"
-                          : "outline"
-                      }
-                    >
-                      {coach.activityStatus}
-                    </Badge>
+                  {coach.coachAvailability === "AVAILABLE" ? (
+                    <Badge variant="default">Available</Badge>
+                  ) : coach.coachAvailability === "BUSY" ? (
+                    <Badge variant="destructive">Busy</Badge>
                   ) : (
-                    <Badge variant="outline">Not Coaching</Badge>
+                    <Badge variant="outline">Unavailable</Badge>
                   )}
                 </TableCell>
               </TableRow>

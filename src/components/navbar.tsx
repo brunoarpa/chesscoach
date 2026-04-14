@@ -18,6 +18,9 @@ export async function Navbar() {
           <Link href="/search" className="text-sm hover:underline">
             Find a Coach
           </Link>
+          <Link href="/how-it-works" className="text-sm hover:underline">
+            How It Works
+          </Link>
           <Link href="/leaderboard" className="text-sm hover:underline">
             Leaderboard
           </Link>

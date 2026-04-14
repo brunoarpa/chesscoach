@@ -12,6 +12,7 @@ interface SearchParams {
   maxPrice?: string;
   communication?: string;
   status?: string;
+  availability?: string;
 }
 
 export default async function SearchPage({
@@ -24,7 +25,7 @@ export default async function SearchPage({
   // Build where clause
   const where: Prisma.UserWhereInput = {
     verificationStatus: "VERIFIED",
-    coachingEnabled: true,
+    coachAvailability: { in: ["AVAILABLE", "BUSY"] },
   };
 
   if (params.q) {
@@ -57,6 +58,10 @@ export default async function SearchPage({
     where.activityStatus = params.status as "ACTIVE" | "AWAY" | "INACTIVE";
   }
 
+  if (params.availability && params.availability !== "all") {
+    where.coachAvailability = params.availability as "AVAILABLE" | "BUSY";
+  }
+
   // Build order by — always by total earnings
   type OrderBy = Prisma.UserOrderByWithRelationInput;
   const orderBy: OrderBy[] = [
@@ -77,7 +82,7 @@ export default async function SearchPage({
       communicationPreference: true,
       coachElo: true,
       activityStatus: true,
-      coachingEnabled: true,
+      coachAvailability: true,
       lastActiveAt: true,
       lessonsGiven: true,
       reviewsReceived: { select: { rating: true } },
@@ -117,7 +122,7 @@ export default async function SearchPage({
                     communicationPreference={coach.communicationPreference}
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
-                    coachingEnabled={coach.coachingEnabled}
+                    coachAvailability={coach.coachAvailability}
                     avgRating={avgRating}
                     reviewCount={coach.reviewsReceived.length}
                     lessonsGiven={coach.lessonsGiven}

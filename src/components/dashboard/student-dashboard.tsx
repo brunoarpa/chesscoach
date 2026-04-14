@@ -50,7 +50,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining }: { requests: 
     <div className="space-y-8">
       {freeTrialsRemaining > 0 && (
         <div className="p-3 rounded-lg border bg-muted/50 text-sm">
-          You have <span className="font-bold">{freeTrialsRemaining}</span> free trial{freeTrialsRemaining !== 1 ? "s" : ""} remaining.
+          You have <span className="font-bold">{freeTrialsRemaining}</span> free {freeTrialsRemaining !== 1 ? "trials" : "trial"} remaining.
           Visit a coach&apos;s profile to request one!
         </div>
       )}
@@ -115,6 +115,10 @@ export function StudentDashboard({ requests, freeTrialsRemaining }: { requests: 
       {requests.length === 0 && (
         <p className="text-muted-foreground text-center py-8">
           No lessons yet. Search for a coach to get started!
+          <br />
+          <a href="/how-it-works" className="underline text-sm mt-1 inline-block">
+            Not sure where to start? Learn how it works
+          </a>
         </p>
       )}
     </div>

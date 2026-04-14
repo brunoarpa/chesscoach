@@ -38,12 +38,15 @@ export async function createLessonRequest(formData: FormData) {
   // Check suspension
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { isSuspended: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true },
+    select: { isSuspended: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true, verificationStatus: true },
   });
 
   if (!currentUser) return { error: "User not found" };
   if (currentUser.isSuspended) {
     return { error: "Your account is under review. Contact support at chesscoach.training@gmail.com" };
+  }
+  if (currentUser.verificationStatus !== "VERIFIED") {
+    return { error: "You must verify your chess.com account before requesting lessons. Visit your profile to get started." };
   }
 
   // Get coach to calculate price
@@ -54,7 +57,7 @@ export async function createLessonRequest(formData: FormData) {
       gameReviewPrice: true,
       verificationStatus: true,
       activityStatus: true,
-      coachingEnabled: true,
+      coachAvailability: true,
     },
   });
 
@@ -62,8 +65,8 @@ export async function createLessonRequest(formData: FormData) {
   if (coach.verificationStatus !== "VERIFIED") {
     return { error: "Coach is not verified" };
   }
-  if (!coach.coachingEnabled) {
-    return { error: "This coach is not currently accepting students" };
+  if (coach.coachAvailability !== "AVAILABLE") {
+    return { error: coach.coachAvailability === "BUSY" ? "This coach is currently busy and not accepting new lesson requests" : "This coach is not currently accepting students" };
   }
 
   // Calculate cost
@@ -171,6 +174,11 @@ export async function respondToLessonRequest(
   if (request.status !== "PENDING") return { error: "Request is no longer pending" };
 
   if (action === "accept") {
+    // Auto-set coach to BUSY if currently AVAILABLE
+    const coach = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { coachAvailability: true },
+    });
     await prisma.$transaction([
       prisma.lessonRequest.update({
         where: { id: requestId },
@@ -178,7 +186,11 @@ export async function respondToLessonRequest(
       }),
       prisma.user.update({
         where: { id: session.user.id },
-        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+        data: {
+          lastActiveAt: new Date(),
+          activityStatus: "ACTIVE",
+          ...(coach?.coachAvailability === "AVAILABLE" ? { coachAvailability: "BUSY" } : {}),
+        },
       }),
     ]);
   } else {
@@ -348,6 +360,27 @@ export async function confirmLesson(requestId: string) {
         where: { id: request.coachId },
         data: { playersTaught: distinctStudents.length },
       });
+
+      // Auto-restore to AVAILABLE if coach was BUSY and has no more active lessons
+      const remainingActive = await tx.lessonRequest.count({
+        where: {
+          coachId: request.coachId,
+          status: "ACCEPTED",
+          id: { not: requestId },
+        },
+      });
+      if (remainingActive === 0) {
+        const coachUser = await tx.user.findUnique({
+          where: { id: request.coachId },
+          select: { coachAvailability: true },
+        });
+        if (coachUser?.coachAvailability === "BUSY") {
+          await tx.user.update({
+            where: { id: request.coachId },
+            data: { coachAvailability: "AVAILABLE" },
+          });
+        }
+      }
     } else {
       await tx.lessonRequest.update({
         where: { id: requestId },
@@ -427,6 +460,18 @@ export async function submitReview(formData: FormData) {
 
   // Determine who we're reviewing
   const toUserId = isStudent ? lesson.coachId : lesson.studentId;
+
+  // Only allow one review per user pair (across all lessons)
+  const existingReview = await prisma.review.findFirst({
+    where: {
+      fromUserId: session.user.id,
+      toUserId,
+      lessonId: { not: lessonId },
+    },
+  });
+  if (existingReview) {
+    return { error: "You have already reviewed this person. You can only leave one review per person." };
+  }
 
   // Upsert: create or update review
   await prisma.review.upsert({

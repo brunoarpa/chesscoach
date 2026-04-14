@@ -102,6 +102,7 @@ export function SearchFilters({ params }: Props) {
             name="minPrice"
             type="number"
             step="0.01"
+            min="0"
             placeholder="Min"
             defaultValue={params.minPrice}
           />
@@ -125,6 +126,30 @@ export function SearchFilters({ params }: Props) {
             <SelectItem value="any">Any</SelectItem>
             <SelectItem value="CHAT_ONLY">Chat Only</SelectItem>
             <SelectItem value="CHAT_AND_CALL">Chat & Call</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Availability</Label>
+        <Select name="availability" defaultValue={searchParams.get("availability") ?? ""}>
+          <SelectTrigger>
+            <SelectValue placeholder="All" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="AVAILABLE">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                Available
+              </span>
+            </SelectItem>
+            <SelectItem value="BUSY">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                Busy
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

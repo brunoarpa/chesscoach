@@ -38,7 +38,13 @@ const statusColors: Record<string, string> = {
   CANCELLED: "outline",
 };
 
-export function CoachDashboard({ requests }: { requests: Request[] }) {
+const availabilityConfig: Record<string, { color: string; label: string }> = {
+  AVAILABLE: { color: "bg-green-500", label: "Available" },
+  BUSY: { color: "bg-red-500", label: "Busy" },
+  UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
+};
+
+export function CoachDashboard({ requests, coachAvailability }: { requests: Request[]; coachAvailability: string }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
   const completed = requests.filter((r) => r.status === "COMPLETED");
@@ -48,6 +54,27 @@ export function CoachDashboard({ requests }: { requests: Request[] }) {
 
   return (
     <div className="space-y-8">
+      {/* Availability status banner */}
+      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+        coachAvailability === "AVAILABLE"
+          ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30"
+          : coachAvailability === "BUSY"
+          ? "border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/30"
+          : "border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-950/30"
+      }`}>
+        <span className={`w-3 h-3 rounded-full ${availabilityConfig[coachAvailability]?.color ?? "bg-gray-400"}`} />
+        <span className="text-sm font-medium">
+          {availabilityConfig[coachAvailability]?.label ?? "Unknown"}
+        </span>
+        <span className="text-sm text-muted-foreground">
+          {coachAvailability === "AVAILABLE"
+            ? "— You are accepting lesson requests"
+            : coachAvailability === "BUSY"
+            ? "— Students cannot send you new requests"
+            : "— Your profile is hidden from search"}
+        </span>
+      </div>
+
       {pending.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-4">Pending Requests</h2>
@@ -108,6 +135,10 @@ export function CoachDashboard({ requests }: { requests: Request[] }) {
       {requests.length === 0 && (
         <p className="text-muted-foreground text-center py-8">
           No lesson requests yet. Set your coaching prices in your profile to start receiving requests.
+          <br />
+          <a href="/how-it-works" className="underline text-sm mt-1 inline-block">
+            Not sure where to start? Learn how it works
+          </a>
         </p>
       )}
     </div>

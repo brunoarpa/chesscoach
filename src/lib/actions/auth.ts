@@ -97,7 +97,7 @@ export async function signup(formData: FormData) {
     redirect: false,
   });
 
-  redirect("/dashboard");
+  redirect("/how-it-works");
 }
 
 export async function login(_prevState: unknown, formData: FormData) {
@@ -144,7 +144,7 @@ export async function updateProfile(formData: FormData) {
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
     bio: (formData.get("bio") as string) || undefined,
-    coachingEnabled: formData.get("coachingEnabled") === "true",
+    coachAvailability: (formData.get("coachAvailability") as string) || "AVAILABLE",
   };
 
   await prisma.user.update({
@@ -159,7 +159,7 @@ export async function updateProfile(formData: FormData) {
         : null,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,
-      coachingEnabled: raw.coachingEnabled,
+      coachAvailability: raw.coachAvailability as "AVAILABLE" | "BUSY" | "UNAVAILABLE",
       lastActiveAt: new Date(),
       activityStatus: "ACTIVE",
     },

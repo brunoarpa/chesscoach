@@ -15,13 +15,15 @@ interface Props {
   gameReviewPrice: number | null;
   availableBalance: number;
   freeTrialsRemaining: number;
+  hasCompletedPaidLesson: boolean;
 }
 
-export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice, availableBalance, freeTrialsRemaining }: Props) {
+export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson }: Props) {
   const [type, setType] = useState<string>("");
   const [duration, setDuration] = useState("");
   const [loading, setLoading] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
+  const [warningDismissed, setWarningDismissed] = useState(false);
 
   const hasPricing = coachPricePerHour !== null || gameReviewPrice !== null;
 
@@ -140,6 +142,24 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
               {estimatedCost > availableBalance / 100 && " — Insufficient balance"}
             </p>
           ) : null}
+
+          {!isTrial && !hasCompletedPaidLesson && !warningDismissed && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30">
+              <span className="text-amber-600 dark:text-amber-400 mt-0.5">⚠️</span>
+              <div className="flex-1">
+                <p className="text-sm text-amber-800 dark:text-amber-300">
+                  This coach hasn&apos;t completed any paid lessons yet. They may be new to coaching on ChessCoach.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWarningDismissed(true)}
+                className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 text-sm font-medium"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <Button
             type="submit"

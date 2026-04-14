@@ -23,7 +23,7 @@ interface Props {
   gameReviewPrice?: number;
   communicationPreference: string;
   bio?: string;
-  coachingEnabled: boolean;
+  coachAvailability: string;
 }
 
 export function ProfileEditForm(props: Props) {
@@ -108,19 +108,35 @@ export function ProfileEditForm(props: Props) {
           <div className="space-y-2">
             <Label>Coaching Availability</Label>
             <Select
-              name="coachingEnabled"
-              defaultValue={props.coachingEnabled ? "true" : "false"}
+              name="coachAvailability"
+              defaultValue={props.coachAvailability}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">Available for coaching</SelectItem>
-                <SelectItem value="false">Not taking students</SelectItem>
+                <SelectItem value="AVAILABLE">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                    Available
+                  </span>
+                </SelectItem>
+                <SelectItem value="BUSY">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                    Busy
+                  </span>
+                </SelectItem>
+                <SelectItem value="UNAVAILABLE">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
+                    Unavailable
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              When disabled, your profile will show as unavailable and you won&apos;t receive lesson requests.
+              Available: accepting requests. Busy: visible but not accepting requests (auto-set during lessons). Unavailable: hidden from search.
             </p>
           </div>
 
