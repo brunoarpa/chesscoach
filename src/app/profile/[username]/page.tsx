@@ -217,7 +217,10 @@ export default async function ProfilePage({
         <div className="md:col-span-2 space-y-6">
           {user.bio && (
             <Card>
-              <CardContent className="pt-4">
+              <CardHeader>
+                <CardTitle>Bio</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <p className="whitespace-pre-line">{user.bio}</p>
               </CardContent>
             </Card>
@@ -325,7 +328,10 @@ export default async function ProfilePage({
         {/* Sidebar */}
         <div className="space-y-6">
           <Card>
-            <CardContent className="pt-4 space-y-2 text-sm">
+            <CardHeader>
+              <CardTitle>Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Website Age:</span>{" "}
                 {websiteAge} days
@@ -349,8 +355,8 @@ export default async function ProfilePage({
                 </div>
               )}
               <div>
-                <span className="text-muted-foreground">Status:</span>{" "}
-                {user.activityStatus}
+                <span className="text-muted-foreground">Last Seen:</span>{" "}
+                {formatLastSeen(user.lastActiveAt)}
               </div>
 
               {user.verificationStatus === "VERIFIED" && (

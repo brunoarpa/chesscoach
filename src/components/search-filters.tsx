@@ -160,6 +160,23 @@ export function SearchFilters({ params }: Props) {
         </Select>
       </div>
 
+      <div className="space-y-2">
+        <Label>Last Seen</Label>
+        <Select name="lastSeen" defaultValue={searchParams.get("lastSeen") ?? ""}>
+          <SelectTrigger>
+            <SelectValue placeholder="Any" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any</SelectItem>
+            <SelectItem value="online">Online</SelectItem>
+            <SelectItem value="1h">Last hour</SelectItem>
+            <SelectItem value="24h">Last 24 hours</SelectItem>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <Button type="submit" className="w-full">
         Apply Filters
       </Button>

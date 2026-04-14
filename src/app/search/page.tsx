@@ -13,6 +13,7 @@ interface SearchParams {
   communication?: string;
   status?: string;
   availability?: string;
+  lastSeen?: string;
 }
 
 export default async function SearchPage({
@@ -59,6 +60,21 @@ export default async function SearchPage({
 
   if (params.availability && params.availability !== "all") {
     where.coachAvailability = params.availability as "AVAILABLE" | "BUSY" | "UNAVAILABLE";
+  }
+
+  if (params.lastSeen && params.lastSeen !== "any") {
+    const now = Date.now();
+    const thresholds: Record<string, number> = {
+      online: 5 * 60 * 1000,
+      "1h": 60 * 60 * 1000,
+      "24h": 24 * 60 * 60 * 1000,
+      "7d": 7 * 24 * 60 * 60 * 1000,
+      "30d": 30 * 24 * 60 * 60 * 1000,
+    };
+    const ms = thresholds[params.lastSeen];
+    if (ms) {
+      where.lastActiveAt = { gte: new Date(now - ms) };
+    }
   }
 
   // Build order by — always by total earnings
@@ -122,6 +138,7 @@ export default async function SearchPage({
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
                     coachAvailability={coach.coachAvailability}
+                    lastActiveAt={coach.lastActiveAt}
                     avgRating={avgRating}
                     reviewCount={coach.reviewsReceived.length}
                     lessonsGiven={coach.lessonsGiven}
