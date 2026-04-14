@@ -13,9 +13,10 @@ interface Props {
   coachId: string;
   coachPricePerHour: number | null;
   gameReviewPrice: number | null;
+  availableBalance: number;
 }
 
-export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice }: Props) {
+export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice, availableBalance }: Props) {
   const [type, setType] = useState<string>("");
   const [duration, setDuration] = useState("");
   const [loading, setLoading] = useState(false);
@@ -105,13 +106,18 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice 
             />
           </div>
 
+          <p className="text-sm text-muted-foreground">
+            Your available balance: <span className="font-medium">${(availableBalance / 100).toFixed(2)}</span>
+          </p>
+
           {estimatedCost > 0 && (
-            <p className="text-sm font-medium">
+            <p className={`text-sm font-medium ${estimatedCost > availableBalance / 100 ? "text-destructive" : ""}`}>
               Estimated cost: ${estimatedCost.toFixed(2)}
+              {estimatedCost > availableBalance / 100 && " — Insufficient balance"}
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading || !type || !duration}>
+          <Button type="submit" className="w-full" disabled={loading || !type || !duration || (estimatedCost > 0 && estimatedCost > availableBalance / 100)}>
             {loading ? "Sending..." : "Send Request"}
           </Button>
         </form>

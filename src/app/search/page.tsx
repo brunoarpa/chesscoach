@@ -12,7 +12,6 @@ interface SearchParams {
   maxPrice?: string;
   communication?: string;
   status?: string;
-  sort?: string;
 }
 
 export default async function SearchPage({
@@ -58,20 +57,11 @@ export default async function SearchPage({
     where.activityStatus = params.status as "ACTIVE" | "AWAY" | "INACTIVE";
   }
 
-  // Build order by
+  // Build order by — always by total earnings
   type OrderBy = Prisma.UserOrderByWithRelationInput;
-  let orderBy: OrderBy[] = [
-    { activityStatus: "asc" }, // ACTIVE first (alphabetically: ACTIVE < AWAY < INACTIVE)
-    { coachElo: "desc" },
+  const orderBy: OrderBy[] = [
+    { totalEarningsAllTime: "desc" },
   ];
-
-  if (params.sort === "price_asc") {
-    orderBy = [{ coachPricePerHour: "asc" }];
-  } else if (params.sort === "price_desc") {
-    orderBy = [{ coachPricePerHour: "desc" }];
-  } else if (params.sort === "rating") {
-    orderBy = [{ chessRating: "desc" }];
-  }
 
   const coaches = await prisma.user.findMany({
     where,

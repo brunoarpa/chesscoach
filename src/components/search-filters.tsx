@@ -16,6 +16,8 @@ const continents = [
   { value: "OCEANIA", label: "Oceania" },
 ];
 
+const ratingOptions = Array.from({ length: 30 }, (_, i) => (i + 1) * 100); // 100 to 3000
+
 interface Props {
   params: Record<string, string | undefined>;
 }
@@ -27,7 +29,7 @@ export function SearchFilters({ params }: Props) {
   function applyFilters(formData: FormData) {
     const newParams = new URLSearchParams();
     for (const [key, value] of formData.entries()) {
-      if (value && value !== "") {
+      if (value && value !== "" && value !== "any") {
         newParams.set(key, value as string);
       }
     }
@@ -64,18 +66,32 @@ export function SearchFilters({ params }: Props) {
       <div className="space-y-2">
         <Label>Chess Rating</Label>
         <div className="flex gap-2">
-          <Input
-            name="minRating"
-            type="number"
-            placeholder="Min"
-            defaultValue={params.minRating}
-          />
-          <Input
-            name="maxRating"
-            type="number"
-            placeholder="Max"
-            defaultValue={params.maxRating}
-          />
+          <Select name="minRating" defaultValue={searchParams.get("minRating") ?? ""}>
+            <SelectTrigger>
+              <SelectValue placeholder="Min" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              {ratingOptions.map((r) => (
+                <SelectItem key={r} value={String(r)}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select name="maxRating" defaultValue={searchParams.get("maxRating") ?? ""}>
+            <SelectTrigger>
+              <SelectValue placeholder="Max" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              {ratingOptions.map((r) => (
+                <SelectItem key={r} value={String(r)}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -109,21 +125,6 @@ export function SearchFilters({ params }: Props) {
             <SelectItem value="any">Any</SelectItem>
             <SelectItem value="CHAT_ONLY">Chat Only</SelectItem>
             <SelectItem value="CHAT_AND_CALL">Chat & Call</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Sort By</Label>
-        <Select name="sort" defaultValue={searchParams.get("sort") ?? ""}>
-          <SelectTrigger>
-            <SelectValue placeholder="Coach ELO" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="elo">Coach ELO</SelectItem>
-            <SelectItem value="price_asc">Price (Low to High)</SelectItem>
-            <SelectItem value="price_desc">Price (High to Low)</SelectItem>
-            <SelectItem value="rating">Chess Rating</SelectItem>
           </SelectContent>
         </Select>
       </div>

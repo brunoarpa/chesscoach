@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { ReviewList } from "@/components/review-list";
 import { LessonRequestForm } from "@/components/lesson-request-form";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
+import { fetchChessComRating } from "@/lib/chess-com";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -84,6 +85,18 @@ export default async function ProfilePage({
 
   if (!user) notFound();
 
+  // Refresh chess.com rapid rating on profile view for verified users
+  if (user.verificationStatus === "VERIFIED" && user.chessComUsername) {
+    const freshRating = await fetchChessComRating(user.chessComUsername);
+    if (freshRating !== null && freshRating !== user.chessRating) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { chessRating: freshRating },
+      });
+      user.chessRating = freshRating;
+    }
+  }
+
   const session = await auth();
   const isOwnProfile = session?.user?.id === user.id;
 
@@ -117,6 +130,18 @@ export default async function ProfilePage({
     });
     for (const lesson of completedLessons) {
       studentTotals[lesson.studentId] = (studentTotals[lesson.studentId] || 0) + lesson.estimatedCost;
+    }
+  }
+
+  // Fetch student wallet balance for lesson request form
+  let studentAvailableBalance: number | null = null;
+  if (session?.user?.id && !isOwnProfile) {
+    const studentData = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { walletBalance: true, reservedBalance: true },
+    });
+    if (studentData) {
+      studentAvailableBalance = studentData.walletBalance - studentData.reservedBalance;
     }
   }
 
@@ -327,6 +352,7 @@ export default async function ProfilePage({
                 coachId={user.id}
                 coachPricePerHour={user.coachPricePerHour}
                 gameReviewPrice={user.gameReviewPrice}
+                availableBalance={studentAvailableBalance ?? 0}
               />
             )}
           {!isOwnProfile &&
