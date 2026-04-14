@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,9 +11,9 @@ import {
 import { updateCoachAvailability } from "@/lib/actions/auth";
 
 const statuses = [
-  { value: "AVAILABLE" as const, color: "bg-green-500", label: "Available" },
-  { value: "BUSY" as const, color: "bg-red-500", label: "Busy" },
-  { value: "UNAVAILABLE" as const, color: "bg-gray-400", label: "Unavailable" },
+  { value: "AVAILABLE" as const, label: "Available", badgeClass: "bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400" },
+  { value: "BUSY" as const, label: "Busy", badgeVariant: "destructive" as const },
+  { value: "UNAVAILABLE" as const, label: "Unavailable", badgeVariant: "secondary" as const },
 ];
 
 export function AvailabilityToggle({ initialStatus }: { initialStatus: string }) {
@@ -28,9 +28,13 @@ export function AvailabilityToggle({ initialStatus }: { initialStatus: string })
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title={`Status: ${current.label}`}>
-          <span className={`w-3 h-3 rounded-full ${current.color}`} />
-        </Button>
+        <button type="button" className="cursor-pointer" title={`Status: ${current.label}`}>
+          {"badgeClass" in current ? (
+            <Badge className={current.badgeClass}>{current.label}</Badge>
+          ) : (
+            <Badge variant={current.badgeVariant}>{current.label}</Badge>
+          )}
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {statuses.map((s) => (
@@ -39,8 +43,11 @@ export function AvailabilityToggle({ initialStatus }: { initialStatus: string })
             onClick={() => handleChange(s.value)}
             className={status === s.value ? "font-semibold" : ""}
           >
-            <span className={`w-2.5 h-2.5 rounded-full ${s.color} mr-2`} />
-            {s.label}
+            {"badgeClass" in s ? (
+              <Badge className={s.badgeClass}>{s.label}</Badge>
+            ) : (
+              <Badge variant={s.badgeVariant}>{s.label}</Badge>
+            )}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

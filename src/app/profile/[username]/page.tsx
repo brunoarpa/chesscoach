@@ -355,20 +355,6 @@ export default async function ProfilePage({
                 <span className="text-muted-foreground">Last Seen:</span>{" "}
                 {formatLastSeen(user.lastActiveAt)}
               </div>
-
-              {user.verificationStatus === "VERIFIED" && (
-                <div>
-                  <span className="text-muted-foreground">Coaching:</span>{" "}
-                  <span className={`font-semibold ${
-                    user.coachAvailability === "AVAILABLE" ? "text-green-500" :
-                    user.coachAvailability === "BUSY" ? "text-red-500" :
-                    "text-muted-foreground"
-                  }`}>
-                    {user.coachAvailability === "AVAILABLE" ? "Available" :
-                     user.coachAvailability === "BUSY" ? "Busy" : "Unavailable"}
-                  </span>
-                </div>
-              )}
             </CardContent>
           </Card>
 
