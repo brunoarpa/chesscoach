@@ -36,6 +36,7 @@ const statusColors: Record<string, string> = {
   EXPIRED: "outline",
   COMPLETED: "default",
   CANCELLED: "outline",
+  DISPUTED: "destructive",
 };
 
 const availabilityConfig: Record<string, { color: string; label: string }> = {
@@ -47,9 +48,10 @@ const availabilityConfig: Record<string, { color: string; label: string }> = {
 export function CoachDashboard({ requests, coachAvailability }: { requests: Request[]; coachAvailability: string }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
+  const disputed = requests.filter((r) => r.status === "DISPUTED");
   const completed = requests.filter((r) => r.status === "COMPLETED");
   const other = requests.filter(
-    (r) => !["PENDING", "ACCEPTED", "COMPLETED"].includes(r.status)
+    (r) => !["PENDING", "ACCEPTED", "COMPLETED", "DISPUTED"].includes(r.status)
   );
 
   return (
@@ -92,6 +94,32 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
           <div className="space-y-3">
             {accepted.map((r) => (
               <ActiveLessonCard key={r.id} request={r} role="coach" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {disputed.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Disputed</h2>
+          <div className="space-y-3">
+            {disputed.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">{r.student.username}</span>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
+                      </span>
+                    </div>
+                    <Badge variant="destructive">Disputed — Under Review</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    The student has raised a dispute. An admin will review and may contact you via email or Chess.com.
+                  </p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </section>

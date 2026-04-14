@@ -154,6 +154,7 @@ async function detectNonResponsiveCoaches() {
  */
 export async function detectConfirmationDisputes() {
   // Find ACCEPTED lessons where respondedAt + duration + 48h < now
+  // Exclude DISPUTED lessons — those are handled by admin
   const acceptedLessons = await prisma.lessonRequest.findMany({
     where: {
       status: "ACCEPTED",
@@ -207,12 +208,75 @@ export async function detectConfirmationDisputes() {
           relatedUserId: lesson.coachId,
         },
       });
+    } else if (coachConfirmed && !studentConfirmed) {
+      // Coach confirmed but student didn't respond within 48h — auto-complete
+      // (student silence = satisfaction)
+      const txOps = [
+        prisma.lessonRequest.update({
+          where: { id: lesson.id },
+          data: {
+            status: "COMPLETED",
+            studentConfirmed: true,
+            completedAt: new Date(),
+          },
+        }),
+        ...(lesson.isTrial
+          ? [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { lessonsTaken: { increment: 1 } },
+              }),
+              prisma.user.update({
+                where: { id: lesson.coachId },
+                data: { lessonsGiven: { increment: 1 } },
+              }),
+            ]
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: {
+                  walletBalance: { decrement: lesson.estimatedCost },
+                  reservedBalance: { decrement: lesson.estimatedCost },
+                  lessonsTaken: { increment: 1 },
+                },
+              }),
+              prisma.user.update({
+                where: { id: lesson.coachId },
+                data: {
+                  pendingEarnings: { increment: lesson.estimatedCost },
+                  totalEarningsAllTime: { increment: lesson.estimatedCost },
+                  lessonsGiven: { increment: 1 },
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.studentId,
+                  type: "LESSON_PAYMENT",
+                  amount: -lesson.estimatedCost,
+                  lessonRequestId: lesson.id,
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.coachId,
+                  type: "LESSON_PAYMENT",
+                  amount: lesson.estimatedCost,
+                  lessonRequestId: lesson.id,
+                },
+              }),
+              prisma.earningRecord.create({
+                data: {
+                  userId: lesson.coachId,
+                  amount: lesson.estimatedCost,
+                },
+              }),
+            ]),
+      ];
+      await prisma.$transaction(txOps);
     } else {
-      // One side confirmed but not the other — dispute
-      const confirmedBy = studentConfirmed ? "student" : "coach";
-      const notConfirmedBy = studentConfirmed ? "coach" : "student";
-      const flaggedUserId = studentConfirmed ? lesson.coachId : lesson.studentId;
-      const relatedUserId = studentConfirmed ? lesson.studentId : lesson.coachId;
+      // Student confirmed but coach didn't — expire and refund
+      const flaggedUserId = lesson.coachId;
+      const relatedUserId = lesson.studentId;
 
       // Expire and refund
       const txOps = [
@@ -236,7 +300,7 @@ export async function detectConfirmationDisputes() {
           userId: flaggedUserId,
           type: "ONE_SIDED_CONFIRMATION",
           severity: "MEDIUM",
-          details: `${confirmedBy} confirmed but ${notConfirmedBy} did not within 48h. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
+          details: `Student confirmed but coach did not within 48h. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
           relatedLessonId: lesson.id,
           relatedUserId,
         },

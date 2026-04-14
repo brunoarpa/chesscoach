@@ -38,12 +38,15 @@ export async function createLessonRequest(formData: FormData) {
   // Check suspension
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { isSuspended: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true, verificationStatus: true },
+    select: { isSuspended: true, hasActiveDispute: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true, verificationStatus: true },
   });
 
   if (!currentUser) return { error: "User not found" };
   if (currentUser.isSuspended) {
     return { error: "Your account is under review. Contact support at chesscoach.training@gmail.com" };
+  }
+  if (currentUser.hasActiveDispute) {
+    return { error: "You have an active lesson dispute. Please wait for admin resolution before requesting new lessons." };
   }
   if (currentUser.verificationStatus !== "VERIFIED") {
     return { error: "You must verify your chess.com account before requesting lessons. Visit your profile to get started." };
@@ -430,6 +433,58 @@ export async function cancelLessonRequest(requestId: string) {
 
   // Check for student spam pattern
   await checkStudentSpamPattern(request.studentId);
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function disputeLesson(requestId: string, reason: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  if (!requestId || typeof requestId !== "string") return { error: "Invalid request ID" };
+  if (!reason || reason.trim().length < 10) return { error: "Please provide a reason (at least 10 characters)" };
+  if (reason.length > 1000) return { error: "Reason must be under 1000 characters" };
+
+  const request = await prisma.lessonRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      student: { select: { username: true } },
+      coach: { select: { username: true } },
+    },
+  });
+
+  if (!request) return { error: "Request not found" };
+  if (request.studentId !== session.user.id) return { error: "Only the student can dispute a lesson" };
+  if (request.status !== "ACCEPTED") return { error: "Lesson must be active to dispute" };
+
+  await prisma.$transaction([
+    prisma.lessonRequest.update({
+      where: { id: requestId },
+      data: {
+        status: "DISPUTED",
+        disputeReason: reason.trim(),
+      },
+    }),
+    prisma.user.update({
+      where: { id: request.studentId },
+      data: {
+        hasActiveDispute: true,
+        lastActiveAt: new Date(),
+        activityStatus: "ACTIVE",
+      },
+    }),
+    prisma.abuseFlag.create({
+      data: {
+        userId: request.studentId,
+        type: "LESSON_DISPUTE",
+        severity: "HIGH",
+        details: `Student "${request.student.username}" disputed lesson with coach "${request.coach.username}". Reason: ${reason.trim()}`,
+        relatedLessonId: requestId,
+        relatedUserId: request.coachId,
+      },
+    }),
+  ]);
 
   revalidatePath("/dashboard");
   return { success: true };

@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   const currentUser = await prisma.user.update({
     where: { id: session.user.id },
     data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true },
   });
 
   const [incomingRequests, outgoingRequests] = await Promise.all([
@@ -63,10 +63,10 @@ export default async function DashboardPage() {
       <Tabs defaultValue="coach">
         <TabsList className="mb-6">
           <TabsTrigger value="coach">
-            Coach ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED").length})
+            Coach ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "DISPUTED").length})
           </TabsTrigger>
           <TabsTrigger value="student">
-            Student ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED").length})
+            Student ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "DISPUTED").length})
           </TabsTrigger>
         </TabsList>
 
@@ -81,6 +81,7 @@ export default async function DashboardPage() {
           <StudentDashboard
             requests={JSON.parse(JSON.stringify(outgoingRequests))}
             freeTrialsRemaining={currentUser.freeTrialsRemaining}
+            hasActiveDispute={currentUser.hasActiveDispute}
           />
         </TabsContent>
       </Tabs>

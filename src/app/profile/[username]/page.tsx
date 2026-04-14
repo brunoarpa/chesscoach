@@ -217,8 +217,8 @@ export default async function ProfilePage({
         <div className="md:col-span-2 space-y-6">
           {user.bio && (
             <Card>
-              <CardContent className="pt-6">
-                <p>{user.bio}</p>
+              <CardContent className="pt-4">
+                <p className="whitespace-pre-line">{user.bio}</p>
               </CardContent>
             </Card>
           )}
@@ -325,7 +325,7 @@ export default async function ProfilePage({
         {/* Sidebar */}
         <div className="space-y-6">
           <Card>
-            <CardContent className="pt-6 space-y-2 text-sm">
+            <CardContent className="pt-4 space-y-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Website Age:</span>{" "}
                 {websiteAge} days

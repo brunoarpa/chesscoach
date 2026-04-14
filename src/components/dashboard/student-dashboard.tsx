@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cancelLessonRequest, confirmLesson, submitReview } from "@/lib/actions/lessons";
+import { cancelLessonRequest, confirmLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -36,18 +36,29 @@ const statusColors: Record<string, string> = {
   EXPIRED: "outline",
   COMPLETED: "default",
   CANCELLED: "outline",
+  DISPUTED: "destructive",
 };
 
-export function StudentDashboard({ requests, freeTrialsRemaining }: { requests: Request[]; freeTrialsRemaining: number }) {
+export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispute }: { requests: Request[]; freeTrialsRemaining: number; hasActiveDispute: boolean }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
+  const disputed = requests.filter((r) => r.status === "DISPUTED");
   const completed = requests.filter((r) => r.status === "COMPLETED");
   const other = requests.filter(
-    (r) => !["PENDING", "ACCEPTED", "COMPLETED"].includes(r.status)
+    (r) => !["PENDING", "ACCEPTED", "COMPLETED", "DISPUTED"].includes(r.status)
   );
 
   return (
     <div className="space-y-8">
+      {hasActiveDispute && (
+        <div className="p-3 rounded-lg border border-destructive bg-destructive/10 text-sm">
+          <p className="font-medium text-destructive">You have an active lesson dispute.</p>
+          <p className="text-muted-foreground mt-1">
+            You cannot request new lessons until the dispute is resolved. An admin will review and contact you via email or Chess.com.
+          </p>
+        </div>
+      )}
+
       {freeTrialsRemaining > 0 && (
         <div className="p-3 rounded-lg border bg-muted/50 text-sm">
           You have <span className="font-bold">{freeTrialsRemaining}</span> free {freeTrialsRemaining !== 1 ? "trials" : "trial"} remaining.
@@ -72,6 +83,32 @@ export function StudentDashboard({ requests, freeTrialsRemaining }: { requests: 
           <div className="space-y-3">
             {accepted.map((r) => (
               <ActiveCard key={r.id} request={r} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {disputed.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Disputed</h2>
+          <div className="space-y-3">
+            {disputed.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">{r.coach.username}</span>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
+                      </span>
+                    </div>
+                    <Badge variant="destructive">Disputed — Awaiting Admin Review</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    An admin will review this dispute and contact you via email or Chess.com.
+                  </p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </section>
@@ -161,6 +198,8 @@ function PendingCard({ request }: { request: Request }) {
 
 function ActiveCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
 
   async function handleConfirm() {
     setLoading(true);
@@ -168,6 +207,18 @@ function ActiveCard({ request }: { request: Request }) {
     setLoading(false);
     if (result.error) toast.error(result.error);
     else toast.success("Confirmed!");
+  }
+
+  async function handleDispute() {
+    if (disputeReason.trim().length < 10) {
+      toast.error("Please provide a reason (at least 10 characters)");
+      return;
+    }
+    setLoading(true);
+    const result = await disputeLesson(request.id, disputeReason.trim());
+    setLoading(false);
+    if (result.error) toast.error(result.error);
+    else toast.success("Dispute submitted. An admin will review and contact you via email or Chess.com.");
   }
 
   return (
@@ -192,11 +243,32 @@ function ActiveCard({ request }: { request: Request }) {
             </div>
           </div>
           {!request.studentConfirmed && (
-            <Button size="sm" onClick={handleConfirm} disabled={loading}>
-              Mark Complete
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handleConfirm} disabled={loading}>
+                Confirm & Pay
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setShowDispute(!showDispute)} disabled={loading}>
+                Dispute
+              </Button>
+            </div>
           )}
         </div>
+        {showDispute && (
+          <div className="mt-4 space-y-3 border-t pt-4">
+            <p className="text-sm text-muted-foreground">
+              If the lesson was unsatisfactory, describe what went wrong. An admin will review your dispute and contact both parties via email or Chess.com.
+            </p>
+            <Textarea
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              placeholder="Describe the issue (at least 10 characters)..."
+              maxLength={1000}
+            />
+            <Button size="sm" variant="destructive" onClick={handleDispute} disabled={loading || disputeReason.trim().length < 10}>
+              Submit Dispute
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -57,6 +57,7 @@ enum LessonRequestStatus {
   EXPIRED
   COMPLETED
   CANCELLED
+  DISPUTED
 }
 
 enum TransactionType {
@@ -79,6 +80,7 @@ enum AbuseFlagType {
   COACH_NON_RESPONSIVE
   STUDENT_SPAM
   MULTI_ACCOUNT_SUSPECTED
+  LESSON_DISPUTE
 }
 
 enum AbuseFlagSeverity {
@@ -129,6 +131,9 @@ model User {
 
   // Suspension
   isSuspended Boolean @default(false)
+
+  // Disputes
+  hasActiveDispute Boolean @default(false)
 
   // Signup IP (for multi-account detection)
   signupIp String?
@@ -205,6 +210,7 @@ model LessonRequest {
   status          LessonRequestStatus @default(PENDING)
   studentConfirmed Boolean @default(false)
   coachConfirmed   Boolean @default(false)
+  disputeReason    String?
   
   createdAt   DateTime  @default(now())
   respondedAt DateTime?

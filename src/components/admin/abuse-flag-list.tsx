@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { resolveAbuseFlag, suspendUser, banUser } from "@/lib/actions/admin";
+import { resolveAbuseFlag, suspendUser, banUser, resolveDispute } from "@/lib/actions/admin";
 import { toast } from "sonner";
 
 interface AbuseFlag {
@@ -36,6 +36,7 @@ const typeLabels: Record<string, string> = {
   COACH_NON_RESPONSIVE: "Coach Non-Responsive",
   STUDENT_SPAM: "Student Spam",
   MULTI_ACCOUNT_SUSPECTED: "Multi-Account Suspected",
+  LESSON_DISPUTE: "Lesson Dispute",
 };
 
 export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
@@ -45,6 +46,19 @@ export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
       toast.success("Flag resolved");
     } catch {
       toast.error("Failed to resolve flag");
+    }
+  }
+
+  async function handleDisputeResolution(lessonId: string, resolution: "refund" | "pay_coach") {
+    const msg = resolution === "refund"
+      ? "Refund the student and cancel this lesson?"
+      : "Pay the coach and complete this lesson?";
+    if (!confirm(msg)) return;
+    try {
+      await resolveDispute(lessonId, resolution);
+      toast.success(resolution === "refund" ? "Student refunded, dispute resolved" : "Coach paid, dispute resolved");
+    } catch {
+      toast.error("Failed to resolve dispute");
     }
   }
 
@@ -110,9 +124,20 @@ export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
                 </p>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                <Button size="sm" variant="outline" onClick={() => handleResolve(flag.id)}>
-                  Resolve
-                </Button>
+                {flag.type === "LESSON_DISPUTE" && flag.relatedLesson ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => handleDisputeResolution(flag.relatedLesson!.id, "refund")}>
+                      Refund Student
+                    </Button>
+                    <Button size="sm" variant="default" onClick={() => handleDisputeResolution(flag.relatedLesson!.id, "pay_coach")}>
+                      Pay Coach
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => handleResolve(flag.id)}>
+                    Resolve
+                  </Button>
+                )}
                 <Button size="sm" variant="secondary" onClick={() => handleSuspend(flag.user.id)}>
                   Suspend
                 </Button>
