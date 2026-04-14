@@ -21,6 +21,7 @@ interface Request {
   durationMinutes: number;
   estimatedCost: number;
   status: string;
+  isTrial: boolean;
   studentConfirmed: boolean;
   coachConfirmed: boolean;
   createdAt: string;
@@ -90,8 +91,9 @@ export function CoachDashboard({ requests }: { requests: Request[] }) {
                   <div>
                     <span className="font-medium">{r.student.username}</span>
                     <span className="text-sm text-muted-foreground ml-2">
-                      {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · ${(r.estimatedCost / 100).toFixed(2)}
+                      {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
                     </span>
+                    {r.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
                   </div>
                   <Badge variant={statusColors[r.status] as "default" | "secondary" | "destructive" | "outline"}>
                     {r.status}
@@ -130,8 +132,9 @@ function PendingRequestCard({ request }: { request: Request }) {
           <div>
             <span className="font-medium">{request.student.username}</span>
             <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
+              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
             </span>
+            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={() => handleRespond("accept")} disabled={loading}>
@@ -168,8 +171,9 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
           <div>
             <span className="font-medium">{otherUser.username}</span>
             <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
+              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
             </span>
+            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
             {otherUser.chessComUsername && (
               <div className="text-sm font-medium text-blue-600 mt-1">
                 Chess.com: {otherUser.chessComUsername}
@@ -216,8 +220,9 @@ function CompletedCard({ request, otherUser }: { request: Request; otherUser: { 
           <div>
             <span className="font-medium">{otherUser.username}</span>
             <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
+              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
             </span>
+            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
           </div>
           <div className="flex items-center gap-2">
             <Badge>Completed</Badge>

@@ -9,10 +9,11 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  // Update activity
-  await prisma.user.update({
+  // Update activity and fetch user data
+  const currentUser = await prisma.user.update({
     where: { id: session.user.id },
     data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+    select: { isSuspended: true, freeTrialsRemaining: true },
   });
 
   const [incomingRequests, outgoingRequests] = await Promise.all([
@@ -46,6 +47,19 @@ export default async function DashboardPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
+      {currentUser.isSuspended && (
+        <div className="mb-6 p-4 rounded-lg border border-destructive bg-destructive/10 text-destructive">
+          <p className="font-medium">Your account is under review.</p>
+          <p className="text-sm mt-1">
+            You cannot create new lesson requests or make deposits while your account is being reviewed.
+            Contact support at{" "}
+            <a href="mailto:chesscoach.training@gmail.com" className="underline font-medium">
+              chesscoach.training@gmail.com
+            </a>
+          </p>
+        </div>
+      )}
+
       <Tabs defaultValue="coach">
         <TabsList className="mb-6">
           <TabsTrigger value="coach">
@@ -61,7 +75,10 @@ export default async function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="student">
-          <StudentDashboard requests={JSON.parse(JSON.stringify(outgoingRequests))} />
+          <StudentDashboard
+            requests={JSON.parse(JSON.stringify(outgoingRequests))}
+            freeTrialsRemaining={currentUser.freeTrialsRemaining}
+          />
         </TabsContent>
       </Tabs>
     </div>

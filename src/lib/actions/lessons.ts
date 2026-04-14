@@ -4,11 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { headers } from "next/headers";
+import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
   type: z.enum(["GAME_REVIEW", "LESSON"]),
   durationMinutes: z.coerce.number().int().min(5).max(480),
+  isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
 });
 
 export async function createLessonRequest(formData: FormData) {
@@ -19,16 +22,28 @@ export async function createLessonRequest(formData: FormData) {
     coachId: formData.get("coachId"),
     type: formData.get("type"),
     durationMinutes: formData.get("durationMinutes"),
+    isTrial: formData.get("isTrial") ?? "false",
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { coachId, type, durationMinutes } = parsed.data;
+  const { coachId, type, durationMinutes, isTrial } = parsed.data;
 
   if (coachId === session.user.id) {
     return { error: "You cannot request a lesson from yourself" };
+  }
+
+  // Check suspension
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { isSuspended: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true },
+  });
+
+  if (!currentUser) return { error: "User not found" };
+  if (currentUser.isSuspended) {
+    return { error: "Your account is under review. Contact support at chesscoach.training@gmail.com" };
   }
 
   // Get coach to calculate price
@@ -53,7 +68,34 @@ export async function createLessonRequest(formData: FormData) {
 
   // Calculate cost
   let estimatedCost: number;
-  if (type === "GAME_REVIEW") {
+  if (isTrial) {
+    // Free trial: no cost
+    if (currentUser.freeTrialsRemaining <= 0) {
+      return { error: "You have no free trials remaining" };
+    }
+
+    // Rate limit: max 1 free trial request per hour
+    const h = await headers();
+    const ip = getClientIpFromHeaders(h);
+    const { success: rlSuccess } = await rateLimit(`free-trial:${ip}`, { maxAttempts: 1, windowMs: 60 * 60 * 1000 });
+    if (!rlSuccess) {
+      return { error: "You can only request one free trial per hour. Please try again later." };
+    }
+
+    // Only allow 1 pending free trial at a time
+    const pendingFreeTrial = await prisma.lessonRequest.findFirst({
+      where: {
+        studentId: session.user.id,
+        isTrial: true,
+        status: "PENDING",
+      },
+    });
+    if (pendingFreeTrial) {
+      return { error: "You already have a pending free trial request. Wait for it to be accepted or declined first." };
+    }
+
+    estimatedCost = 0;
+  } else if (type === "GAME_REVIEW") {
     if (!coach.gameReviewPrice) return { error: "Coach doesn't offer game reviews" };
     const reviewCount = Math.ceil(durationMinutes / 5);
     estimatedCost = coach.gameReviewPrice * reviewCount;
@@ -62,17 +104,12 @@ export async function createLessonRequest(formData: FormData) {
     estimatedCost = Math.round((coach.coachPricePerHour * durationMinutes) / 60);
   }
 
-  // Check student wallet
-  const student = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { walletBalance: true, reservedBalance: true },
-  });
-
-  if (!student) return { error: "User not found" };
-
-  const available = student.walletBalance - student.reservedBalance;
-  if (available < estimatedCost) {
-    return { error: `Insufficient balance. You need $${(estimatedCost / 100).toFixed(2)} but only have $${(available / 100).toFixed(2)} available.` };
+  // Check student wallet (skip for free trials)
+  if (!isTrial) {
+    const available = currentUser.walletBalance - currentUser.reservedBalance;
+    if (available < estimatedCost) {
+      return { error: `Insufficient balance. You need $${(estimatedCost / 100).toFixed(2)} but only have $${(available / 100).toFixed(2)} available.` };
+    }
   }
 
   // Prevent duplicate pending requests for the same coach
@@ -87,8 +124,8 @@ export async function createLessonRequest(formData: FormData) {
     return { error: "You already have a pending request with this coach" };
   }
 
-  // Create request and reserve funds
-  await prisma.$transaction([
+  // Create request and reserve funds (or decrement free trial)
+  const txOps = [
     prisma.lessonRequest.create({
       data: {
         studentId: session.user.id,
@@ -96,17 +133,22 @@ export async function createLessonRequest(formData: FormData) {
         type,
         durationMinutes,
         estimatedCost,
+        isTrial,
       },
     }),
     prisma.user.update({
       where: { id: session.user.id },
       data: {
-        reservedBalance: { increment: estimatedCost },
+        ...(isTrial
+          ? { freeTrialsRemaining: { decrement: 1 } }
+          : { reservedBalance: { increment: estimatedCost } }),
         lastActiveAt: new Date(),
         activityStatus: "ACTIVE",
       },
     }),
-  ]);
+  ];
+
+  await prisma.$transaction(txOps);
 
   revalidatePath("/dashboard");
   return { success: true };
@@ -140,21 +182,29 @@ export async function respondToLessonRequest(
       }),
     ]);
   } else {
-    // Decline: release reserved funds
-    await prisma.$transaction([
+    // Decline: release reserved funds (skip for free trials — no balance reserved)
+    const txOps = [
       prisma.lessonRequest.update({
         where: { id: requestId },
         data: { status: "DECLINED", respondedAt: new Date() },
       }),
-      prisma.user.update({
-        where: { id: request.studentId },
-        data: { reservedBalance: { decrement: request.estimatedCost } },
-      }),
+      ...(request.isTrial
+        ? []
+        : [
+            prisma.user.update({
+              where: { id: request.studentId },
+              data: { reservedBalance: { decrement: request.estimatedCost } },
+            }),
+          ]),
       prisma.user.update({
         where: { id: session.user.id },
         data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
       }),
-    ]);
+    ];
+    await prisma.$transaction(txOps);
+
+    // Check for student spam pattern: 5+ declined/cancelled in 7 days
+    await checkStudentSpamPattern(request.studentId);
   }
 
   revalidatePath("/dashboard");
@@ -180,6 +230,7 @@ export async function confirmLesson(requestId: string) {
       estimatedCost: number;
       respondedAt: Date | null;
       durationMinutes: number;
+      isTrial: boolean;
     }>>`SELECT * FROM "LessonRequest" WHERE id = ${requestId} FOR UPDATE`;
 
     const request = rows[0];
@@ -209,7 +260,7 @@ export async function confirmLesson(requestId: string) {
     const bothConfirmed = newStudentConfirmed && newCoachConfirmed;
 
     if (bothConfirmed) {
-      // Complete the lesson: transfer money (all within the same transaction)
+      // Complete the lesson
       await tx.lessonRequest.update({
         where: { id: requestId },
         data: {
@@ -218,52 +269,74 @@ export async function confirmLesson(requestId: string) {
           completedAt: new Date(),
         },
       });
-      // Debit student
-      await tx.user.update({
-        where: { id: request.studentId },
-        data: {
-          walletBalance: { decrement: request.estimatedCost },
-          reservedBalance: { decrement: request.estimatedCost },
-          lessonsTaken: { increment: 1 },
-          lastActiveAt: new Date(),
-          activityStatus: "ACTIVE",
-        },
-      });
-      // Credit coach
-      await tx.user.update({
-        where: { id: request.coachId },
-        data: {
-          pendingEarnings: { increment: request.estimatedCost },
-          totalEarningsAllTime: { increment: request.estimatedCost },
-          lessonsGiven: { increment: 1 },
-          lastActiveAt: new Date(),
-          activityStatus: "ACTIVE",
-        },
-      });
-      // Record transactions
-      await tx.transaction.create({
-        data: {
-          userId: request.studentId,
-          type: "LESSON_PAYMENT",
-          amount: -request.estimatedCost,
-          lessonRequestId: requestId,
-        },
-      });
-      await tx.transaction.create({
-        data: {
-          userId: request.coachId,
-          type: "LESSON_PAYMENT",
-          amount: request.estimatedCost,
-          lessonRequestId: requestId,
-        },
-      });
-      // Record earning for ELO
-      await tx.earningRecord.create({
-        data: {
-          userId: request.coachId,
-          amount: request.estimatedCost,
-        },
-      });
+
+      if (request.isTrial) {
+        // Free trial: no money transfer, just update stats
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: {
+            lessonsTaken: { increment: 1 },
+            lastActiveAt: new Date(),
+            activityStatus: "ACTIVE",
+          },
+        });
+        await tx.user.update({
+          where: { id: request.coachId },
+          data: {
+            lessonsGiven: { increment: 1 },
+            lastActiveAt: new Date(),
+            activityStatus: "ACTIVE",
+          },
+        });
+      } else {
+        // Paid lesson: transfer money
+        // Debit student
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: {
+            walletBalance: { decrement: request.estimatedCost },
+            reservedBalance: { decrement: request.estimatedCost },
+            lessonsTaken: { increment: 1 },
+            lastActiveAt: new Date(),
+            activityStatus: "ACTIVE",
+          },
+        });
+        // Credit coach
+        await tx.user.update({
+          where: { id: request.coachId },
+          data: {
+            pendingEarnings: { increment: request.estimatedCost },
+            totalEarningsAllTime: { increment: request.estimatedCost },
+            lessonsGiven: { increment: 1 },
+            lastActiveAt: new Date(),
+            activityStatus: "ACTIVE",
+          },
+        });
+        // Record transactions
+        await tx.transaction.create({
+          data: {
+            userId: request.studentId,
+            type: "LESSON_PAYMENT",
+            amount: -request.estimatedCost,
+            lessonRequestId: requestId,
+          },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: request.coachId,
+            type: "LESSON_PAYMENT",
+            amount: request.estimatedCost,
+            lessonRequestId: requestId,
+          },
+        });
+        // Record earning for ELO
+        await tx.earningRecord.create({
+          data: {
+            userId: request.coachId,
+            amount: request.estimatedCost,
+          },
+        });
+      }
 
       // Update players taught count (distinct students) inside transaction
       const distinctStudents = await tx.lessonRequest.findMany({
@@ -305,16 +378,25 @@ export async function cancelLessonRequest(requestId: string) {
   if (request.studentId !== session.user.id) return { error: "Not authorized" };
   if (request.status !== "PENDING") return { error: "Can only cancel pending requests" };
 
-  await prisma.$transaction([
+  const txOps = [
     prisma.lessonRequest.update({
       where: { id: requestId },
       data: { status: "CANCELLED" },
     }),
-    prisma.user.update({
-      where: { id: request.studentId },
-      data: { reservedBalance: { decrement: request.estimatedCost } },
-    }),
-  ]);
+    ...(request.isTrial
+      ? []
+      : [
+          prisma.user.update({
+            where: { id: request.studentId },
+            data: { reservedBalance: { decrement: request.estimatedCost } },
+          }),
+        ]),
+  ];
+
+  await prisma.$transaction(txOps);
+
+  // Check for student spam pattern
+  await checkStudentSpamPattern(request.studentId);
 
   revalidatePath("/dashboard");
   return { success: true };
@@ -365,4 +447,42 @@ export async function submitReview(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath(`/profile`);
   return { success: true };
+}
+
+/**
+ * Check if a student has a suspicious pattern of declined/cancelled requests.
+ * 5+ in 7 days triggers an abuse flag.
+ */
+async function checkStudentSpamPattern(studentId: string) {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const recentDeclinedCancelled = await prisma.lessonRequest.count({
+    where: {
+      studentId,
+      status: { in: ["DECLINED", "CANCELLED"] },
+      createdAt: { gte: sevenDaysAgo },
+    },
+  });
+
+  if (recentDeclinedCancelled >= 5) {
+    // Check if we already flagged this recently (avoid duplicate flags)
+    const recentFlag = await prisma.abuseFlag.findFirst({
+      where: {
+        userId: studentId,
+        type: "STUDENT_SPAM",
+        createdAt: { gte: sevenDaysAgo },
+      },
+    });
+
+    if (!recentFlag) {
+      await prisma.abuseFlag.create({
+        data: {
+          userId: studentId,
+          type: "STUDENT_SPAM",
+          severity: "MEDIUM",
+          details: `${recentDeclinedCancelled} declined/cancelled lesson requests in the last 7 days.`,
+        },
+      });
+    }
+  }
 }

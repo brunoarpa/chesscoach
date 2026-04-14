@@ -16,7 +16,7 @@ async function getClientIp() {
 
 export async function signup(formData: FormData) {
   const ip = await getClientIp();
-  const { success } = rateLimit(`signup:${ip}`, { maxAttempts: 5, windowMs: 15 * 60 * 1000 });
+  const { success } = await rateLimit(`signup:${ip}`, { maxAttempts: 5, windowMs: 15 * 60 * 1000 });
   if (!success) {
     return { error: "Too many signup attempts. Please try again later." };
   }
@@ -58,8 +58,37 @@ export async function signup(formData: FormData) {
       passwordHash,
       email: email || null,
       continent: continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
+      signupIp: ip,
     },
   });
+
+  // Check for other accounts from same IP (created in last 7 days)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const sameIpAccounts = await prisma.user.findMany({
+    where: {
+      signupIp: ip,
+      username: { not: username },
+      createdAt: { gte: sevenDaysAgo },
+    },
+    select: { id: true, username: true },
+  });
+
+  if (sameIpAccounts.length > 0) {
+    const newUser = await prisma.user.findUnique({ where: { username }, select: { id: true } });
+    if (newUser) {
+      for (const otherAccount of sameIpAccounts) {
+        await prisma.abuseFlag.create({
+          data: {
+            userId: newUser.id,
+            type: "MULTI_ACCOUNT_SUSPECTED",
+            severity: "MEDIUM",
+            details: `Multiple accounts created from same IP (${ip}) within 7 days. Other account: ${otherAccount.username}`,
+            relatedUserId: otherAccount.id,
+          },
+        });
+      }
+    }
+  }
 
   // Auto sign in after signup
   await signIn("credentials", {
@@ -80,7 +109,7 @@ export async function login(_prevState: unknown, formData: FormData) {
   }
 
   const ip = await getClientIp();
-  const { success } = rateLimit(`login:${ip}`, { maxAttempts: 10, windowMs: 15 * 60 * 1000 });
+  const { success } = await rateLimit(`login:${ip}`, { maxAttempts: 10, windowMs: 15 * 60 * 1000 });
   if (!success) {
     return { error: "Too many login attempts. Please try again later." };
   }

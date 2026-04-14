@@ -66,6 +66,21 @@ enum PayoutStatus {
   FAILED
 }
 
+enum AbuseFlagType {
+  DUPLICATE_CARD
+  CONFIRMATION_TIMEOUT
+  ONE_SIDED_CONFIRMATION
+  COACH_NON_RESPONSIVE
+  STUDENT_SPAM
+  MULTI_ACCOUNT_SUSPECTED
+}
+
+enum AbuseFlagSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model User {
   id            String   @id @default(cuid())
   username      String   @unique
@@ -103,6 +118,15 @@ model User {
   // Coaching availability
   coachingEnabled Boolean @default(true)
 
+  // Free trials
+  freeTrialsRemaining Int @default(3)
+
+  // Suspension
+  isSuspended Boolean @default(false)
+
+  // Signup IP (for multi-account detection)
+  signupIp String?
+
   // Activity
   lastActiveAt   DateTime @default(now())
   activityStatus ActivityStatus @default(ACTIVE)
@@ -126,6 +150,9 @@ model User {
   transactions      Transaction[]
   payouts           Payout[]
   earningRecords    EarningRecord[]
+  cardFingerprints  CardFingerprint[]
+  abuseFlags        AbuseFlag[]     @relation("FlaggedUser")
+  abuseFlagsRelated AbuseFlag[]     @relation("RelatedUser")
 
   @@index([coachElo(sort: Desc)])
   @@index([activityStatus])
@@ -167,6 +194,7 @@ model LessonRequest {
   type            LessonType
   durationMinutes Int
   estimatedCost   Int       // cents
+  isTrial         Boolean   @default(false)
   
   status          LessonRequestStatus @default(PENDING)
   studentConfirmed Boolean @default(false)
@@ -178,6 +206,7 @@ model LessonRequest {
   
   reviews Review[]
   transactions Transaction[]
+  abuseFlags AbuseFlag[]
   
   @@index([studentId])
   @@index([coachId])
@@ -247,4 +276,48 @@ model AuditLog {
   @@index([adminId])
   @@index([targetId])
   @@index([createdAt])
+}
+
+model CardFingerprint {
+  id          String   @id @default(cuid())
+  fingerprint String   // Stripe card fingerprint
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  last4       String?
+  brand       String?
+  firstSeenAt DateTime @default(now())
+
+  @@unique([fingerprint, userId])
+  @@index([fingerprint])
+  @@index([userId])
+}
+
+model AbuseFlag {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation("FlaggedUser", fields: [userId], references: [id])
+  type            AbuseFlagType
+  severity        AbuseFlagSeverity
+  details         String
+  relatedLessonId String?
+  relatedLesson   LessonRequest?    @relation(fields: [relatedLessonId], references: [id])
+  relatedUserId   String?
+  relatedUser     User?             @relation("RelatedUser", fields: [relatedUserId], references: [id])
+  resolved        Boolean           @default(false)
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@index([userId])
+  @@index([resolved])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model RateLimitEntry {
+  key       String   @id
+  count     Int      @default(1)
+  resetAt   DateTime
+
+  @@index([resetAt])
 }

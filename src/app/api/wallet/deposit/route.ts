@@ -8,6 +8,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // Check suspension
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { isSuspended: true },
+  });
+  if (user?.isSuspended) {
+    return NextResponse.json(
+      { error: "Your account is under review. Contact support at chesscoach.training@gmail.com" },
+      { status: 403 }
+    );
+  }
+
   const { amount } = await request.json();
 
   if (!amount || amount < 500) {

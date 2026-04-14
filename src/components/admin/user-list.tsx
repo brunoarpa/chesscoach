@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { banUser, setUserRole } from "@/lib/actions/admin";
+import { banUser, setUserRole, suspendUser, unsuspendUser } from "@/lib/actions/admin";
 import { toast } from "sonner";
 
 interface User {
@@ -13,12 +13,14 @@ interface User {
   role: string;
   verificationStatus: string;
   activityStatus: string;
+  isSuspended: boolean;
   walletBalance: number;
   totalEarningsAllTime: number;
   createdAt: string;
+  _count: { abuseFlags: number };
 }
 
-export function UserList({ users }: { users: User[] }) {
+export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAccountsMap: Record<string, number> }) {
   async function handleBan(userId: string) {
     if (!confirm("Are you sure you want to ban this user? This action cannot be easily undone.")) return;
     try {
@@ -40,6 +42,21 @@ export function UserList({ users }: { users: User[] }) {
     }
   }
 
+  async function handleToggleSuspend(userId: string, isSuspended: boolean) {
+    const action = isSuspended ? "unsuspend" : "suspend";
+    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+    try {
+      if (isSuspended) {
+        await unsuspendUser(userId);
+      } else {
+        await suspendUser(userId);
+      }
+      toast.success(isSuspended ? "User unsuspended" : "User suspended");
+    } catch {
+      toast.error("Failed");
+    }
+  }
+
   return (
     <Table>
       <TableHeader>
@@ -49,6 +66,7 @@ export function UserList({ users }: { users: User[] }) {
           <TableHead>Role</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Verification</TableHead>
+          <TableHead>Flags</TableHead>
           <TableHead className="text-right">Balance</TableHead>
           <TableHead className="text-right">Total Earned</TableHead>
           <TableHead>Actions</TableHead>
@@ -67,17 +85,22 @@ export function UserList({ users }: { users: User[] }) {
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge
-                variant={
-                  user.activityStatus === "ACTIVE"
-                    ? "default"
-                    : user.activityStatus === "AWAY"
-                    ? "secondary"
-                    : "outline"
-                }
-              >
-                {user.activityStatus}
-              </Badge>
+              <div className="flex gap-1 flex-wrap">
+                <Badge
+                  variant={
+                    user.activityStatus === "ACTIVE"
+                      ? "default"
+                      : user.activityStatus === "AWAY"
+                      ? "secondary"
+                      : "outline"
+                  }
+                >
+                  {user.activityStatus}
+                </Badge>
+                {user.isSuspended && (
+                  <Badge variant="destructive">SUSPENDED</Badge>
+                )}
+              </div>
             </TableCell>
             <TableCell>
               <Badge
@@ -91,6 +114,16 @@ export function UserList({ users }: { users: User[] }) {
               >
                 {user.verificationStatus}
               </Badge>
+            </TableCell>
+            <TableCell>
+              <div className="flex gap-1 flex-wrap">
+                {user._count.abuseFlags > 0 && (
+                  <Badge variant="destructive">{user._count.abuseFlags} flag{user._count.abuseFlags !== 1 ? "s" : ""}</Badge>
+                )}
+                {linkedAccountsMap[user.id] > 0 && (
+                  <Badge variant="secondary">{linkedAccountsMap[user.id]} linked</Badge>
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-right font-mono">
               ${(user.walletBalance / 100).toFixed(2)}
@@ -106,6 +139,13 @@ export function UserList({ users }: { users: User[] }) {
                   onClick={() => handleToggleAdmin(user.id, user.role)}
                 >
                   {user.role === "ADMIN" ? "Demote" : "Promote"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={user.isSuspended ? "default" : "secondary"}
+                  onClick={() => handleToggleSuspend(user.id, user.isSuspended)}
+                >
+                  {user.isSuspended ? "Unsuspend" : "Suspend"}
                 </Button>
                 <Button
                   size="sm"

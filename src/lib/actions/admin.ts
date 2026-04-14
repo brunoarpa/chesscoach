@@ -106,3 +106,50 @@ export async function setUserRole(userId: string, role: "USER" | "ADMIN") {
 
   revalidatePath("/admin");
 }
+
+export async function suspendUser(userId: string) {
+  const adminId = await requireAdmin();
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { isSuspended: true },
+    }),
+    prisma.auditLog.create({
+      data: { adminId, action: "SUSPEND_USER", targetId: userId },
+    }),
+  ]);
+
+  revalidatePath("/admin");
+}
+
+export async function unsuspendUser(userId: string) {
+  const adminId = await requireAdmin();
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { isSuspended: false },
+    }),
+    prisma.auditLog.create({
+      data: { adminId, action: "UNSUSPEND_USER", targetId: userId },
+    }),
+  ]);
+
+  revalidatePath("/admin");
+}
+
+export async function resolveAbuseFlag(flagId: string) {
+  const adminId = await requireAdmin();
+
+  await prisma.abuseFlag.update({
+    where: { id: flagId },
+    data: {
+      resolved: true,
+      resolvedBy: adminId,
+      resolvedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/admin");
+}

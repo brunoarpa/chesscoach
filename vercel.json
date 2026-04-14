@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-payout",
+      "schedule": "0 0 1 * *"
+    }
+  ]
+}

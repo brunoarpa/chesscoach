@@ -21,6 +21,7 @@ interface Request {
   durationMinutes: number;
   estimatedCost: number;
   status: string;
+  isTrial: boolean;
   studentConfirmed: boolean;
   coachConfirmed: boolean;
   createdAt: string;
@@ -37,7 +38,7 @@ const statusColors: Record<string, string> = {
   CANCELLED: "outline",
 };
 
-export function StudentDashboard({ requests }: { requests: Request[] }) {
+export function StudentDashboard({ requests, freeTrialsRemaining }: { requests: Request[]; freeTrialsRemaining: number }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
   const completed = requests.filter((r) => r.status === "COMPLETED");
@@ -47,6 +48,13 @@ export function StudentDashboard({ requests }: { requests: Request[] }) {
 
   return (
     <div className="space-y-8">
+      {freeTrialsRemaining > 0 && (
+        <div className="p-3 rounded-lg border bg-muted/50 text-sm">
+          You have <span className="font-bold">{freeTrialsRemaining}</span> free trial{freeTrialsRemaining !== 1 ? "s" : ""} remaining.
+          Visit a coach&apos;s profile to request one!
+        </div>
+      )}
+
       {pending.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-4">Pending Requests</h2>
@@ -90,8 +98,9 @@ export function StudentDashboard({ requests }: { requests: Request[] }) {
                   <div>
                     <span className="font-medium">{r.coach.username}</span>
                     <span className="text-sm text-muted-foreground ml-2">
-                      {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · ${(r.estimatedCost / 100).toFixed(2)}
+                      {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
                     </span>
+                    {r.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
                   </div>
                   <Badge variant={statusColors[r.status] as "default" | "secondary" | "destructive" | "outline"}>
                     {r.status}
@@ -130,8 +139,9 @@ function PendingCard({ request }: { request: Request }) {
           <div>
             <span className="font-medium">{request.coach.username}</span>
             <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
+              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
             </span>
+            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Waiting for coach</Badge>
@@ -163,8 +173,9 @@ function ActiveCard({ request }: { request: Request }) {
           <div>
             <span className="font-medium">{request.coach.username}</span>
             <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
+              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
             </span>
+            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
             {request.coach.chessComUsername && (
               <div className="text-sm font-medium text-blue-600 mt-1">
                 Chess.com: {request.coach.chessComUsername}
@@ -211,8 +222,9 @@ function CompletedCard({ request }: { request: Request }) {
           <div>
             <span className="font-medium">{request.coach.username}</span>
             <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · ${(request.estimatedCost / 100).toFixed(2)}
+              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
             </span>
+            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
           </div>
           <div className="flex items-center gap-2">
             <Badge>Completed</Badge>

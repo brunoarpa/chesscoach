@@ -133,15 +133,17 @@ export default async function ProfilePage({
     }
   }
 
-  // Fetch student wallet balance for lesson request form
+  // Fetch student wallet balance and free trials for lesson request form
   let studentAvailableBalance: number | null = null;
+  let freeTrialsRemaining: number = 0;
   if (session?.user?.id && !isOwnProfile) {
     const studentData = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { walletBalance: true, reservedBalance: true },
+      select: { walletBalance: true, reservedBalance: true, freeTrialsRemaining: true },
     });
     if (studentData) {
       studentAvailableBalance = studentData.walletBalance - studentData.reservedBalance;
+      freeTrialsRemaining = studentData.freeTrialsRemaining;
     }
   }
 
@@ -350,6 +352,7 @@ export default async function ProfilePage({
                 coachPricePerHour={user.coachPricePerHour}
                 gameReviewPrice={user.gameReviewPrice}
                 availableBalance={studentAvailableBalance ?? 0}
+                freeTrialsRemaining={freeTrialsRemaining}
               />
             )}
           {!isOwnProfile &&

@@ -1,28 +1,21 @@
-const attempts = new Map<string, { count: number; resetAt: number }>();
+import { prisma } from "@/lib/prisma";
 
-// Clean up stale entries periodically
-if (typeof globalThis !== "undefined") {
-  // Avoid duplicate intervals in dev with hot reload
-  const g = globalThis as unknown as { _rateLimitCleanup?: ReturnType<typeof setInterval> };
-  if (!g._rateLimitCleanup) {
-    g._rateLimitCleanup = setInterval(() => {
-      const now = Date.now();
-      for (const [key, val] of attempts) {
-        if (now > val.resetAt) attempts.delete(key);
-      }
-    }, 60_000);
-  }
-}
-
-export function rateLimit(
+export async function rateLimit(
   key: string,
   { maxAttempts = 5, windowMs = 15 * 60 * 1000 } = {}
-): { success: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = attempts.get(key);
+): Promise<{ success: boolean; remaining: number }> {
+  const now = new Date();
 
-  if (!entry || now > entry.resetAt) {
-    attempts.set(key, { count: 1, resetAt: now + windowMs });
+  // Try to find an existing entry
+  const entry = await prisma.rateLimitEntry.findUnique({ where: { key } });
+
+  if (!entry || now >= entry.resetAt) {
+    // Expired or no entry — start a new window
+    await prisma.rateLimitEntry.upsert({
+      where: { key },
+      update: { count: 1, resetAt: new Date(Date.now() + windowMs) },
+      create: { key, count: 1, resetAt: new Date(Date.now() + windowMs) },
+    });
     return { success: true, remaining: maxAttempts - 1 };
   }
 
@@ -30,8 +23,13 @@ export function rateLimit(
     return { success: false, remaining: 0 };
   }
 
-  entry.count++;
-  return { success: true, remaining: maxAttempts - entry.count };
+  // Increment count
+  await prisma.rateLimitEntry.update({
+    where: { key },
+    data: { count: { increment: 1 } },
+  });
+
+  return { success: true, remaining: maxAttempts - (entry.count + 1) };
 }
 
 /**

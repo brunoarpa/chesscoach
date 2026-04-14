@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const { success } = rateLimit(`reset-confirm:${ip}`, { maxAttempts: 5, windowMs: 15 * 60 * 1000 });
+  const { success } = await rateLimit(`reset-confirm:${ip}`, { maxAttempts: 5, windowMs: 15 * 60 * 1000 });
   if (!success) {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
   }

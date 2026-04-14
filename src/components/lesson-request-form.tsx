@@ -14,12 +14,14 @@ interface Props {
   coachPricePerHour: number | null;
   gameReviewPrice: number | null;
   availableBalance: number;
+  freeTrialsRemaining: number;
 }
 
-export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice, availableBalance }: Props) {
+export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice, availableBalance, freeTrialsRemaining }: Props) {
   const [type, setType] = useState<string>("");
   const [duration, setDuration] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isTrial, setIsTrial] = useState(false);
 
   const hasPricing = coachPricePerHour !== null || gameReviewPrice !== null;
 
@@ -42,9 +44,10 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success("Lesson request sent!");
+      toast.success(isTrial ? "Free trial request sent!" : "Lesson request sent!");
       setType("");
       setDuration("");
+      setIsTrial(false);
     }
   }
 
@@ -71,6 +74,23 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
       <CardContent>
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="coachId" value={coachId} />
+          <input type="hidden" name="isTrial" value={isTrial ? "true" : "false"} />
+
+          {freeTrialsRemaining > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
+              <input
+                type="checkbox"
+                id="isTrial"
+                checked={isTrial}
+                onChange={(e) => setIsTrial(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <label htmlFor="isTrial" className="text-sm flex-1">
+                <span className="font-medium">Use free trial</span>
+                <span className="text-muted-foreground ml-1">({freeTrialsRemaining} remaining)</span>
+              </label>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Type</Label>
@@ -110,15 +130,23 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
             Your available balance: <span className="font-medium">${(availableBalance / 100).toFixed(2)}</span>
           </p>
 
-          {estimatedCost > 0 && (
+          {isTrial ? (
+            <p className="text-sm font-medium text-green-600">
+              Free trial — no charge
+            </p>
+          ) : estimatedCost > 0 ? (
             <p className={`text-sm font-medium ${estimatedCost > availableBalance / 100 ? "text-destructive" : ""}`}>
               Estimated cost: ${estimatedCost.toFixed(2)}
               {estimatedCost > availableBalance / 100 && " — Insufficient balance"}
             </p>
-          )}
+          ) : null}
 
-          <Button type="submit" className="w-full" disabled={loading || !type || !duration || (estimatedCost > 0 && estimatedCost > availableBalance / 100)}>
-            {loading ? "Sending..." : "Send Request"}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || !type || !duration || (!isTrial && estimatedCost > 0 && estimatedCost > availableBalance / 100)}
+          >
+            {loading ? "Sending..." : isTrial ? "Send Free Trial Request" : "Send Request"}
           </Button>
         </form>
       </CardContent>

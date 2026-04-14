@@ -84,15 +84,163 @@ export async function expirePendingRequests() {
   });
 
   for (const request of expiredRequests) {
-    await prisma.$transaction([
+    const txOps = [
       prisma.lessonRequest.update({
         where: { id: request.id },
         data: { status: "EXPIRED" },
       }),
-      prisma.user.update({
-        where: { id: request.studentId },
-        data: { reservedBalance: { decrement: request.estimatedCost } },
-      }),
-    ]);
+      ...(request.isTrial
+        ? []
+        : [
+            prisma.user.update({
+              where: { id: request.studentId },
+              data: { reservedBalance: { decrement: request.estimatedCost } },
+            }),
+          ]),
+    ];
+    await prisma.$transaction(txOps);
+  }
+
+  // Check for coach non-responsive pattern: 3+ expired in 7 days
+  await detectNonResponsiveCoaches();
+}
+
+/**
+ * Detect coaches who consistently don't respond to requests.
+ * 3+ expired requests in 7 days triggers an abuse flag.
+ */
+async function detectNonResponsiveCoaches() {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const nonResponsiveCoaches = await prisma.lessonRequest.groupBy({
+    by: ["coachId"],
+    where: {
+      status: "EXPIRED",
+      createdAt: { gte: sevenDaysAgo },
+    },
+    _count: { id: true },
+    having: {
+      id: { _count: { gte: 3 } },
+    },
+  });
+
+  for (const coach of nonResponsiveCoaches) {
+    // Avoid duplicate flags
+    const recentFlag = await prisma.abuseFlag.findFirst({
+      where: {
+        userId: coach.coachId,
+        type: "COACH_NON_RESPONSIVE",
+        createdAt: { gte: sevenDaysAgo },
+      },
+    });
+
+    if (!recentFlag) {
+      await prisma.abuseFlag.create({
+        data: {
+          userId: coach.coachId,
+          type: "COACH_NON_RESPONSIVE",
+          severity: "LOW",
+          details: `${coach._count.id} lesson requests expired (unanswered) in the last 7 days.`,
+        },
+      });
+    }
+  }
+}
+
+/**
+ * Detect confirmation timeouts and one-sided confirmations.
+ * Called by daily cron. Checks ACCEPTED lessons where the confirmation
+ * window has passed (cooldown + 48 hours).
+ */
+export async function detectConfirmationDisputes() {
+  // Find ACCEPTED lessons where respondedAt + duration + 48h < now
+  const acceptedLessons = await prisma.lessonRequest.findMany({
+    where: {
+      status: "ACCEPTED",
+      respondedAt: { not: null },
+    },
+    include: {
+      student: { select: { username: true } },
+      coach: { select: { username: true } },
+    },
+  });
+
+  const now = Date.now();
+  const DISPUTE_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours after cooldown
+
+  for (const lesson of acceptedLessons) {
+    if (!lesson.respondedAt) continue;
+
+    const cooldownMs = Math.max(lesson.durationMinutes * 60 * 1000, 5 * 60 * 1000);
+    const deadline = new Date(lesson.respondedAt).getTime() + cooldownMs + DISPUTE_WINDOW_MS;
+
+    if (now <= deadline) continue; // Not yet past the window
+
+    const studentConfirmed = lesson.studentConfirmed;
+    const coachConfirmed = lesson.coachConfirmed;
+
+    if (!studentConfirmed && !coachConfirmed) {
+      // Neither confirmed — timeout, expire and refund
+      const txOps = [
+        prisma.lessonRequest.update({
+          where: { id: lesson.id },
+          data: { status: "EXPIRED" },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { reservedBalance: { decrement: lesson.estimatedCost } },
+              }),
+            ]),
+      ];
+      await prisma.$transaction(txOps);
+
+      await prisma.abuseFlag.create({
+        data: {
+          userId: lesson.studentId,
+          type: "CONFIRMATION_TIMEOUT",
+          severity: "LOW",
+          details: `Neither party confirmed lesson completion. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
+          relatedLessonId: lesson.id,
+          relatedUserId: lesson.coachId,
+        },
+      });
+    } else {
+      // One side confirmed but not the other — dispute
+      const confirmedBy = studentConfirmed ? "student" : "coach";
+      const notConfirmedBy = studentConfirmed ? "coach" : "student";
+      const flaggedUserId = studentConfirmed ? lesson.coachId : lesson.studentId;
+      const relatedUserId = studentConfirmed ? lesson.studentId : lesson.coachId;
+
+      // Expire and refund
+      const txOps = [
+        prisma.lessonRequest.update({
+          where: { id: lesson.id },
+          data: { status: "EXPIRED" },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { reservedBalance: { decrement: lesson.estimatedCost } },
+              }),
+            ]),
+      ];
+      await prisma.$transaction(txOps);
+
+      await prisma.abuseFlag.create({
+        data: {
+          userId: flaggedUserId,
+          type: "ONE_SIDED_CONFIRMATION",
+          severity: "MEDIUM",
+          details: `${confirmedBy} confirmed but ${notConfirmedBy} did not within 48h. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
+          relatedLessonId: lesson.id,
+          relatedUserId,
+        },
+      });
+    }
   }
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { recalculateAllElos } from "@/lib/elo";
-import { updateActivityStatuses, expirePendingRequests } from "@/lib/activity";
+import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes } from "@/lib/activity";
 import { refreshAllChessComRatings } from "@/lib/chess-com";
+import { prisma } from "@/lib/prisma";
 
 // This endpoint should be called daily by a cron job
 // In Vercel, configure in vercel.json: { "crons": [{ "path": "/api/cron/daily", "schedule": "0 6 * * *" }] }
@@ -21,6 +22,9 @@ export async function POST(request: Request) {
       updateActivityStatuses(),
       expirePendingRequests(),
       refreshAllChessComRatings(),
+      detectConfirmationDisputes(),
+      // Purge expired rate-limit rows
+      prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
     ]);
 
     return NextResponse.json({ success: true, timestamp: new Date().toISOString() });
