@@ -333,3 +333,18 @@ model RateLimitEntry {
 
   @@index([resetAt])
 }
+
+model RecoveryRequest {
+  id               String   @id @default(cuid())
+  username         String   // the username they're trying to recover
+  chessComUsername  String?  // chess.com username if they have one
+  contactInfo      String   // how to reach them (email, discord, etc.)
+  message          String?  // optional extra info
+  resolved         Boolean  @default(false)
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([resolved])
+  @@index([createdAt])
+}

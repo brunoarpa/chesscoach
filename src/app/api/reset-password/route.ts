@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -10,28 +9,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
-  const { email } = await request.json();
+  const { username, chessComUsername, contactInfo, message } = await request.json();
 
-  if (!email) {
-    return NextResponse.json({ error: "Email required" }, { status: 400 });
+  if (!username || typeof username !== "string" || !contactInfo || typeof contactInfo !== "string") {
+    return NextResponse.json({ error: "Username and contact info are required" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  // Check that the username actually exists
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: { id: true },
+  });
 
-  if (user) {
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const expiry = new Date(Date.now() + 3600000); // 1 hour
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { resetToken: tokenHash, resetTokenExpiry: expiry },
-    });
-
-    // TODO: Send email with reset link: /reset-password/confirm?token=${token}
-    // The raw token is sent to the user; only the hash is stored in DB.
+  if (!user) {
+    return NextResponse.json({ error: "No account found with that username" }, { status: 404 });
   }
 
-  // Always return success to prevent email enumeration
+  // Check for existing unresolved request for this username
+  const existing = await prisma.recoveryRequest.findFirst({
+    where: { username, resolved: false },
+  });
+
+  if (existing) {
+    return NextResponse.json({ error: "You already have a pending recovery request. Please wait for an admin to review it." }, { status: 409 });
+  }
+
+  await prisma.recoveryRequest.create({
+    data: {
+      username,
+      chessComUsername: chessComUsername || null,
+      contactInfo,
+      message: message || null,
+    },
+  });
+
   return NextResponse.json({ success: true });
 }

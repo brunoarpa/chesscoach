@@ -154,6 +154,21 @@ export async function resolveAbuseFlag(flagId: string) {
   revalidatePath("/admin");
 }
 
+export async function resolveRecoveryRequest(requestId: string) {
+  const adminId = await requireAdmin();
+
+  await prisma.recoveryRequest.update({
+    where: { id: requestId },
+    data: {
+      resolved: true,
+      resolvedBy: adminId,
+      resolvedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/admin");
+}
+
 export async function resolveDispute(
   lessonId: string,
   resolution: "refund" | "pay_coach"

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DepositForm } from "@/components/deposit-form";
+import { StripeConnectSetup } from "@/components/stripe-connect-setup";
 
 export default async function WalletPage() {
   const session = await auth();
@@ -16,6 +17,9 @@ export default async function WalletPage() {
       reservedBalance: true,
       pendingEarnings: true,
       totalEarningsAllTime: true,
+      verificationStatus: true,
+      coachPricePerHour: true,
+      gameReviewPrice: true,
     },
   });
 
@@ -70,6 +74,13 @@ export default async function WalletPage() {
       </div>
 
       <DepositForm />
+
+      {user.verificationStatus === "VERIFIED" && (user.coachPricePerHour || user.gameReviewPrice) && (
+        <>
+          <Separator className="my-8" />
+          <StripeConnectSetup />
+        </>
+      )}
 
       <Separator className="my-8" />
 

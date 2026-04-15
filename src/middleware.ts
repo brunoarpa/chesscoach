@@ -32,11 +32,19 @@ export default authMiddleware((req) => {
     return NextResponse.redirect(url);
   }
 
-  // Admin routes
-  if (pathname.startsWith("/admin") && !req.auth) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  // Admin routes — require authentication AND ADMIN role
+  if (pathname.startsWith("/admin")) {
+    if (!req.auth) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+    const role = (req.auth.user as unknown as Record<string, unknown> | undefined)?.role;
+    if (role !== "ADMIN") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();

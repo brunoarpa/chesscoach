@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // Rate limit: max 10 deposit attempts per 15 minutes per user
+  const { success: rlSuccess } = await rateLimit(`deposit:${session.user.id}`, { maxAttempts: 10, windowMs: 15 * 60 * 1000 });
+  if (!rlSuccess) {
+    return NextResponse.json({ error: "Too many deposit attempts. Please try again later." }, { status: 429 });
   }
 
   // Check suspension
@@ -38,6 +45,8 @@ export async function POST(request: Request) {
   const stripe = (await import("stripe")).default;
   const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
 
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+
   const checkoutSession = await stripeClient.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
@@ -55,8 +64,8 @@ export async function POST(request: Request) {
       userId: session.user.id,
       type: "deposit",
     },
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/wallet?success=true`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/wallet?cancelled=true`,
+    success_url: `${appUrl}/wallet?success=true`,
+    cancel_url: `${appUrl}/wallet?cancelled=true`,
   });
 
   return NextResponse.json({ url: checkoutSession.url });

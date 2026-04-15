@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerificationList } from "@/components/admin/verification-list";
 import { UserList } from "@/components/admin/user-list";
 import { AbuseFlagList } from "@/components/admin/abuse-flag-list";
+import { RecoveryRequestList } from "@/components/admin/recovery-request-list";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -17,7 +18,7 @@ export default async function AdminPage() {
 
   if (user?.role !== "ADMIN") redirect("/");
 
-  const [pendingVerifications, allUsers, abuseFlags, cardFingerprints] = await Promise.all([
+  const [pendingVerifications, allUsers, abuseFlags, cardFingerprints, recoveryRequests] = await Promise.all([
     prisma.user.findMany({
       where: { verificationStatus: "PENDING" },
       orderBy: { updatedAt: "desc" },
@@ -65,6 +66,10 @@ export default async function AdminPage() {
         userId: true,
       },
     }),
+    prisma.recoveryRequest.findMany({
+      where: { resolved: false },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   // Build linked accounts count from card fingerprints
@@ -97,6 +102,9 @@ export default async function AdminPage() {
           <TabsTrigger value="verifications">
             Verifications ({pendingVerifications.length})
           </TabsTrigger>
+          <TabsTrigger value="recovery">
+            Recovery ({recoveryRequests.length})
+          </TabsTrigger>
           <TabsTrigger value="users">All Users ({allUsers.length})</TabsTrigger>
         </TabsList>
 
@@ -106,6 +114,10 @@ export default async function AdminPage() {
 
         <TabsContent value="verifications">
           <VerificationList users={JSON.parse(JSON.stringify(pendingVerifications))} />
+        </TabsContent>
+
+        <TabsContent value="recovery">
+          <RecoveryRequestList requests={JSON.parse(JSON.stringify(recoveryRequests))} />
         </TabsContent>
 
         <TabsContent value="users">
