@@ -100,7 +100,12 @@ export async function expirePendingRequests() {
         data: { status: "EXPIRED" },
       }),
       ...(request.isTrial
-        ? []
+        ? [
+            prisma.user.update({
+              where: { id: request.studentId },
+              data: { freeTrialsRemaining: { increment: 1 } },
+            }),
+          ]
         : [
             prisma.user.update({
               where: { id: request.studentId },

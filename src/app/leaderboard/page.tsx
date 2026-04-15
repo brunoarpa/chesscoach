@@ -51,7 +51,7 @@ export default async function LeaderboardPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">#</TableHead>
+              <TableHead className="w-16">Position</TableHead>
               <TableHead>Coach</TableHead>
               <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>

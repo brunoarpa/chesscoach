@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
+import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -61,6 +62,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <AutoRefresh />
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
       {currentUser.isSuspended && (

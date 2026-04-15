@@ -280,8 +280,8 @@ function AcceptedLessonCard({ request, role }: { request: Request; role: "coach"
             <span className="font-medium">{otherUser.username}</span>
             <RequestMeta request={request} />
             {otherUser.chessComUsername && (
-              <div className="text-sm font-medium text-blue-600 mt-1">
-                Chess.com: {otherUser.chessComUsername}
+              <div className="text-sm mt-1">
+                <a href={`https://www.chess.com/member/${otherUser.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
               </div>
             )}
             <div className="text-xs text-muted-foreground mt-1">
@@ -334,8 +334,8 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
             <span className="font-medium">{otherUser.username}</span>
             <RequestMeta request={request} />
             {otherUser.chessComUsername && (
-              <div className="text-sm font-medium text-blue-600 mt-1">
-                Chess.com: {otherUser.chessComUsername}
+              <div className="text-sm mt-1">
+                <a href={`https://www.chess.com/member/${otherUser.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
               </div>
             )}
             <div className="text-xs text-muted-foreground mt-1">

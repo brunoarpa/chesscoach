@@ -198,11 +198,6 @@ export async function respondToLessonRequest(
   if (request.status !== "PENDING") return { error: "Request is no longer pending" };
 
   if (action === "accept") {
-    // Auto-set coach to BUSY if currently AVAILABLE
-    const coach = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { coachAvailability: true },
-    });
     await prisma.$transaction([
       prisma.lessonRequest.update({
         where: { id: requestId },
@@ -213,19 +208,23 @@ export async function respondToLessonRequest(
         data: {
           lastActiveAt: new Date(),
           activityStatus: "ACTIVE",
-          ...(coach?.coachAvailability === "AVAILABLE" ? { coachAvailability: "BUSY" } : {}),
         },
       }),
     ]);
   } else {
-    // Decline: release reserved funds (skip for free trials — no balance reserved)
+    // Decline: release reserved funds. For free trials, restore the trial count.
     const txOps = [
       prisma.lessonRequest.update({
         where: { id: requestId },
         data: { status: "DECLINED", respondedAt: new Date() },
       }),
       ...(request.isTrial
-        ? []
+        ? [
+            prisma.user.update({
+              where: { id: request.studentId },
+              data: { freeTrialsRemaining: { increment: 1 } },
+            }),
+          ]
         : [
             prisma.user.update({
               where: { id: request.studentId },
@@ -384,27 +383,6 @@ export async function confirmLesson(requestId: string) {
         where: { id: request.coachId },
         data: { playersTaught: distinctStudents.length },
       });
-
-      // Auto-restore to AVAILABLE if coach was BUSY and has no more active lessons
-      const remainingActive = await tx.lessonRequest.count({
-        where: {
-          coachId: request.coachId,
-          status: { in: ["ACCEPTED", "IN_PROGRESS"] },
-          id: { not: requestId },
-        },
-      });
-      if (remainingActive === 0) {
-        const coachUser = await tx.user.findUnique({
-          where: { id: request.coachId },
-          select: { coachAvailability: true },
-        });
-        if (coachUser?.coachAvailability === "BUSY") {
-          await tx.user.update({
-            where: { id: request.coachId },
-            data: { coachAvailability: "AVAILABLE" },
-          });
-        }
-      }
     } else {
       await tx.lessonRequest.update({
         where: { id: requestId },
@@ -666,27 +644,6 @@ export async function declineAcceptedLesson(requestId: string) {
   ];
 
   await prisma.$transaction(txOps);
-
-  // Auto-restore coach to AVAILABLE if no more active lessons
-  const remainingActive = await prisma.lessonRequest.count({
-    where: {
-      coachId: request.coachId,
-      status: { in: ["ACCEPTED", "IN_PROGRESS"] },
-      id: { not: requestId },
-    },
-  });
-  if (remainingActive === 0) {
-    const coachUser = await prisma.user.findUnique({
-      where: { id: request.coachId },
-      select: { coachAvailability: true },
-    });
-    if (coachUser?.coachAvailability === "BUSY") {
-      await prisma.user.update({
-        where: { id: request.coachId },
-        data: { coachAvailability: "AVAILABLE" },
-      });
-    }
-  }
 
   revalidatePath("/dashboard");
   return { success: true };

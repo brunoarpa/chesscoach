@@ -301,8 +301,8 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             <span className="font-medium">{request.coach.username}</span>
             <RequestMeta request={request} />
             {request.coach.chessComUsername && (
-              <div className="text-sm font-medium text-blue-600 mt-1">
-                Chess.com: {request.coach.chessComUsername}
+              <div className="text-sm mt-1">
+                <a href={`https://www.chess.com/member/${request.coach.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
               </div>
             )}
             <div className="text-xs text-muted-foreground mt-1">
@@ -360,8 +360,8 @@ function StudentActiveCard({ request }: { request: Request }) {
             <span className="font-medium">{request.coach.username}</span>
             <RequestMeta request={request} />
             {request.coach.chessComUsername && (
-              <div className="text-sm font-medium text-blue-600 mt-1">
-                Chess.com: {request.coach.chessComUsername}
+              <div className="text-sm mt-1">
+                <a href={`https://www.chess.com/member/${request.coach.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
               </div>
             )}
             <div className="text-xs text-muted-foreground mt-1">

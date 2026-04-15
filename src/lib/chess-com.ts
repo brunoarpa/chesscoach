@@ -12,7 +12,7 @@ interface ChessComStats {
 
 interface ChessComProfile {
   joined: number; // Unix timestamp
-  username: string;
+  username: string; // current username (may differ from stored if renamed)
 }
 
 /**
@@ -84,7 +84,27 @@ export async function chessComUsernameExists(
 }
 
 /**
- * Refresh chess.com ratings for all verified users.
+ * Fetch a player's current chess.com username (handles renames).
+ */
+export async function fetchChessComCurrentUsername(
+  chessComUsername: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`,
+      { next: { revalidate: 0 } }
+    );
+    if (!res.ok) return null;
+
+    const profile: ChessComProfile = await res.json();
+    return profile.username;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refresh chess.com ratings and usernames for all verified users.
  * Called by the daily cron job.
  */
 export async function refreshAllChessComRatings() {
@@ -101,11 +121,19 @@ export async function refreshAllChessComRatings() {
 
   for (const user of users) {
     if (!user.chessComUsername) continue;
-    const rating = await fetchChessComRating(user.chessComUsername);
-    if (rating !== null) {
+    const [rating, currentUsername] = await Promise.all([
+      fetchChessComRating(user.chessComUsername),
+      fetchChessComCurrentUsername(user.chessComUsername),
+    ]);
+    const updateData: Record<string, unknown> = {};
+    if (rating !== null) updateData.chessRating = rating;
+    if (currentUsername && currentUsername !== user.chessComUsername) {
+      updateData.chessComUsername = currentUsername;
+    }
+    if (Object.keys(updateData).length > 0) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { chessRating: rating },
+        data: updateData,
       });
     }
   }
