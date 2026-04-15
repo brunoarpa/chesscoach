@@ -11,8 +11,8 @@ export default async function ProfileEditPage() {
     where: { id: session.user.id },
     select: {
       continent: true,
-      coachPricePerHour: true,
-      gameReviewPrice: true,
+      coachPricePer5Min: true,
+      gameReviewPricePer5Min: true,
       communicationPreference: true,
       bio: true,
       coachAvailability: true,
@@ -26,8 +26,8 @@ export default async function ProfileEditPage() {
       <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
       <ProfileEditForm
         continent={user.continent}
-        coachPricePerHour={user.coachPricePerHour ? user.coachPricePerHour / 100 : undefined}
-        gameReviewPrice={user.gameReviewPrice ? user.gameReviewPrice / 100 : undefined}
+        coachPricePer5Min={user.coachPricePer5Min ? user.coachPricePer5Min / 100 : undefined}
+        gameReviewPricePer5Min={user.gameReviewPricePer5Min ? user.gameReviewPricePer5Min / 100 : undefined}
         communicationPreference={user.communicationPreference}
         bio={user.bio ?? undefined}
         coachAvailability={user.coachAvailability}

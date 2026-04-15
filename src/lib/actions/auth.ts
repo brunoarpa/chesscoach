@@ -136,11 +136,11 @@ export async function updateProfile(formData: FormData) {
 
   const raw = {
     continent: (formData.get("continent") as string) || undefined,
-    coachPricePerHour: formData.get("coachPricePerHour")
-      ? Number(formData.get("coachPricePerHour"))
+    coachPricePer5Min: formData.get("coachPricePer5Min")
+      ? Number(formData.get("coachPricePer5Min"))
       : undefined,
-    gameReviewPrice: formData.get("gameReviewPrice")
-      ? Number(formData.get("gameReviewPrice"))
+    gameReviewPricePer5Min: formData.get("gameReviewPricePer5Min")
+      ? Number(formData.get("gameReviewPricePer5Min"))
       : undefined,
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
@@ -152,11 +152,11 @@ export async function updateProfile(formData: FormData) {
     where: { id: session.user.id },
     data: {
       continent: raw.continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
-      coachPricePerHour: raw.coachPricePerHour
-        ? Math.round(raw.coachPricePerHour * 100)
+      coachPricePer5Min: raw.coachPricePer5Min
+        ? Math.round(raw.coachPricePer5Min * 100)
         : null,
-      gameReviewPrice: raw.gameReviewPrice
-        ? Math.round(raw.gameReviewPrice * 100)
+      gameReviewPricePer5Min: raw.gameReviewPricePer5Min
+        ? Math.round(raw.gameReviewPricePer5Min * 100)
         : null,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,

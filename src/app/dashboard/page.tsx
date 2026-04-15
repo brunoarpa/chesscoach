@@ -16,7 +16,7 @@ export default async function DashboardPage() {
     select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true },
   });
 
-  const [incomingRequests, outgoingRequests] = await Promise.all([
+  const [incomingRequests, outgoingRequests, favouriteCoaches] = await Promise.all([
     // Coach incoming
     prisma.lessonRequest.findMany({
       where: { coachId: session.user.id },
@@ -41,6 +41,22 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
+    // Favourite coaches
+    prisma.favourite.findMany({
+      where: { userId: session.user.id },
+      include: {
+        coach: {
+          select: {
+            id: true,
+            username: true,
+            coachAvailability: true,
+            chessRating: true,
+            coachPricePer5Min: true,
+            lastActiveAt: true,
+          },
+        },
+      },
+    }),
   ]);
 
   return (
@@ -63,10 +79,10 @@ export default async function DashboardPage() {
       <Tabs defaultValue="coach">
         <TabsList className="mb-6">
           <TabsTrigger value="coach">
-            Coach ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "DISPUTED").length})
+            Coach ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length})
           </TabsTrigger>
           <TabsTrigger value="student">
-            Student ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "DISPUTED").length})
+            Student ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length})
           </TabsTrigger>
         </TabsList>
 
@@ -82,6 +98,7 @@ export default async function DashboardPage() {
             requests={JSON.parse(JSON.stringify(outgoingRequests))}
             freeTrialsRemaining={currentUser.freeTrialsRemaining}
             hasActiveDispute={currentUser.hasActiveDispute}
+            favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
           />
         </TabsContent>
       </Tabs>

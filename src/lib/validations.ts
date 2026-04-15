@@ -29,8 +29,8 @@ export const loginSchema = z.object({
 
 export const profileEditSchema = z.object({
   continent: z.enum(["AFRICA", "ASIA", "EUROPE", "NORTH_AMERICA", "SOUTH_AMERICA", "OCEANIA"]).optional(),
-  coachPricePerHour: z.coerce.number().min(0).optional(),
-  gameReviewPrice: z.coerce.number().min(0).optional(),
+  coachPricePer5Min: z.coerce.number().min(0).optional(),
+  gameReviewPricePer5Min: z.coerce.number().min(0).optional(),
   communicationPreference: z.enum(["CHAT_ONLY", "CHAT_AND_CALL"]),
   bio: z.string().max(500).optional(),
 });

@@ -8,6 +8,7 @@ import { ReviewList } from "@/components/review-list";
 import { LessonRequestForm } from "@/components/lesson-request-form";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
 import { fetchChessComRating } from "@/lib/chess-com";
+import { FavouriteButton } from "@/components/favourite-button";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -149,6 +150,22 @@ export default async function ProfilePage({
     (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 
+  // Check favourite and block status
+  let isFavourited = false;
+  let isBlocked = false;
+  if (session?.user?.id && !isOwnProfile) {
+    const [fav, block] = await Promise.all([
+      prisma.favourite.findUnique({
+        where: { userId_coachId: { userId: session.user.id, coachId: user.id } },
+      }),
+      prisma.block.findUnique({
+        where: { coachId_studentId: { coachId: user.id, studentId: session.user.id } },
+      }),
+    ]);
+    isFavourited = !!fav;
+    isBlocked = !!block;
+  }
+
   // Check if coach has completed any paid lessons (for new coach warning)
   let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
   if (user.verificationStatus === "VERIFIED" && user.coachAvailability === "AVAILABLE") {
@@ -203,6 +220,9 @@ export default async function ProfilePage({
             <Button variant="outline">Edit Profile</Button>
           </Link>
         )}
+        {!isOwnProfile && session?.user && (
+          <FavouriteButton coachId={user.id} initialFavourited={isFavourited} />
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -237,16 +257,16 @@ export default async function ProfilePage({
                     <strong>{continentLabels[user.continent]}</strong>
                   </div>
                 )}
-                {user.coachPricePerHour !== null && (
+                {user.coachPricePer5Min !== null && (
                   <div>
-                    <span className="text-muted-foreground">Price/Hour:</span>{" "}
-                    <strong>${(user.coachPricePerHour / 100).toFixed(2)}</strong>
+                    <span className="text-muted-foreground">Price/5min:</span>{" "}
+                    <strong>${(user.coachPricePer5Min / 100).toFixed(2)}</strong>
                   </div>
                 )}
-                {user.gameReviewPrice !== null && (
+                {user.gameReviewPricePer5Min !== null && (
                   <div>
-                    <span className="text-muted-foreground">Game Review:</span>{" "}
-                    <strong>${(user.gameReviewPrice / 100).toFixed(2)}</strong>
+                    <span className="text-muted-foreground">Game Review/5min:</span>{" "}
+                    <strong>${(user.gameReviewPricePer5Min / 100).toFixed(2)}</strong>
                   </div>
                 )}
                 <div>
@@ -364,16 +384,25 @@ export default async function ProfilePage({
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
             user.coachAvailability === "AVAILABLE" &&
-            studentVerified && (
+            studentVerified &&
+            !isBlocked && (
               <LessonRequestForm
                 coachId={user.id}
-                coachPricePerHour={user.coachPricePerHour}
-                gameReviewPrice={user.gameReviewPrice}
+                coachPricePer5Min={user.coachPricePer5Min}
+                gameReviewPricePer5Min={user.gameReviewPricePer5Min}
+                coachCommunicationPreference={user.communicationPreference}
                 availableBalance={studentAvailableBalance ?? 0}
                 freeTrialsRemaining={freeTrialsRemaining}
                 hasCompletedPaidLesson={hasCompletedPaidLesson}
               />
             )}
+          {!isOwnProfile && isBlocked && session?.user && (
+            <Card>
+              <CardContent className="pt-6 text-center text-sm text-destructive">
+                This coach has blocked you from requesting lessons.
+              </CardContent>
+            </Card>
+          )}
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&

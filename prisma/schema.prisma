@@ -53,11 +53,17 @@ enum LessonType {
 enum LessonRequestStatus {
   PENDING
   ACCEPTED
+  IN_PROGRESS
   DECLINED
   EXPIRED
   COMPLETED
   CANCELLED
   DISPUTED
+}
+
+enum LessonCommunicationMethod {
+  CALL
+  CHAT
 }
 
 enum TransactionType {
@@ -103,8 +109,8 @@ model User {
   // Profile info
   continent             Continent?
   chessRating           Int?
-  coachPricePerHour     Int?      // cents
-  gameReviewPrice       Int?      // cents
+  coachPricePer5Min     Int?      // cents
+  gameReviewPricePer5Min Int?     // cents
   communicationPreference CommunicationPreference @default(CHAT_ONLY)
   chessComAccountAge    DateTime? // when the chess.com account was created
   bio                   String?
@@ -164,6 +170,10 @@ model User {
   cardFingerprints  CardFingerprint[]
   abuseFlags        AbuseFlag[]     @relation("FlaggedUser")
   abuseFlagsRelated AbuseFlag[]     @relation("RelatedUser")
+  favourites        Favourite[]     @relation("FavouriteUser")
+  favouritedBy      Favourite[]     @relation("FavouriteCoach")
+  blockedStudents   Block[]         @relation("BlockingCoach")
+  blockedByCoaches  Block[]         @relation("BlockedStudent")
 
   @@index([coachElo(sort: Desc)])
   @@index([activityStatus])
@@ -206,8 +216,12 @@ model LessonRequest {
   durationMinutes Int
   estimatedCost   Int       // cents
   isTrial         Boolean   @default(false)
+  communicationMethod LessonCommunicationMethod?
+  message         String?
   
   status          LessonRequestStatus @default(PENDING)
+  studentStartConfirmed Boolean @default(false)
+  coachStartConfirmed   Boolean @default(false)
   studentConfirmed Boolean @default(false)
   coachConfirmed   Boolean @default(false)
   disputeReason    String?
@@ -347,4 +361,36 @@ model RecoveryRequest {
 
   @@index([resolved])
   @@index([createdAt])
+}
+
+model Favourite {
+  id      String @id @default(cuid())
+  
+  userId  String
+  user    User   @relation("FavouriteUser", fields: [userId], references: [id])
+  
+  coachId String
+  coach   User   @relation("FavouriteCoach", fields: [coachId], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, coachId])
+  @@index([userId])
+  @@index([coachId])
+}
+
+model Block {
+  id        String @id @default(cuid())
+  
+  coachId   String
+  coach     User   @relation("BlockingCoach", fields: [coachId], references: [id])
+  
+  studentId String
+  student   User   @relation("BlockedStudent", fields: [studentId], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([coachId, studentId])
+  @@index([coachId])
+  @@index([studentId])
 }

@@ -32,6 +32,7 @@ export default async function LeaderboardPage() {
       activityStatus: true,
       lastActiveAt: true,
       coachAvailability: true,
+      coachPricePer5Min: true,
     },
   });
 
@@ -55,6 +56,7 @@ export default async function LeaderboardPage() {
               <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>
               <TableHead className="text-right">Lessons</TableHead>
+              <TableHead className="text-right">Price/5min</TableHead>
               <TableHead className="text-right">Students</TableHead>
               <TableHead className="text-center">Last Active</TableHead>
               <TableHead className="text-center">Status</TableHead>
@@ -82,6 +84,9 @@ export default async function LeaderboardPage() {
                   {coach.chessRating ?? "—"}
                 </TableCell>
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
+                <TableCell className="text-right">
+                  {coach.coachPricePer5Min !== null ? `$${(coach.coachPricePer5Min / 100).toFixed(2)}` : "—"}
+                </TableCell>
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1.5">

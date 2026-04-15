@@ -3,11 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cancelLessonRequest, confirmLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
+import { cancelLessonRequest, confirmLesson, confirmLessonStart, declineAcceptedLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
+import { AcceptedLessonCard, ActiveLessonCard, CompletedCard as CoachCompletedCard } from "./coach-dashboard";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
 
 interface MyReview {
   id: string;
@@ -22,6 +24,10 @@ interface Request {
   estimatedCost: number;
   status: string;
   isTrial: boolean;
+  communicationMethod: string | null;
+  message: string | null;
+  studentStartConfirmed: boolean;
+  coachStartConfirmed: boolean;
   studentConfirmed: boolean;
   coachConfirmed: boolean;
   createdAt: string;
@@ -29,9 +35,19 @@ interface Request {
   reviews: MyReview[];
 }
 
+interface FavouriteCoach {
+  id: string;
+  username: string;
+  coachAvailability: string;
+  chessRating: number | null;
+  coachPricePer5Min: number | null;
+  lastActiveAt: Date | null;
+}
+
 const statusColors: Record<string, string> = {
   PENDING: "secondary",
   ACCEPTED: "default",
+  IN_PROGRESS: "default",
   DECLINED: "destructive",
   EXPIRED: "outline",
   COMPLETED: "default",
@@ -39,13 +55,32 @@ const statusColors: Record<string, string> = {
   DISPUTED: "destructive",
 };
 
-export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispute }: { requests: Request[]; freeTrialsRemaining: number; hasActiveDispute: boolean }) {
+const availabilityColors: Record<string, string> = {
+  AVAILABLE: "bg-green-500",
+  BUSY: "bg-red-500",
+  UNAVAILABLE: "bg-gray-400",
+};
+
+function RequestMeta({ request }: { request: Request }) {
+  return (
+    <>
+      <span className="text-sm text-muted-foreground ml-2">
+        {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
+        {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
+      </span>
+      {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
+    </>
+  );
+}
+
+export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispute, favouriteCoaches }: { requests: Request[]; freeTrialsRemaining: number; hasActiveDispute: boolean; favouriteCoaches: FavouriteCoach[] }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
+  const inProgress = requests.filter((r) => r.status === "IN_PROGRESS");
   const disputed = requests.filter((r) => r.status === "DISPUTED");
   const completed = requests.filter((r) => r.status === "COMPLETED");
   const other = requests.filter(
-    (r) => !["PENDING", "ACCEPTED", "COMPLETED", "DISPUTED"].includes(r.status)
+    (r) => !["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "DISPUTED"].includes(r.status)
   );
 
   return (
@@ -66,6 +101,38 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
         </div>
       )}
 
+      {favouriteCoaches.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Favourite Coaches</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {favouriteCoaches.map((coach) => (
+              <Link key={coach.id} href={`/profile/${coach.username}`}>
+                <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                  <CardContent className="pt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.coachAvailability] ?? "bg-gray-400"}`} />
+                      <div>
+                        <span className="font-medium">{coach.username}</span>
+                        {coach.chessRating && (
+                          <span className="text-sm text-muted-foreground ml-2">
+                            {coach.chessRating} ELO
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {coach.coachPricePer5Min != null && (
+                      <span className="text-sm text-muted-foreground">
+                        ${(coach.coachPricePer5Min / 100).toFixed(2)}/5min
+                      </span>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {pending.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-4">Pending Requests</h2>
@@ -79,10 +146,22 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
 
       {accepted.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-4">Active Lessons</h2>
+          <h2 className="text-lg font-semibold mb-4">Awaiting Start</h2>
+          <p className="text-sm text-muted-foreground mb-3">Both you and the coach must confirm the lesson has started.</p>
           <div className="space-y-3">
             {accepted.map((r) => (
-              <ActiveCard key={r.id} request={r} />
+              <StudentAcceptedCard key={r.id} request={r} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {inProgress.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Active Lessons</h2>
+          <div className="space-y-3">
+            {inProgress.map((r) => (
+              <StudentActiveCard key={r.id} request={r} />
             ))}
           </div>
         </section>
@@ -98,9 +177,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium">{r.coach.username}</span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
-                      </span>
+                      <RequestMeta request={r} />
                     </div>
                     <Badge variant="destructive">Disputed — Awaiting Admin Review</Badge>
                   </div>
@@ -119,7 +196,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
           <h2 className="text-lg font-semibold mb-4">Completed</h2>
           <div className="space-y-3">
             {completed.map((r) => (
-              <CompletedCard key={r.id} request={r} />
+              <StudentCompletedCard key={r.id} request={r} />
             ))}
           </div>
         </section>
@@ -134,10 +211,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                 <CardContent className="pt-4 flex items-center justify-between">
                   <div>
                     <span className="font-medium">{r.coach.username}</span>
-                    <span className="text-sm text-muted-foreground ml-2">
-                      {r.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
-                    </span>
-                    {r.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
+                    <RequestMeta request={r} />
                   </div>
                   <Badge variant={statusColors[r.status] as "default" | "secondary" | "destructive" | "outline"}>
                     {r.status}
@@ -149,7 +223,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
         </section>
       )}
 
-      {requests.length === 0 && (
+      {requests.length === 0 && favouriteCoaches.length === 0 && (
         <p className="text-muted-foreground text-center py-8">
           No lessons yet. Search for a coach to get started!
           <br />
@@ -179,10 +253,7 @@ function PendingCard({ request }: { request: Request }) {
         <div className="flex items-center justify-between">
           <div>
             <span className="font-medium">{request.coach.username}</span>
-            <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
-            </span>
-            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
+            <RequestMeta request={request} />
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Waiting for coach</Badge>
@@ -191,12 +262,72 @@ function PendingCard({ request }: { request: Request }) {
             </Button>
           </div>
         </div>
+        {request.message && (
+          <div className="mt-2 p-2 bg-muted rounded text-sm">
+            <span className="text-xs text-muted-foreground">Your message: </span>
+            {request.message}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function ActiveCard({ request }: { request: Request }) {
+function StudentAcceptedCard({ request }: { request: Request }) {
+  const [loading, setLoading] = useState(false);
+  const [declLoading, setDeclLoading] = useState(false);
+
+  async function handleConfirmStart() {
+    setLoading(true);
+    const result = await confirmLessonStart(request.id);
+    setLoading(false);
+    if (result.error) toast.error(result.error);
+    else toast.success("Start confirmed!");
+  }
+
+  async function handleDecline() {
+    setDeclLoading(true);
+    const result = await declineAcceptedLesson(request.id);
+    setDeclLoading(false);
+    if (result.error) toast.error(result.error);
+    else toast.success("Lesson declined. Funds released.");
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="font-medium">{request.coach.username}</span>
+            <RequestMeta request={request} />
+            {request.coach.chessComUsername && (
+              <div className="text-sm font-medium text-blue-600 mt-1">
+                Chess.com: {request.coach.chessComUsername}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground mt-1">
+              {request.studentStartConfirmed ? "✓ You confirmed start" : "⏳ Confirm when lesson starts"}
+              {" · "}
+              {request.coachStartConfirmed ? "✓ Coach confirmed start" : "⏳ Awaiting coach start confirmation"}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {!request.studentStartConfirmed && (
+              <Button size="sm" onClick={handleConfirmStart} disabled={loading}>
+                Confirm Start
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={handleDecline} disabled={declLoading}>
+              Decline
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StudentActiveCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
@@ -227,19 +358,16 @@ function ActiveCard({ request }: { request: Request }) {
         <div className="flex items-center justify-between">
           <div>
             <span className="font-medium">{request.coach.username}</span>
-            <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
-            </span>
-            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
+            <RequestMeta request={request} />
             {request.coach.chessComUsername && (
               <div className="text-sm font-medium text-blue-600 mt-1">
                 Chess.com: {request.coach.chessComUsername}
               </div>
             )}
             <div className="text-xs text-muted-foreground mt-1">
-              {request.studentConfirmed ? "✓ You confirmed" : "⏳ Awaiting your confirmation"}
+              {request.studentConfirmed ? "✓ You confirmed completion" : "⏳ Awaiting your confirmation"}
               {" · "}
-              {request.coachConfirmed ? "✓ Coach confirmed" : "⏳ Awaiting coach confirmation"}
+              {request.coachConfirmed ? "✓ Coach confirmed completion" : "⏳ Awaiting coach confirmation"}
             </div>
           </div>
           {!request.studentConfirmed && (
@@ -274,7 +402,7 @@ function ActiveCard({ request }: { request: Request }) {
   );
 }
 
-function CompletedCard({ request }: { request: Request }) {
+function StudentCompletedCard({ request }: { request: Request }) {
   const existingReview = request.reviews?.[0] ?? null;
   const [showReview, setShowReview] = useState(false);
   const [rating, setRating] = useState(existingReview?.rating?.toString() ?? "5");
@@ -297,10 +425,7 @@ function CompletedCard({ request }: { request: Request }) {
         <div className="flex items-center justify-between">
           <div>
             <span className="font-medium">{request.coach.username}</span>
-            <span className="text-sm text-muted-foreground ml-2">
-              {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
-            </span>
-            {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
+            <RequestMeta request={request} />
           </div>
           <div className="flex items-center gap-2">
             <Badge>Completed</Badge>

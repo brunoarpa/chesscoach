@@ -18,8 +18,8 @@ export default async function WalletPage() {
       pendingEarnings: true,
       totalEarningsAllTime: true,
       verificationStatus: true,
-      coachPricePerHour: true,
-      gameReviewPrice: true,
+      coachPricePer5Min: true,
+      gameReviewPricePer5Min: true,
     },
   });
 
@@ -75,7 +75,7 @@ export default async function WalletPage() {
 
       <DepositForm />
 
-      {user.verificationStatus === "VERIFIED" && (user.coachPricePerHour || user.gameReviewPrice) && (
+      {user.verificationStatus === "VERIFIED" && (user.coachPricePer5Min || user.gameReviewPricePer5Min) && (
         <>
           <Separator className="my-8" />
           <StripeConnectSetup />

@@ -12,6 +12,8 @@ const lessonRequestInputSchema = z.object({
   type: z.enum(["GAME_REVIEW", "LESSON"]),
   durationMinutes: z.coerce.number().int().min(5).max(480),
   isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
+  communicationMethod: z.enum(["CALL", "CHAT"]).optional(),
+  message: z.string().max(500).optional(),
 });
 
 export async function createLessonRequest(formData: FormData) {
@@ -23,13 +25,15 @@ export async function createLessonRequest(formData: FormData) {
     type: formData.get("type"),
     durationMinutes: formData.get("durationMinutes"),
     isTrial: formData.get("isTrial") ?? "false",
+    communicationMethod: formData.get("communicationMethod") || undefined,
+    message: formData.get("message") || undefined,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { coachId, type, durationMinutes, isTrial } = parsed.data;
+  const { coachId, type, durationMinutes, isTrial, communicationMethod, message } = parsed.data;
 
   if (coachId === session.user.id) {
     return { error: "You cannot request a lesson from yourself" };
@@ -56,11 +60,12 @@ export async function createLessonRequest(formData: FormData) {
   const coach = await prisma.user.findUnique({
     where: { id: coachId },
     select: {
-      coachPricePerHour: true,
-      gameReviewPrice: true,
+      coachPricePer5Min: true,
+      gameReviewPricePer5Min: true,
       verificationStatus: true,
       activityStatus: true,
       coachAvailability: true,
+      communicationPreference: true,
     },
   });
 
@@ -70,6 +75,19 @@ export async function createLessonRequest(formData: FormData) {
   }
   if (coach.coachAvailability !== "AVAILABLE") {
     return { error: coach.coachAvailability === "BUSY" ? "This coach is currently busy and not accepting new lesson requests" : "This coach is not currently accepting students" };
+  }
+
+  // Check if coach has blocked this student
+  const blocked = await prisma.block.findUnique({
+    where: { coachId_studentId: { coachId, studentId: session.user.id } },
+  });
+  if (blocked) {
+    return { error: "This coach has blocked you from requesting lessons." };
+  }
+
+  // Validate communication method against coach preference
+  if (communicationMethod === "CALL" && coach.communicationPreference === "CHAT_ONLY") {
+    return { error: "This coach only accepts chat-based lessons." };
   }
 
   // Calculate cost
@@ -102,12 +120,13 @@ export async function createLessonRequest(formData: FormData) {
 
     estimatedCost = 0;
   } else if (type === "GAME_REVIEW") {
-    if (!coach.gameReviewPrice) return { error: "Coach doesn't offer game reviews" };
-    const reviewCount = Math.ceil(durationMinutes / 5);
-    estimatedCost = coach.gameReviewPrice * reviewCount;
+    if (!coach.gameReviewPricePer5Min) return { error: "Coach doesn't offer game reviews" };
+    const blocks = Math.ceil(durationMinutes / 5);
+    estimatedCost = coach.gameReviewPricePer5Min * blocks;
   } else {
-    if (!coach.coachPricePerHour) return { error: "Coach doesn't offer lessons" };
-    estimatedCost = Math.round((coach.coachPricePerHour * durationMinutes) / 60);
+    if (!coach.coachPricePer5Min) return { error: "Coach doesn't offer lessons" };
+    const blocks = Math.ceil(durationMinutes / 5);
+    estimatedCost = coach.coachPricePer5Min * blocks;
   }
 
   // Check student wallet (skip for free trials)
@@ -140,6 +159,8 @@ export async function createLessonRequest(formData: FormData) {
         durationMinutes,
         estimatedCost,
         isTrial,
+        communicationMethod: communicationMethod as "CALL" | "CHAT" | undefined,
+        message: message?.trim() || null,
       },
     }),
     prisma.user.update({
@@ -250,7 +271,7 @@ export async function confirmLesson(requestId: string) {
 
     const request = rows[0];
     if (!request) return { error: "Request not found" };
-    if (request.status !== "ACCEPTED") return { error: "Lesson must be accepted first" };
+    if (request.status !== "IN_PROGRESS") return { error: "Lesson must be in progress first" };
 
     const isStudent = request.studentId === session.user.id;
     const isCoach = request.coachId === session.user.id;
@@ -368,7 +389,7 @@ export async function confirmLesson(requestId: string) {
       const remainingActive = await tx.lessonRequest.count({
         where: {
           coachId: request.coachId,
-          status: "ACCEPTED",
+          status: { in: ["ACCEPTED", "IN_PROGRESS"] },
           id: { not: requestId },
         },
       });
@@ -456,7 +477,7 @@ export async function disputeLesson(requestId: string, reason: string) {
 
   if (!request) return { error: "Request not found" };
   if (request.studentId !== session.user.id) return { error: "Only the student can dispute a lesson" };
-  if (request.status !== "ACCEPTED") return { error: "Lesson must be active to dispute" };
+  if (request.status !== "ACCEPTED" && request.status !== "IN_PROGRESS") return { error: "Lesson must be active to dispute" };
 
   await prisma.$transaction([
     prisma.lessonRequest.update({
@@ -546,6 +567,215 @@ export async function submitReview(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath(`/profile`);
+  return { success: true };
+}
+
+/**
+ * Confirm lesson start. Both coach and student must confirm.
+ * When both confirm, status moves from ACCEPTED → IN_PROGRESS.
+ */
+export async function confirmLessonStart(requestId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  if (!requestId || typeof requestId !== "string") return { error: "Invalid request ID" };
+
+  const request = await prisma.lessonRequest.findUnique({
+    where: { id: requestId },
+  });
+
+  if (!request) return { error: "Request not found" };
+  if (request.status !== "ACCEPTED") return { error: "Lesson must be accepted first" };
+
+  const isStudent = request.studentId === session.user.id;
+  const isCoach = request.coachId === session.user.id;
+  if (!isStudent && !isCoach) return { error: "Not authorized" };
+
+  const updateData: Record<string, boolean> = {};
+  if (isStudent) updateData.studentStartConfirmed = true;
+  if (isCoach) updateData.coachStartConfirmed = true;
+
+  const newStudentStart = isStudent ? true : request.studentStartConfirmed;
+  const newCoachStart = isCoach ? true : request.coachStartConfirmed;
+  const bothConfirmed = newStudentStart && newCoachStart;
+
+  if (bothConfirmed) {
+    await prisma.$transaction([
+      prisma.lessonRequest.update({
+        where: { id: requestId },
+        data: { ...updateData, status: "IN_PROGRESS" },
+      }),
+      prisma.user.update({
+        where: { id: session.user.id },
+        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+      }),
+    ]);
+  } else {
+    await prisma.$transaction([
+      prisma.lessonRequest.update({
+        where: { id: requestId },
+        data: updateData,
+      }),
+      prisma.user.update({
+        where: { id: session.user.id },
+        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+      }),
+    ]);
+  }
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/**
+ * Decline an accepted lesson before it starts.
+ * Either coach or student can do this. Full refund, no admin needed.
+ */
+export async function declineAcceptedLesson(requestId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  const request = await prisma.lessonRequest.findUnique({
+    where: { id: requestId },
+  });
+
+  if (!request) return { error: "Request not found" };
+  if (request.status !== "ACCEPTED") return { error: "Can only decline accepted lessons that haven't started yet" };
+
+  const isStudent = request.studentId === session.user.id;
+  const isCoach = request.coachId === session.user.id;
+  if (!isStudent && !isCoach) return { error: "Not authorized" };
+
+  const txOps = [
+    prisma.lessonRequest.update({
+      where: { id: requestId },
+      data: { status: "CANCELLED" },
+    }),
+    ...(request.isTrial
+      ? []
+      : [
+          prisma.user.update({
+            where: { id: request.studentId },
+            data: { reservedBalance: { decrement: request.estimatedCost } },
+          }),
+        ]),
+    prisma.user.update({
+      where: { id: session.user.id },
+      data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+    }),
+  ];
+
+  await prisma.$transaction(txOps);
+
+  // Auto-restore coach to AVAILABLE if no more active lessons
+  const remainingActive = await prisma.lessonRequest.count({
+    where: {
+      coachId: request.coachId,
+      status: { in: ["ACCEPTED", "IN_PROGRESS"] },
+      id: { not: requestId },
+    },
+  });
+  if (remainingActive === 0) {
+    const coachUser = await prisma.user.findUnique({
+      where: { id: request.coachId },
+      select: { coachAvailability: true },
+    });
+    if (coachUser?.coachAvailability === "BUSY") {
+      await prisma.user.update({
+        where: { id: request.coachId },
+        data: { coachAvailability: "AVAILABLE" },
+      });
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/**
+ * Toggle a coach as favourite for the current user.
+ */
+export async function toggleFavourite(coachId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  if (coachId === session.user.id) return { error: "You cannot favourite yourself" };
+
+  const existing = await prisma.favourite.findUnique({
+    where: { userId_coachId: { userId: session.user.id, coachId } },
+  });
+
+  if (existing) {
+    await prisma.favourite.delete({ where: { id: existing.id } });
+    revalidatePath("/dashboard");
+    revalidatePath("/search");
+    return { favourited: false };
+  } else {
+    await prisma.favourite.create({
+      data: { userId: session.user.id, coachId },
+    });
+    revalidatePath("/dashboard");
+    revalidatePath("/search");
+    return { favourited: true };
+  }
+}
+
+/**
+ * Coach blocks a student. Also cancels any pending requests from that student.
+ */
+export async function blockStudent(studentId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  if (studentId === session.user.id) return { error: "You cannot block yourself" };
+
+  const existing = await prisma.block.findUnique({
+    where: { coachId_studentId: { coachId: session.user.id, studentId } },
+  });
+  if (existing) return { error: "Student is already blocked" };
+
+  // Block and cancel any pending requests from this student
+  const pendingRequests = await prisma.lessonRequest.findMany({
+    where: { coachId: session.user.id, studentId, status: "PENDING" },
+  });
+
+  const txOps = [
+    prisma.block.create({
+      data: { coachId: session.user.id, studentId },
+    }),
+    ...pendingRequests.map((r) =>
+      prisma.lessonRequest.update({
+        where: { id: r.id },
+        data: { status: "DECLINED", respondedAt: new Date() },
+      })
+    ),
+    ...pendingRequests
+      .filter((r) => !r.isTrial)
+      .map((r) =>
+        prisma.user.update({
+          where: { id: studentId },
+          data: { reservedBalance: { decrement: r.estimatedCost } },
+        })
+      ),
+  ];
+
+  await prisma.$transaction(txOps);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/**
+ * Coach unblocks a student.
+ */
+export async function unblockStudent(studentId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  await prisma.block.deleteMany({
+    where: { coachId: session.user.id, studentId },
+  });
+
+  revalidatePath("/dashboard");
   return { success: true };
 }
 

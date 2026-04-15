@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
+import { auth } from "@/lib/auth";
 
 interface SearchParams {
   q?: string;
@@ -14,6 +15,7 @@ interface SearchParams {
   status?: string;
   availability?: string;
   lastSeen?: string;
+  favourites?: string;
 }
 
 export default async function SearchPage({
@@ -22,11 +24,25 @@ export default async function SearchPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  const session = await auth();
 
   // Build where clause
   const where: Prisma.UserWhereInput = {
     verificationStatus: "VERIFIED",
   };
+
+  // Favourites filter
+  let favouriteCoachIds: string[] = [];
+  if (session?.user?.id) {
+    const favs = await prisma.favourite.findMany({
+      where: { userId: session.user.id },
+      select: { coachId: true },
+    });
+    favouriteCoachIds = favs.map((f) => f.coachId);
+  }
+  if (params.favourites === "true" && favouriteCoachIds.length > 0) {
+    where.id = { in: favouriteCoachIds };
+  }
 
   if (params.q) {
     where.username = { contains: params.q, mode: "insensitive" };
@@ -43,11 +59,11 @@ export default async function SearchPage({
   }
 
   if (params.minPrice || params.maxPrice) {
-    where.coachPricePerHour = {};
+    where.coachPricePer5Min = {};
     if (params.minPrice)
-      where.coachPricePerHour.gte = Math.round(Number(params.minPrice) * 100);
+      where.coachPricePer5Min.gte = Math.round(Number(params.minPrice) * 100);
     if (params.maxPrice)
-      where.coachPricePerHour.lte = Math.round(Number(params.maxPrice) * 100);
+      where.coachPricePer5Min.lte = Math.round(Number(params.maxPrice) * 100);
   }
 
   if (params.communication && params.communication !== "any") {
@@ -92,14 +108,15 @@ export default async function SearchPage({
       username: true,
       chessRating: true,
       continent: true,
-      coachPricePerHour: true,
-      gameReviewPrice: true,
+      coachPricePer5Min: true,
+      gameReviewPricePer5Min: true,
       communicationPreference: true,
       coachElo: true,
       activityStatus: true,
       coachAvailability: true,
       lastActiveAt: true,
       lessonsGiven: true,
+      bio: true,
       reviewsReceived: { select: { rating: true } },
     },
   });
@@ -110,7 +127,7 @@ export default async function SearchPage({
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <aside>
-          <SearchFilters params={params as Record<string, string | undefined>} />
+          <SearchFilters params={params as Record<string, string | undefined>} isLoggedIn={!!session?.user} />
         </aside>
 
         <div className="md:col-span-3">
@@ -129,11 +146,12 @@ export default async function SearchPage({
                 return (
                   <CoachCard
                     key={coach.id}
+                    id={coach.id}
                     username={coach.username}
                     chessRating={coach.chessRating}
                     continent={coach.continent}
-                    coachPricePerHour={coach.coachPricePerHour}
-                    gameReviewPrice={coach.gameReviewPrice}
+                    coachPricePer5Min={coach.coachPricePer5Min}
+                    gameReviewPricePer5Min={coach.gameReviewPricePer5Min}
                     communicationPreference={coach.communicationPreference}
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
@@ -142,6 +160,9 @@ export default async function SearchPage({
                     avgRating={avgRating}
                     reviewCount={coach.reviewsReceived.length}
                     lessonsGiven={coach.lessonsGiven}
+                    bio={coach.bio}
+                    isFavourited={favouriteCoachIds.includes(coach.id)}
+                    showFavourite={!!session?.user}
                   />
                 );
               })}

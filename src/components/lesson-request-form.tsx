@@ -6,35 +6,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { createLessonRequest } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 
 interface Props {
   coachId: string;
-  coachPricePerHour: number | null;
-  gameReviewPrice: number | null;
+  coachPricePer5Min: number | null;
+  gameReviewPricePer5Min: number | null;
+  coachCommunicationPreference: string;
   availableBalance: number;
   freeTrialsRemaining: number;
   hasCompletedPaidLesson: boolean;
 }
 
-export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson }: Props) {
+export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPricePer5Min, coachCommunicationPreference, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson }: Props) {
   const [type, setType] = useState<string>("");
   const [duration, setDuration] = useState("");
   const [loading, setLoading] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
   const [warningDismissed, setWarningDismissed] = useState(false);
+  const [commMethod, setCommMethod] = useState<string>("");
+  const [message, setMessage] = useState("");
 
-  const hasPricing = coachPricePerHour !== null || gameReviewPrice !== null;
+  const hasPricing = coachPricePer5Min !== null || gameReviewPricePer5Min !== null;
 
   const estimatedCost = (() => {
     const mins = Number(duration);
     if (!mins) return 0;
-    if (type === "GAME_REVIEW" && gameReviewPrice) {
-      return (gameReviewPrice * Math.ceil(mins / 5)) / 100;
+    const blocks = Math.ceil(mins / 5);
+    if (type === "GAME_REVIEW" && gameReviewPricePer5Min) {
+      return (gameReviewPricePer5Min * blocks) / 100;
     }
-    if (type === "LESSON" && coachPricePerHour) {
-      return (coachPricePerHour * mins) / 60 / 100;
+    if (type === "LESSON" && coachPricePer5Min) {
+      return (coachPricePer5Min * blocks) / 100;
     }
     return 0;
   })();
@@ -50,6 +55,8 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
       setType("");
       setDuration("");
       setIsTrial(false);
+      setCommMethod("");
+      setMessage("");
     }
   }
 
@@ -101,14 +108,14 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
-                {coachPricePerHour && (
+                {coachPricePer5Min && (
                   <SelectItem value="LESSON">
-                    Lesson (${(coachPricePerHour / 100).toFixed(2)}/hr)
+                    Lesson (${(coachPricePer5Min / 100).toFixed(2)}/5min)
                   </SelectItem>
                 )}
-                {gameReviewPrice && (
+                {gameReviewPricePer5Min && (
                   <SelectItem value="GAME_REVIEW">
-                    Game Review (${(gameReviewPrice / 100).toFixed(2)} per ~5min)
+                    Game Review (${(gameReviewPricePer5Min / 100).toFixed(2)}/5min)
                   </SelectItem>
                 )}
               </SelectContent>
@@ -124,8 +131,36 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
               max={480}
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              placeholder={type === "GAME_REVIEW" ? "5" : "60"}
+              placeholder={type === "GAME_REVIEW" ? "5" : "30"}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Communication Method</Label>
+            <Select name="communicationMethod" value={commMethod} onValueChange={setCommMethod}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CHAT">Chat</SelectItem>
+                {coachCommunicationPreference === "CHAT_AND_CALL" && (
+                  <SelectItem value="CALL">Call</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Message for Coach (optional)</Label>
+            <Textarea
+              name="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Introduce yourself, describe what you'd like to work on..."
+              maxLength={500}
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground text-right">{message.length}/500</p>
           </div>
 
           <p className="text-sm text-muted-foreground">
@@ -164,7 +199,7 @@ export function LessonRequestForm({ coachId, coachPricePerHour, gameReviewPrice,
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || !type || !duration || (!isTrial && estimatedCost > 0 && estimatedCost > availableBalance / 100)}
+            disabled={loading || !type || !duration || !commMethod || (!isTrial && estimatedCost > 0 && estimatedCost > availableBalance / 100)}
           >
             {loading ? "Sending..." : isTrial ? "Send Free Trial Request" : "Send Request"}
           </Button>

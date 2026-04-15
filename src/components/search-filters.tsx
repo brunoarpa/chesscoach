@@ -20,9 +20,10 @@ const ratingOptions = Array.from({ length: 30 }, (_, i) => (i + 1) * 100); // 10
 
 interface Props {
   params: Record<string, string | undefined>;
+  isLoggedIn?: boolean;
 }
 
-export function SearchFilters({ params }: Props) {
+export function SearchFilters({ params, isLoggedIn }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -96,7 +97,7 @@ export function SearchFilters({ params }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label>Price per Hour ($)</Label>
+        <Label>Price per 5 min ($)</Label>
         <div className="flex gap-2">
           <Input
             name="minPrice"
@@ -180,6 +181,20 @@ export function SearchFilters({ params }: Props) {
       <Button type="submit" className="w-full">
         Apply Filters
       </Button>
+
+      {isLoggedIn && (
+        <div className="flex items-center gap-2 pt-2">
+          <input
+            type="checkbox"
+            id="favourites"
+            name="favourites"
+            value="true"
+            defaultChecked={params.favourites === "true"}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          <label htmlFor="favourites" className="text-sm">Favourites only</label>
+        </div>
+      )}
     </form>
   );
 }
