@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { getActivityDotColor } from "@/lib/utils";
+import { getActivityDotColor, getEffectiveAvailability } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -97,9 +97,9 @@ export default async function LeaderboardPage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  {coach.coachAvailability === "AVAILABLE" ? (
+                  {getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt) === "AVAILABLE" ? (
                     <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                  ) : coach.coachAvailability === "BUSY" ? (
+                  ) : getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt) === "BUSY" ? (
                     <Badge variant="destructive">Busy</Badge>
                   ) : (
                     <Badge variant="secondary">Unavailable</Badge>

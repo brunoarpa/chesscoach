@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { getEffectiveAvailability } from "@/lib/utils";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
@@ -65,6 +66,7 @@ export async function createLessonRequest(formData: FormData) {
       verificationStatus: true,
       activityStatus: true,
       coachAvailability: true,
+      lastActiveAt: true,
       communicationPreference: true,
     },
   });
@@ -73,8 +75,9 @@ export async function createLessonRequest(formData: FormData) {
   if (coach.verificationStatus !== "VERIFIED") {
     return { error: "Coach is not verified" };
   }
-  if (coach.coachAvailability !== "AVAILABLE") {
-    return { error: coach.coachAvailability === "BUSY" ? "This coach is currently busy and not accepting new lesson requests" : "This coach is not currently accepting students" };
+  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt);
+  if (effectiveAvailability !== "AVAILABLE") {
+    return { error: effectiveAvailability === "BUSY" ? "This coach is currently busy and not accepting new lesson requests" : "This coach is not currently accepting students" };
   }
 
   // Check if coach has blocked this student

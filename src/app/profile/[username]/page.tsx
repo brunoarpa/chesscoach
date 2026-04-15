@@ -22,7 +22,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-import { getActivityDotColor, getActivityLabel } from "@/lib/utils";
+import { getActivityDotColor, getActivityLabel, getEffectiveAvailability } from "@/lib/utils";
 
 function formatLastSeen(date: Date): string {
   const now = Date.now();
@@ -168,7 +168,8 @@ export default async function ProfilePage({
 
   // Check if coach has completed any paid lessons (for new coach warning)
   let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
-  if (user.verificationStatus === "VERIFIED" && user.coachAvailability === "AVAILABLE") {
+  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt);
+  if (user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
     const paidCompleted = await prisma.lessonRequest.findFirst({
       where: {
         coachId: user.id,
@@ -200,13 +201,13 @@ export default async function ProfilePage({
             {user.verificationStatus === "PENDING" && (
               <Badge variant="secondary">Pending Verification</Badge>
             )}
-            {user.verificationStatus === "VERIFIED" && user.coachAvailability === "AVAILABLE" && (
+            {user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE" && (
               <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
             )}
-            {user.verificationStatus === "VERIFIED" && user.coachAvailability === "UNAVAILABLE" && (
+            {user.verificationStatus === "VERIFIED" && effectiveAvailability === "UNAVAILABLE" && (
               <Badge variant="secondary">Unavailable</Badge>
             )}
-            {user.verificationStatus === "VERIFIED" && user.coachAvailability === "BUSY" && (
+            {user.verificationStatus === "VERIFIED" && effectiveAvailability === "BUSY" && (
               <Badge variant="destructive">Busy</Badge>
             )}
           </div>
@@ -383,7 +384,7 @@ export default async function ProfilePage({
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
-            user.coachAvailability === "AVAILABLE" &&
+            effectiveAvailability === "AVAILABLE" &&
             studentVerified &&
             !isBlocked && (
               <LessonRequestForm
@@ -406,7 +407,7 @@ export default async function ProfilePage({
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
-            user.coachAvailability === "AVAILABLE" &&
+            effectiveAvailability === "AVAILABLE" &&
             !studentVerified && (
               <Card>
                 <CardContent className="pt-6 text-center text-sm text-muted-foreground">
@@ -417,7 +418,7 @@ export default async function ProfilePage({
             )}
           {!isOwnProfile &&
             user.verificationStatus === "VERIFIED" &&
-            user.coachAvailability === "BUSY" && (
+            effectiveAvailability === "BUSY" && (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   <div className="flex items-center justify-center gap-2 mb-1">
@@ -430,7 +431,7 @@ export default async function ProfilePage({
             )}
           {!isOwnProfile &&
             user.verificationStatus === "VERIFIED" &&
-            user.coachAvailability === "UNAVAILABLE" && (
+            effectiveAvailability === "UNAVAILABLE" && (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   This coach is not currently taking students.

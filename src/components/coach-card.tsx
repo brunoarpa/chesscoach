@@ -13,7 +13,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-import { getActivityDotColor } from "@/lib/utils";
+import { getActivityDotColor, getEffectiveAvailability } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -70,9 +70,9 @@ export function CoachCard(props: Props) {
             <p className="text-sm text-muted-foreground mb-3">
               <span className="flex items-center gap-1.5">
                 ♟ Chess Coach
-                {props.coachAvailability === "AVAILABLE" ? (
+                {getEffectiveAvailability(props.coachAvailability, props.lastActiveAt) === "AVAILABLE" ? (
                   <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                ) : props.coachAvailability === "BUSY" ? (
+                ) : getEffectiveAvailability(props.coachAvailability, props.lastActiveAt) === "BUSY" ? (
                   <Badge variant="destructive">Busy</Badge>
                 ) : (
                   <Badge variant="secondary">Unavailable</Badge>

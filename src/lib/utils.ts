@@ -22,6 +22,16 @@ export function getActivityDotColor(lastActiveAt: Date): string {
   return "bg-gray-400";
 }
 
+/**
+ * Returns the effective coach availability, overriding the stored value
+ * to UNAVAILABLE if the coach hasn't been active in 24+ hours.
+ */
+export function getEffectiveAvailability(coachAvailability: string, lastActiveAt: Date): string {
+  const hours = (Date.now() - lastActiveAt.getTime()) / (1000 * 60 * 60);
+  if (hours >= 24 && coachAvailability !== "UNAVAILABLE") return "UNAVAILABLE";
+  return coachAvailability;
+}
+
 export function getActivityLabel(lastActiveAt: Date): string {
   const diffMs = Date.now() - lastActiveAt.getTime();
   const hours = diffMs / (1000 * 60 * 60);
