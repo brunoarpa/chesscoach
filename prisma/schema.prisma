@@ -338,7 +338,7 @@ model RecoveryRequest {
   id               String   @id @default(cuid())
   username         String   // the username they're trying to recover
   chessComUsername  String?  // chess.com username if they have one
-  contactInfo      String   // how to reach them (email, discord, etc.)
+  email            String   // email to contact them
   message          String?  // optional extra info
   resolved         Boolean  @default(false)
   resolvedBy       String?

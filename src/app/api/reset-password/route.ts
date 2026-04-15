@@ -9,10 +9,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
-  const { username, chessComUsername, contactInfo, message } = await request.json();
+  const { username, chessComUsername, email, message } = await request.json();
 
-  if (!username || typeof username !== "string" || !contactInfo || typeof contactInfo !== "string") {
-    return NextResponse.json({ error: "Username and contact info are required" }, { status: 400 });
+  if (!username || typeof username !== "string") {
+    return NextResponse.json({ error: "Username is required" }, { status: 400 });
+  }
+
+  if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+  }
+
+  if (email.length > 254) {
+    return NextResponse.json({ error: "Email is too long" }, { status: 400 });
+  }
+
+  if (username.length > 50 || (chessComUsername && chessComUsername.length > 50)) {
+    return NextResponse.json({ error: "Input too long" }, { status: 400 });
+  }
+
+  if (message && message.length > 500) {
+    return NextResponse.json({ error: "Message is too long (max 500 characters)" }, { status: 400 });
   }
 
   // Check that the username actually exists
@@ -37,9 +53,9 @@ export async function POST(request: Request) {
   await prisma.recoveryRequest.create({
     data: {
       username,
-      chessComUsername: chessComUsername || null,
-      contactInfo,
-      message: message || null,
+      chessComUsername: chessComUsername?.slice(0, 50) || null,
+      email: email.toLowerCase().trim(),
+      message: message?.slice(0, 500) || null,
     },
   });
 

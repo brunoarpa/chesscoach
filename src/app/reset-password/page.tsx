@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function ResetPasswordPage() {
   const [username, setUsername] = useState("");
   const [chessComUsername, setChessComUsername] = useState("");
-  const [contactInfo, setContactInfo] = useState("");
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +23,7 @@ export default function ResetPasswordPage() {
       const res = await fetch("/api/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, chessComUsername, contactInfo, message }),
+        body: JSON.stringify({ username, chessComUsername, email, message }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -87,13 +87,15 @@ export default function ResetPasswordPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="contactInfo">How can we reach you?</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="contactInfo"
+                    id="email"
+                    type="email"
                     required
-                    value={contactInfo}
-                    onChange={(e) => setContactInfo(e.target.value)}
-                    placeholder="Email, Discord, etc."
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    maxLength={254}
                   />
                 </div>
                 <div className="space-y-2">

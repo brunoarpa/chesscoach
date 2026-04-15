@@ -10,7 +10,7 @@ interface RecoveryRequest {
   id: string;
   username: string;
   chessComUsername: string | null;
-  contactInfo: string;
+  email: string;
   message: string | null;
   createdAt: string;
 }
@@ -58,7 +58,7 @@ export function RecoveryRequestList({ requests }: { requests: RecoveryRequest[] 
                   </a>
                 </Badge>
               )}
-              <Badge variant="outline">Contact: {req.contactInfo}</Badge>
+              <Badge variant="outline">{req.email}</Badge>
             </div>
             {req.message && (
               <p className="text-sm text-muted-foreground">{req.message}</p>
