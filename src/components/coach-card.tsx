@@ -12,11 +12,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-const activityColors: Record<string, string> = {
-  ACTIVE: "bg-green-500",
-  AWAY: "bg-yellow-500",
-  INACTIVE: "bg-gray-400",
-};
+import { getActivityDotColor } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -97,7 +93,7 @@ export function CoachCard(props: Props) {
             <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {props.lessonsGiven} lessons</span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              <span className={`w-2 h-2 rounded-full ${activityColors[props.activityStatus] ?? "bg-gray-400"}`} />
+              <span className={`w-2 h-2 rounded-full ${getActivityDotColor(props.lastActiveAt)}`} />
               {formatRelativeTime(props.lastActiveAt)}
             </span>
           </div>

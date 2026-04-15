@@ -2,12 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-
-const activityColors: Record<string, string> = {
-  ACTIVE: "bg-green-500",
-  AWAY: "bg-yellow-500",
-  INACTIVE: "bg-gray-400",
-};
+import { getActivityDotColor } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -90,7 +85,7 @@ export default async function LeaderboardPage() {
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${activityColors[coach.activityStatus]}`} />
+                    <span className={`w-2 h-2 rounded-full ${getActivityDotColor(coach.lastActiveAt)}`} />
                     <span className="text-xs text-muted-foreground">
                       {formatRelativeTime(coach.lastActiveAt)}
                     </span>

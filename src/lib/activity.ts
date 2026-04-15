@@ -68,6 +68,16 @@ export async function updateActivityStatuses() {
     },
     data: { activityStatus: "ACTIVE" },
   });
+
+  // Auto-set coaches to UNAVAILABLE if inactive for 24+ hours
+  await prisma.user.updateMany({
+    where: {
+      lastActiveAt: { lt: oneDayAgo },
+      verificationStatus: "VERIFIED",
+      coachAvailability: { not: "UNAVAILABLE" },
+    },
+    data: { coachAvailability: "UNAVAILABLE" },
+  });
 }
 
 /**

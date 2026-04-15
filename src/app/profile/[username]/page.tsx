@@ -21,11 +21,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-const activityColors: Record<string, string> = {
-  ACTIVE: "bg-green-500",
-  AWAY: "bg-yellow-500",
-  INACTIVE: "bg-gray-400",
-};
+import { getActivityDotColor, getActivityLabel } from "@/lib/utils";
 
 function formatLastSeen(date: Date): string {
   const now = Date.now();
@@ -178,8 +174,8 @@ export default async function ProfilePage({
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{user.username}</h1>
             <div
-              className={`w-3 h-3 rounded-full ${activityColors[user.activityStatus]}`}
-              title={user.activityStatus}
+              className={`w-3 h-3 rounded-full ${getActivityDotColor(user.lastActiveAt)}`}
+              title={getActivityLabel(user.lastActiveAt)}
             />
             {user.verificationStatus === "VERIFIED" && (
               <Badge variant="default">Verified</Badge>
@@ -198,7 +194,7 @@ export default async function ProfilePage({
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {user.activityStatus === "ACTIVE" ? "Active" : user.activityStatus === "AWAY" ? "Away" : "Inactive"}
+            {getActivityLabel(user.lastActiveAt)}
           </p>
         </div>
 
