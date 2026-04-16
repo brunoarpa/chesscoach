@@ -106,6 +106,16 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, coachCommunicati
               onChange={(e) => setDuration(e.target.value)}
               placeholder="30"
             />
+            {!isTrial && Number(duration) >= 5 && coachPricePer5Min && (
+              <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {Math.ceil(Number(duration) / 5)} × €{(coachPricePer5Min / 100).toFixed(2)} per 5 min
+                  </span>
+                  <span className="font-medium">€{estimatedCost.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

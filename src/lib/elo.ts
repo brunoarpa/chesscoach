@@ -7,26 +7,25 @@ const EARNING_BONUS = 400; // bonus from recent earnings (decays from last earni
 const EARNING_DECAY = 0.023; // half-life ≈ 30 days
 const EARNINGS_MULTIPLIER = 100; // log-scaled lifetime earnings boost
 
+type PrismaLike = Pick<typeof prisma, "user" | "earningRecord">;
+
 /**
  * Calculate coach ELO rating.
  *
- * Formula: 100 + 500·e^(-0.1·daysSinceActive) + 400·e^(-0.023·daysSinceLastEarning) + 100·ln(1 + totalEarnings$)
+ * Formula: 100 + 500·e^(-0.1·daysSinceActive) + 400·e^(-0.023·daysSinceLastEarning) + 100·ln(1 + totalEarnings€)
  *
- * - New active coach starts at ~1000.
- * - Activity component (500 pts) decays with ~7-day half-life — log in regularly to stay high.
- * - Earning component (400 pts) decays with ~30-day half-life from last earning.
- * - Log-scaled lifetime earnings give a permanent (but diminishing) boost.
- * - Floor at 100 for completely inactive coaches.
+ * Accepts an optional prisma client (e.g. a transaction client) so it can
+ * read data that hasn't been committed yet.
  */
-export async function calculateCoachElo(userId: string): Promise<number> {
-  const user = await prisma.user.findUnique({
+export async function calculateCoachElo(userId: string, db: PrismaLike = prisma): Promise<number> {
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: { createdAt: true, lastActiveAt: true },
   });
 
   if (!user) return BASE_RATING + ACTIVITY_BONUS + EARNING_BONUS;
 
-  const earnings = await prisma.earningRecord.findMany({
+  const earnings = await db.earningRecord.findMany({
     where: { userId },
     select: { amount: true, earnedAt: true },
     orderBy: { earnedAt: "desc" },

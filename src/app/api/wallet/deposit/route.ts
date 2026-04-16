@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
+const PROCESSING_FEE_CENTS = 50; // €0.50 flat fee
+const MIN_DEPOSIT_CENTS = 500;   // €5.00
+const MAX_DEPOSIT_CENTS = 1000;  // €10.00
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -29,17 +33,19 @@ export async function POST(request: Request) {
 
   const { amount } = await request.json();
 
-  if (!amount || amount < 500) {
+  if (!amount || amount < MIN_DEPOSIT_CENTS) {
     return NextResponse.json({ error: "Minimum deposit is €5.00" }, { status: 400 });
   }
 
-  if (amount > 1000000) {
-    return NextResponse.json({ error: "Maximum deposit is €10,000.00" }, { status: 400 });
+  if (amount > MAX_DEPOSIT_CENTS) {
+    return NextResponse.json({ error: "Maximum deposit is €10.00" }, { status: 400 });
   }
 
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
   }
+
+  const totalCharge = amount + PROCESSING_FEE_CENTS;
 
   // Create a Stripe Checkout session
   const stripe = (await import("stripe")).default;
@@ -59,10 +65,19 @@ export async function POST(request: Request) {
         },
         quantity: 1,
       },
+      {
+        price_data: {
+          currency: "eur",
+          product_data: { name: "Processing Fee" },
+          unit_amount: PROCESSING_FEE_CENTS,
+        },
+        quantity: 1,
+      },
     ],
     metadata: {
       userId: session.user.id,
       type: "deposit",
+      depositAmount: String(amount),
     },
     success_url: `${appUrl}/wallet?success=true`,
     cancel_url: `${appUrl}/wallet?cancelled=true`,

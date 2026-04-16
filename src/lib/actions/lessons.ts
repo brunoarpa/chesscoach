@@ -381,8 +381,8 @@ export async function confirmLesson(requestId: string) {
         data: { playersTaught: distinctStudents.length },
       });
 
-      // Recalculate coach ELO immediately
-      const newElo = await calculateCoachElo(request.coachId);
+      // Recalculate coach ELO immediately (pass tx so it sees uncommitted data)
+      const newElo = await calculateCoachElo(request.coachId, tx);
       await tx.user.update({
         where: { id: request.coachId },
         data: { coachElo: newElo },

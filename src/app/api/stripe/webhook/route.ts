@@ -30,10 +30,11 @@ export async function POST(request: Request) {
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as { metadata?: { userId?: string; type?: string }; amount_total?: number | null; payment_intent?: string; id?: string };
+    const session = event.data.object as { metadata?: { userId?: string; type?: string; depositAmount?: string }; amount_total?: number | null; payment_intent?: string; id?: string };
     const userId = session.metadata?.userId;
     const type = session.metadata?.type;
-    const amount = session.amount_total;
+    // Use depositAmount from metadata (excludes processing fee), fall back to amount_total for older sessions
+    const amount = session.metadata?.depositAmount ? parseInt(session.metadata.depositAmount, 10) : session.amount_total;
     const paymentIntentId = session.payment_intent as string;
 
     if (userId && type === "deposit" && amount && paymentIntentId) {

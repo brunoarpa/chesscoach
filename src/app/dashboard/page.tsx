@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { calculateCoachElo } from "@/lib/elo";
 import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
@@ -14,8 +15,17 @@ export default async function DashboardPage() {
   const currentUser = await prisma.user.update({
     where: { id: session.user.id },
     data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true },
   });
+
+  // Recalculate coach ELO on every dashboard visit for verified coaches
+  if (currentUser.verificationStatus === "VERIFIED") {
+    const newElo = await calculateCoachElo(session.user.id);
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { coachElo: newElo },
+    });
+  }
 
   const [incomingRequests, outgoingRequests, favouriteCoaches] = await Promise.all([
     // Coach incoming
@@ -65,9 +75,7 @@ export default async function DashboardPage() {
       <AutoRefresh />
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
-      <div className="mb-8">
-        <LessonFlowGuide />
-      </div>
+      <LessonFlowGuide />
 
       {currentUser.isSuspended && (
         <div className="mb-6 p-4 rounded-lg border border-destructive bg-destructive/10 text-destructive">
