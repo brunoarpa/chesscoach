@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { LessonFlowGuide } from "@/components/dashboard/lesson-flow-guide";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,6 +48,7 @@ export default function RootLayout({
               <a href="mailto:chesscoach.training@gmail.com" className="hover:underline">Contact</a>
             </div>
           </footer>
+          <LessonFlowGuide />
           <Toaster />
         </ThemeProvider>
       </body>

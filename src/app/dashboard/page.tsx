@@ -5,7 +5,6 @@ import { calculateCoachElo } from "@/lib/elo";
 import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
-import { LessonFlowGuide } from "@/components/dashboard/lesson-flow-guide";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -74,8 +73,6 @@ export default async function DashboardPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <AutoRefresh />
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
-
-      <LessonFlowGuide />
 
       {currentUser.isSuspended && (
         <div className="mb-6 p-4 rounded-lg border border-destructive bg-destructive/10 text-destructive">
