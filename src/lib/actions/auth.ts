@@ -139,9 +139,6 @@ export async function updateProfile(formData: FormData) {
     coachPricePer5Min: formData.get("coachPricePer5Min")
       ? Number(formData.get("coachPricePer5Min"))
       : undefined,
-    gameReviewPricePer5Min: formData.get("gameReviewPricePer5Min")
-      ? Number(formData.get("gameReviewPricePer5Min"))
-      : undefined,
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
     bio: (formData.get("bio") as string) || undefined,
@@ -154,9 +151,6 @@ export async function updateProfile(formData: FormData) {
       continent: raw.continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
       coachPricePer5Min: raw.coachPricePer5Min
         ? Math.round(raw.coachPricePer5Min * 100)
-        : null,
-      gameReviewPricePer5Min: raw.gameReviewPricePer5Min
-        ? Math.round(raw.gameReviewPricePer5Min * 100)
         : null,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,

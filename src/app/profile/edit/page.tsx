@@ -12,7 +12,6 @@ export default async function ProfileEditPage() {
     select: {
       continent: true,
       coachPricePer5Min: true,
-      gameReviewPricePer5Min: true,
       communicationPreference: true,
       bio: true,
       coachAvailability: true,
@@ -27,7 +26,6 @@ export default async function ProfileEditPage() {
       <ProfileEditForm
         continent={user.continent}
         coachPricePer5Min={user.coachPricePer5Min ? user.coachPricePer5Min / 100 : undefined}
-        gameReviewPricePer5Min={user.gameReviewPricePer5Min ? user.gameReviewPricePer5Min / 100 : undefined}
         communicationPreference={user.communicationPreference}
         bio={user.bio ?? undefined}
         coachAvailability={user.coachAvailability}

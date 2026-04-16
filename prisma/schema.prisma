@@ -46,7 +46,6 @@ enum Continent {
 }
 
 enum LessonType {
-  GAME_REVIEW
   LESSON
 }
 
@@ -110,7 +109,6 @@ model User {
   continent             Continent?
   chessRating           Int?
   coachPricePer5Min     Int?      // cents
-  gameReviewPricePer5Min Int?     // cents
   communicationPreference CommunicationPreference @default(CHAT_ONLY)
   chessComAccountAge    DateTime? // when the chess.com account was created
   bio                   String?

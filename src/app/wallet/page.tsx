@@ -19,7 +19,6 @@ export default async function WalletPage() {
       totalEarningsAllTime: true,
       verificationStatus: true,
       coachPricePer5Min: true,
-      gameReviewPricePer5Min: true,
     },
   });
 
@@ -49,25 +48,25 @@ export default async function WalletPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">${(available / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">€{(available / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Available</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">${(user.reservedBalance / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">€{(user.reservedBalance / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Reserved</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">${(user.pendingEarnings / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">€{(user.pendingEarnings / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Pending Earnings</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">${(user.totalEarningsAllTime / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">€{(user.totalEarningsAllTime / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Total Earned</div>
           </CardContent>
         </Card>
@@ -75,7 +74,7 @@ export default async function WalletPage() {
 
       <DepositForm />
 
-      {user.verificationStatus === "VERIFIED" && (user.coachPricePer5Min || user.gameReviewPricePer5Min) && (
+      {user.verificationStatus === "VERIFIED" && user.coachPricePer5Min && (
         <>
           <Separator className="my-8" />
           <StripeConnectSetup />
@@ -99,7 +98,7 @@ export default async function WalletPage() {
                     {tx.type === "LESSON_PAYMENT" && (
                       <>
                         {tx.amount > 0 ? "Earned from" : "Paid for"}{" "}
-                        {tx.lessonRequest?.type === "GAME_REVIEW" ? "game review" : "lesson"}
+                        lesson
                         {tx.amount > 0
                           ? ` (${tx.lessonRequest?.student?.username})`
                           : ` (${tx.lessonRequest?.coach?.username})`}
@@ -117,7 +116,7 @@ export default async function WalletPage() {
                     tx.amount > 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  {tx.amount > 0 ? "+" : ""}${(tx.amount / 100).toFixed(2)}
+                  {tx.amount > 0 ? "+" : ""}€{(tx.amount / 100).toFixed(2)}
                 </span>
               </CardContent>
             </Card>

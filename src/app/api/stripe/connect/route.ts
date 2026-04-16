@@ -24,7 +24,6 @@ export async function POST() {
     select: {
       verificationStatus: true,
       coachPricePer5Min: true,
-      gameReviewPricePer5Min: true,
       stripeConnectAccountId: true,
       isSuspended: true,
     },
@@ -43,7 +42,7 @@ export async function POST() {
     return NextResponse.json({ error: "You must be a verified coach to set up payouts" }, { status: 403 });
   }
 
-  if (!user.coachPricePer5Min && !user.gameReviewPricePer5Min) {
+  if (!user.coachPricePer5Min) {
     return NextResponse.json({ error: "Set your coaching prices before setting up payouts" }, { status: 400 });
   }
 

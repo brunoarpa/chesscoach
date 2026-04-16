@@ -30,7 +30,6 @@ export const loginSchema = z.object({
 export const profileEditSchema = z.object({
   continent: z.enum(["AFRICA", "ASIA", "EUROPE", "NORTH_AMERICA", "SOUTH_AMERICA", "OCEANIA"]).optional(),
   coachPricePer5Min: z.coerce.number().min(0).optional(),
-  gameReviewPricePer5Min: z.coerce.number().min(0).optional(),
   communicationPreference: z.enum(["CHAT_ONLY", "CHAT_AND_CALL"]),
   bio: z.string().max(500).optional(),
 });
@@ -44,7 +43,6 @@ export const chessComUsernameSchema = z.object({
 
 export const lessonRequestSchema = z.object({
   coachId: z.string().min(1),
-  type: z.enum(["GAME_REVIEW", "LESSON"]),
   durationMinutes: z.coerce.number().min(5).max(480),
 });
 
@@ -55,7 +53,7 @@ export const reviewSchema = z.object({
 });
 
 export const depositSchema = z.object({
-  amount: z.coerce.number().min(500, "Minimum deposit is $5.00"), // cents
+  amount: z.coerce.number().min(500, "Minimum deposit is €5.00"), // cents
 });
 
 export const resetPasswordRequestSchema = z.object({

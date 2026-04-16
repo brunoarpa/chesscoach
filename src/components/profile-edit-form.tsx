@@ -20,7 +20,6 @@ const continents = [
 interface Props {
   continent: string | null;
   coachPricePer5Min?: number;
-  gameReviewPricePer5Min?: number;
   communicationPreference: string;
   bio?: string;
   coachAvailability: string;
@@ -64,7 +63,7 @@ export function ProfileEditForm(props: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="coachPricePer5Min">Price per 5 min ($)</Label>
+              <Label htmlFor="coachPricePer5Min">Price per 5 min (€)</Label>
               <Input
                 id="coachPricePer5Min"
                 name="coachPricePer5Min"
@@ -73,18 +72,6 @@ export function ProfileEditForm(props: Props) {
                 min="0"
                 defaultValue={props.coachPricePer5Min}
                 placeholder="Leave empty if not coaching"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="gameReviewPricePer5Min">Game Review per 5 min ($)</Label>
-              <Input
-                id="gameReviewPricePer5Min"
-                name="gameReviewPricePer5Min"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={props.gameReviewPricePer5Min}
-                placeholder="Per 5 min of review"
               />
             </div>
           </div>

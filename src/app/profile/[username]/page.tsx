@@ -261,13 +261,7 @@ export default async function ProfilePage({
                 {user.coachPricePer5Min !== null && (
                   <div>
                     <span className="text-muted-foreground">Price/5min:</span>{" "}
-                    <strong>${(user.coachPricePer5Min / 100).toFixed(2)}</strong>
-                  </div>
-                )}
-                {user.gameReviewPricePer5Min !== null && (
-                  <div>
-                    <span className="text-muted-foreground">Game Review/5min:</span>{" "}
-                    <strong>${(user.gameReviewPricePer5Min / 100).toFixed(2)}</strong>
+                    <strong>€{(user.coachPricePer5Min / 100).toFixed(2)}</strong>
                   </div>
                 )}
                 <div>
@@ -390,7 +384,6 @@ export default async function ProfilePage({
               <LessonRequestForm
                 coachId={user.id}
                 coachPricePer5Min={user.coachPricePer5Min}
-                gameReviewPricePer5Min={user.gameReviewPricePer5Min}
                 coachCommunicationPreference={user.communicationPreference}
                 availableBalance={studentAvailableBalance ?? 0}
                 freeTrialsRemaining={freeTrialsRemaining}

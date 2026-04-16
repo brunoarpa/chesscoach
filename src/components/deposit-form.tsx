@@ -14,7 +14,7 @@ export function DepositForm() {
   async function handleDeposit() {
     const cents = Math.round(Number(amount) * 100);
     if (cents < 500) {
-      toast.error("Minimum deposit is $5.00");
+      toast.error("Minimum deposit is €5.00");
       return;
     }
 
@@ -31,7 +31,7 @@ export function DepositForm() {
         window.location.href = data.url;
       } else if (data.success) {
         // Dev mode: direct deposit
-        toast.success(`$${(cents / 100).toFixed(2)} deposited!`);
+        toast.success(`€${(cents / 100).toFixed(2)} deposited!`);
         window.location.reload();
       } else {
         toast.error(data.error || "Failed to create deposit");
@@ -50,7 +50,7 @@ export function DepositForm() {
       <CardContent>
         <div className="flex items-end gap-4">
           <div className="flex-1 space-y-2">
-            <Label>Amount ($)</Label>
+            <Label>Amount (€)</Label>
             <Input
               type="number"
               step="0.01"
@@ -58,7 +58,7 @@ export function DepositForm() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">Minimum $5.00</p>
+            <p className="text-xs text-muted-foreground">Minimum €5.00</p>
           </div>
           <Button onClick={handleDeposit} disabled={loading}>
             {loading ? "Processing..." : "Deposit"}

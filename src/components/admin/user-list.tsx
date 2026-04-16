@@ -126,10 +126,10 @@ export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAc
               </div>
             </TableCell>
             <TableCell className="text-right font-mono">
-              ${(user.walletBalance / 100).toFixed(2)}
+              €{(user.walletBalance / 100).toFixed(2)}
             </TableCell>
             <TableCell className="text-right font-mono">
-              ${(user.totalEarningsAllTime / 100).toFixed(2)}
+              €{(user.totalEarningsAllTime / 100).toFixed(2)}
             </TableCell>
             <TableCell>
               <div className="flex gap-1">

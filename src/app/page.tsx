@@ -46,7 +46,7 @@ export default async function Home() {
         <div className="text-center space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Flexible Lessons</h3>
           <p className="text-sm text-muted-foreground">
-            Game reviews from 5 minutes, or full lessons up to any length
+            Quick 5-minute sessions or full lessons up to any length
           </p>
         </div>
         <div className="text-center space-y-2 p-6 rounded-lg border">

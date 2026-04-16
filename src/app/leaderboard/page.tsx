@@ -85,7 +85,7 @@ export default async function LeaderboardPage() {
                 </TableCell>
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">
-                  {coach.coachPricePer5Min !== null ? `$${(coach.coachPricePer5Min / 100).toFixed(2)}` : "—"}
+                  {coach.coachPricePer5Min !== null ? `€${(coach.coachPricePer5Min / 100).toFixed(2)}` : "—"}
                 </TableCell>
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">

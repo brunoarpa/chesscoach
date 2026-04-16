@@ -54,7 +54,7 @@ function RequestMeta({ request }: { request: Request }) {
   return (
     <>
       <span className="text-sm text-muted-foreground ml-2">
-        {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
+        Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
       </span>
       {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}

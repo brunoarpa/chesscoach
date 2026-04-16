@@ -30,11 +30,11 @@ export async function POST(request: Request) {
   const { amount } = await request.json();
 
   if (!amount || amount < 500) {
-    return NextResponse.json({ error: "Minimum deposit is $5.00" }, { status: 400 });
+    return NextResponse.json({ error: "Minimum deposit is €5.00" }, { status: 400 });
   }
 
   if (amount > 1000000) {
-    return NextResponse.json({ error: "Maximum deposit is $10,000.00" }, { status: 400 });
+    return NextResponse.json({ error: "Maximum deposit is €10,000.00" }, { status: 400 });
   }
 
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: "eur",
           product_data: { name: "ChessCoach Wallet Deposit" },
           unit_amount: amount,
         },

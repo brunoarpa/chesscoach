@@ -65,7 +65,7 @@ function RequestMeta({ request }: { request: Request }) {
   return (
     <>
       <span className="text-sm text-muted-foreground ml-2">
-        {request.type === "GAME_REVIEW" ? "Game Review" : "Lesson"} · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
+        Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
       </span>
       {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
@@ -122,7 +122,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                     </div>
                     {coach.coachPricePer5Min != null && (
                       <span className="text-sm text-muted-foreground">
-                        ${(coach.coachPricePer5Min / 100).toFixed(2)}/5min
+                        €{(coach.coachPricePer5Min / 100).toFixed(2)}/5min
                       </span>
                     )}
                   </CardContent>

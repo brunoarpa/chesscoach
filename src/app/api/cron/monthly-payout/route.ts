@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 // Monthly payout cron - transfer pending earnings to coaches
 // Configure in Vercel: { "crons": [{ "path": "/api/cron/monthly-payout", "schedule": "0 0 1 * *" }] }
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (
     !process.env.CRON_SECRET ||
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
           const transfer = await stripeClient.transfers.create({
             amount: coach.pendingEarnings,
-            currency: "usd",
+            currency: "eur",
             destination: coach.stripeConnectAccountId,
           });
 

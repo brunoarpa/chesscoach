@@ -33,7 +33,7 @@ export function ReviewList({ reviews, showTotalPaid }: Props) {
                 </span>
                 {showTotalPaid && review.totalPaid != null && review.totalPaid > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    · ${(review.totalPaid / 100).toFixed(2)} total paid
+                    · €{(review.totalPaid / 100).toFixed(2)} total paid
                   </span>
                 )}
               </div>

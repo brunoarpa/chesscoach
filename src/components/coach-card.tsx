@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, DollarSign, Search, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
+import { MapPin, DollarSign, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
 import { FavouriteButton } from "@/components/favourite-button";
 
 const continentLabels: Record<string, string> = {
@@ -33,7 +33,6 @@ interface Props {
   chessRating: number | null;
   continent: string | null;
   coachPricePer5Min: number | null;
-  gameReviewPricePer5Min: number | null;
   communicationPreference: string;
   coachElo: number;
   activityStatus: string;
@@ -94,10 +93,7 @@ export function CoachCard(props: Props) {
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {continentLabels[props.continent]}</span>
               )}
               {props.coachPricePer5Min !== null && (
-                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> ${(props.coachPricePer5Min / 100).toFixed(2)}/5min</span>
-              )}
-              {props.gameReviewPricePer5Min !== null && (
-                <span className="flex items-center gap-1"><Search className="h-3 w-3" /> ${(props.gameReviewPricePer5Min / 100).toFixed(2)}/5min</span>
+                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> €{(props.coachPricePer5Min / 100).toFixed(2)}/5min</span>
               )}
               <span className="flex items-center gap-1">
                 {props.communicationPreference === "CHAT_AND_CALL" ? (

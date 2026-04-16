@@ -109,7 +109,6 @@ export default async function SearchPage({
       chessRating: true,
       continent: true,
       coachPricePer5Min: true,
-      gameReviewPricePer5Min: true,
       communicationPreference: true,
       coachElo: true,
       activityStatus: true,
@@ -151,7 +150,6 @@ export default async function SearchPage({
                     chessRating={coach.chessRating}
                     continent={coach.continent}
                     coachPricePer5Min={coach.coachPricePer5Min}
-                    gameReviewPricePer5Min={coach.gameReviewPricePer5Min}
                     communicationPreference={coach.communicationPreference}
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}

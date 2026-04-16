@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 // This endpoint should be called daily by a cron job
 // In Vercel, configure in vercel.json: { "crons": [{ "path": "/api/cron/daily", "schedule": "0 6 * * *" }] }
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   // Verify cron secret to prevent unauthorized access
   const authHeader = request.headers.get("authorization");
   if (

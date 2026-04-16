@@ -13,15 +13,13 @@ import { toast } from "sonner";
 interface Props {
   coachId: string;
   coachPricePer5Min: number | null;
-  gameReviewPricePer5Min: number | null;
   coachCommunicationPreference: string;
   availableBalance: number;
   freeTrialsRemaining: number;
   hasCompletedPaidLesson: boolean;
 }
 
-export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPricePer5Min, coachCommunicationPreference, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson }: Props) {
-  const [type, setType] = useState<string>("");
+export function LessonRequestForm({ coachId, coachPricePer5Min, coachCommunicationPreference, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson }: Props) {
   const [duration, setDuration] = useState("");
   const [loading, setLoading] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
@@ -29,16 +27,13 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
   const [commMethod, setCommMethod] = useState<string>("");
   const [message, setMessage] = useState("");
 
-  const hasPricing = coachPricePer5Min !== null || gameReviewPricePer5Min !== null;
+  const hasPricing = coachPricePer5Min !== null;
 
   const estimatedCost = (() => {
     const mins = Number(duration);
     if (!mins) return 0;
     const blocks = Math.ceil(mins / 5);
-    if (type === "GAME_REVIEW" && gameReviewPricePer5Min) {
-      return (gameReviewPricePer5Min * blocks) / 100;
-    }
-    if (type === "LESSON" && coachPricePer5Min) {
+    if (coachPricePer5Min) {
       return (coachPricePer5Min * blocks) / 100;
     }
     return 0;
@@ -52,7 +47,6 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
       toast.error(result.error);
     } else {
       toast.success(isTrial ? "Free trial request sent!" : "Lesson request sent!");
-      setType("");
       setDuration("");
       setIsTrial(false);
       setCommMethod("");
@@ -102,27 +96,6 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
           )}
 
           <div className="space-y-2">
-            <Label>Type</Label>
-            <Select name="type" value={type} onValueChange={setType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {coachPricePer5Min && (
-                  <SelectItem value="LESSON">
-                    Lesson (${(coachPricePer5Min / 100).toFixed(2)}/5min)
-                  </SelectItem>
-                )}
-                {gameReviewPricePer5Min && (
-                  <SelectItem value="GAME_REVIEW">
-                    Game Review (${(gameReviewPricePer5Min / 100).toFixed(2)}/5min)
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label>Duration (minutes)</Label>
             <Input
               name="durationMinutes"
@@ -131,7 +104,7 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
               max={480}
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              placeholder={type === "GAME_REVIEW" ? "5" : "30"}
+              placeholder="30"
             />
           </div>
 
@@ -164,7 +137,7 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Your available balance: <span className="font-medium">${(availableBalance / 100).toFixed(2)}</span>
+            Your available balance: <span className="font-medium">€{(availableBalance / 100).toFixed(2)}</span>
           </p>
 
           {isTrial ? (
@@ -173,7 +146,7 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
             </p>
           ) : estimatedCost > 0 ? (
             <p className={`text-sm font-medium ${estimatedCost > availableBalance / 100 ? "text-destructive" : ""}`}>
-              Estimated cost: ${estimatedCost.toFixed(2)}
+              Estimated cost: €{estimatedCost.toFixed(2)}
               {estimatedCost > availableBalance / 100 && " — Insufficient balance"}
             </p>
           ) : null}
@@ -199,7 +172,7 @@ export function LessonRequestForm({ coachId, coachPricePer5Min, gameReviewPriceP
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || !type || !duration || !commMethod || (!isTrial && estimatedCost > 0 && estimatedCost > availableBalance / 100)}
+            disabled={loading || !duration || !commMethod || (!isTrial && estimatedCost > 0 && estimatedCost > availableBalance / 100)}
           >
             {loading ? "Sending..." : isTrial ? "Send Free Trial Request" : "Send Request"}
           </Button>

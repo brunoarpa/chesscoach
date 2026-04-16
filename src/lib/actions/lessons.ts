@@ -7,10 +7,10 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getEffectiveAvailability } from "@/lib/utils";
+import { calculateCoachElo } from "@/lib/elo";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
-  type: z.enum(["GAME_REVIEW", "LESSON"]),
   durationMinutes: z.coerce.number().int().min(5).max(480),
   isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
   communicationMethod: z.enum(["CALL", "CHAT"]).optional(),
@@ -23,7 +23,6 @@ export async function createLessonRequest(formData: FormData) {
 
   const parsed = lessonRequestInputSchema.safeParse({
     coachId: formData.get("coachId"),
-    type: formData.get("type"),
     durationMinutes: formData.get("durationMinutes"),
     isTrial: formData.get("isTrial") ?? "false",
     communicationMethod: formData.get("communicationMethod") || undefined,
@@ -34,7 +33,7 @@ export async function createLessonRequest(formData: FormData) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { coachId, type, durationMinutes, isTrial, communicationMethod, message } = parsed.data;
+  const { coachId, durationMinutes, isTrial, communicationMethod, message } = parsed.data;
 
   if (coachId === session.user.id) {
     return { error: "You cannot request a lesson from yourself" };
@@ -62,7 +61,6 @@ export async function createLessonRequest(formData: FormData) {
     where: { id: coachId },
     select: {
       coachPricePer5Min: true,
-      gameReviewPricePer5Min: true,
       verificationStatus: true,
       activityStatus: true,
       coachAvailability: true,
@@ -122,10 +120,6 @@ export async function createLessonRequest(formData: FormData) {
     }
 
     estimatedCost = 0;
-  } else if (type === "GAME_REVIEW") {
-    if (!coach.gameReviewPricePer5Min) return { error: "Coach doesn't offer game reviews" };
-    const blocks = Math.ceil(durationMinutes / 5);
-    estimatedCost = coach.gameReviewPricePer5Min * blocks;
   } else {
     if (!coach.coachPricePer5Min) return { error: "Coach doesn't offer lessons" };
     const blocks = Math.ceil(durationMinutes / 5);
@@ -136,7 +130,7 @@ export async function createLessonRequest(formData: FormData) {
   if (!isTrial) {
     const available = currentUser.walletBalance - currentUser.reservedBalance;
     if (available < estimatedCost) {
-      return { error: `Insufficient balance. You need $${(estimatedCost / 100).toFixed(2)} but only have $${(available / 100).toFixed(2)} available.` };
+      return { error: `Insufficient balance. You need €${(estimatedCost / 100).toFixed(2)} but only have €${(available / 100).toFixed(2)} available.` };
     }
   }
 
@@ -158,7 +152,7 @@ export async function createLessonRequest(formData: FormData) {
       data: {
         studentId: session.user.id,
         coachId,
-        type,
+        type: "LESSON",
         durationMinutes,
         estimatedCost,
         isTrial,
@@ -385,6 +379,13 @@ export async function confirmLesson(requestId: string) {
       await tx.user.update({
         where: { id: request.coachId },
         data: { playersTaught: distinctStudents.length },
+      });
+
+      // Recalculate coach ELO immediately
+      const newElo = await calculateCoachElo(request.coachId);
+      await tx.user.update({
+        where: { id: request.coachId },
+        data: { coachElo: newElo },
       });
     } else {
       await tx.lessonRequest.update({
