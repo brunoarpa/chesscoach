@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cancelLessonRequest, confirmLesson, confirmLessonStart, declineAcceptedLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
-import { AcceptedLessonCard, ActiveLessonCard, CompletedCard as CoachCompletedCard } from "./coach-dashboard";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -42,7 +41,7 @@ interface FavouriteCoach {
   coachAvailability: string;
   chessRating: number | null;
   coachPricePer5Min: number | null;
-  lastActiveAt: Date | null;
+  lastActiveAt: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -111,7 +110,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                 <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                   <CardContent className="pt-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.lastActiveAt ? getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt) : coach.coachAvailability] ?? "bg-gray-400"}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.lastActiveAt ? getEffectiveAvailability(coach.coachAvailability, new Date(coach.lastActiveAt)) : coach.coachAvailability] ?? "bg-gray-400"}`} />
                       <div>
                         <span className="font-medium">{coach.username}</span>
                         {coach.chessRating && (

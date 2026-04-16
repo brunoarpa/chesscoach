@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
@@ -78,32 +77,39 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <Tabs defaultValue="coach">
-        <TabsList className="mb-6">
-          <TabsTrigger value="coach">
-            Coach ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length})
-          </TabsTrigger>
-          <TabsTrigger value="student">
-            Student ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length})
-          </TabsTrigger>
-        </TabsList>
+      <section>
+        <h2 className="text-xl font-semibold mb-4">
+          Coach
+          {incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length > 0 && (
+            <span className="ml-2 text-base text-muted-foreground">
+              ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length} active)
+            </span>
+          )}
+        </h2>
+        <CoachDashboard
+          requests={JSON.parse(JSON.stringify(incomingRequests))}
+          coachAvailability={currentUser.coachAvailability}
+        />
+      </section>
 
-        <TabsContent value="coach">
-          <CoachDashboard
-            requests={JSON.parse(JSON.stringify(incomingRequests))}
-            coachAvailability={currentUser.coachAvailability}
-          />
-        </TabsContent>
+      <hr className="my-8 border-border" />
 
-        <TabsContent value="student">
-          <StudentDashboard
-            requests={JSON.parse(JSON.stringify(outgoingRequests))}
-            freeTrialsRemaining={currentUser.freeTrialsRemaining}
-            hasActiveDispute={currentUser.hasActiveDispute}
-            favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
-          />
-        </TabsContent>
-      </Tabs>
+      <section>
+        <h2 className="text-xl font-semibold mb-4">
+          Student
+          {outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length > 0 && (
+            <span className="ml-2 text-base text-muted-foreground">
+              ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length} active)
+            </span>
+          )}
+        </h2>
+        <StudentDashboard
+          requests={JSON.parse(JSON.stringify(outgoingRequests))}
+          freeTrialsRemaining={currentUser.freeTrialsRemaining}
+          hasActiveDispute={currentUser.hasActiveDispute}
+          favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
+        />
+      </section>
     </div>
   );
 }
