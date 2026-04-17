@@ -10,6 +10,7 @@ export default async function ProfileEditPage() {
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
+      username: true,
       continent: true,
       coachPricePer5Min: true,
       communicationPreference: true,
@@ -24,6 +25,7 @@ export default async function ProfileEditPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
       <ProfileEditForm
+        username={user.username}
         continent={user.continent}
         coachPricePer5Min={user.coachPricePer5Min ? user.coachPricePer5Min / 100 : undefined}
         communicationPreference={user.communicationPreference}

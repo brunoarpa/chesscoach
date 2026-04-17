@@ -135,6 +135,7 @@ export async function updateProfile(formData: FormData) {
   }
 
   const raw = {
+    username: (formData.get("username") as string)?.trim() || undefined,
     continent: (formData.get("continent") as string) || undefined,
     coachPricePer5Min: formData.get("coachPricePer5Min")
       ? Number(formData.get("coachPricePer5Min"))
@@ -145,27 +146,62 @@ export async function updateProfile(formData: FormData) {
     coachAvailability: (formData.get("coachAvailability") as string) || "AVAILABLE",
   };
 
+  // Validate and handle username change
+  let newUsername = session.user.username;
+  if (raw.username && raw.username !== session.user.username) {
+    // Validate username format
+    if (raw.username.length < 3 || raw.username.length > 20) {
+      return { error: "Username must be between 3 and 20 characters" };
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(raw.username)) {
+      return { error: "Username can only contain letters, numbers, and underscores" };
+    }
+    // Check uniqueness
+    const existingUser = await prisma.user.findUnique({ where: { username: raw.username } });
+    if (existingUser && existingUser.id !== session.user.id) {
+      return { error: "Username already taken" };
+    }
+    newUsername = raw.username;
+  }
+
+  // If no price is set, force availability to UNAVAILABLE
+  const priceInCents = raw.coachPricePer5Min ? Math.round(raw.coachPricePer5Min * 100) : null;
+  let availability = raw.coachAvailability as "AVAILABLE" | "BUSY" | "UNAVAILABLE";
+  if (!priceInCents && availability === "AVAILABLE") {
+    availability = "UNAVAILABLE";
+  }
+
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
+      username: newUsername,
       continent: raw.continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
-      coachPricePer5Min: raw.coachPricePer5Min
-        ? Math.round(raw.coachPricePer5Min * 100)
-        : null,
+      coachPricePer5Min: priceInCents,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,
-      coachAvailability: raw.coachAvailability as "AVAILABLE" | "BUSY" | "UNAVAILABLE",
+      coachAvailability: availability,
       lastActiveAt: new Date(),
       activityStatus: "ACTIVE",
     },
   });
 
-  redirect("/profile/" + session.user.username);
+  redirect("/profile/" + newUsername);
 }
 
 export async function updateCoachAvailability(newStatus: "AVAILABLE" | "BUSY" | "UNAVAILABLE") {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
+
+  // Prevent setting to AVAILABLE without a price
+  if (newStatus === "AVAILABLE") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { coachPricePer5Min: true },
+    });
+    if (!user?.coachPricePer5Min) {
+      return { error: "You must set a price before setting yourself as available. Go to Edit Profile to set your price." };
+    }
+  }
 
   await prisma.user.update({
     where: { id: session.user.id },

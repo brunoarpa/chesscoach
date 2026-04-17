@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { updateCoachAvailability } from "@/lib/actions/auth";
+import { toast } from "sonner";
 
 const statuses = [
   { value: "AVAILABLE" as const, label: "Available", badgeClass: "bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400" },
@@ -21,8 +22,13 @@ export function AvailabilityToggle({ initialStatus }: { initialStatus: string })
   const current = statuses.find((s) => s.value === status) ?? statuses[2];
 
   async function handleChange(newStatus: "AVAILABLE" | "BUSY" | "UNAVAILABLE") {
+    const prevStatus = status;
     setStatus(newStatus);
-    await updateCoachAvailability(newStatus);
+    const result = await updateCoachAvailability(newStatus);
+    if (result?.error) {
+      setStatus(prevStatus);
+      toast.error(result.error);
+    }
   }
 
   return (

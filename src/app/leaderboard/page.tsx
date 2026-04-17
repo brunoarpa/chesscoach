@@ -97,9 +97,9 @@ export default async function LeaderboardPage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  {getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt) === "AVAILABLE" ? (
+                  {getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min) === "AVAILABLE" ? (
                     <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                  ) : getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt) === "BUSY" ? (
+                  ) : getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min) === "BUSY" ? (
                     <Badge variant="destructive">Busy</Badge>
                   ) : (
                     <Badge variant="secondary">Unavailable</Badge>

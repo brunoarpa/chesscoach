@@ -69,9 +69,9 @@ export function CoachCard(props: Props) {
             <p className="text-sm text-muted-foreground mb-3">
               <span className="flex items-center gap-1.5">
                 ♟ Chess Coach
-                {getEffectiveAvailability(props.coachAvailability, props.lastActiveAt) === "AVAILABLE" ? (
+                {getEffectiveAvailability(props.coachAvailability, props.lastActiveAt, props.coachPricePer5Min) === "AVAILABLE" ? (
                   <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                ) : getEffectiveAvailability(props.coachAvailability, props.lastActiveAt) === "BUSY" ? (
+                ) : getEffectiveAvailability(props.coachAvailability, props.lastActiveAt, props.coachPricePer5Min) === "BUSY" ? (
                   <Badge variant="destructive">Busy</Badge>
                 ) : (
                   <Badge variant="secondary">Unavailable</Badge>

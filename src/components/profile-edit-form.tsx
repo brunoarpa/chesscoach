@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateProfile } from "@/lib/actions/auth";
+import { toast } from "sonner";
 
 const continents = [
   { value: "AFRICA", label: "Africa" },
@@ -18,6 +19,7 @@ const continents = [
 ];
 
 interface Props {
+  username: string;
   continent: string | null;
   coachPricePer5Min?: number;
   communicationPreference: string;
@@ -27,13 +29,31 @@ interface Props {
 
 export function ProfileEditForm(props: Props) {
   async function handleSubmit(formData: FormData) {
-    await updateProfile(formData);
+    const result = await updateProfile(formData);
+    if (result?.error) {
+      toast.error(result.error);
+    }
   }
 
   return (
     <Card>
       <CardContent className="pt-6">
         <form action={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              name="username"
+              defaultValue={props.username}
+              minLength={3}
+              maxLength={20}
+              pattern="^[a-zA-Z0-9_]+$"
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              3-20 characters. Letters, numbers, and underscores only.
+            </p>
+          </div>
           <div className="space-y-2">
             <Label>Continent</Label>
             <Select name="continent" defaultValue={props.continent ?? undefined}>
@@ -123,7 +143,7 @@ export function ProfileEditForm(props: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Available: accepting requests. Busy: visible but not accepting requests (auto-set during lessons). Unavailable: not accepting requests. You can also quickly toggle from the navigation bar.
+              Available: accepting requests (requires a price). Busy: visible but not accepting requests. Unavailable: not accepting requests. You are automatically set to unavailable after 24 hours of inactivity — you must manually set yourself back to available.
             </p>
           </div>
 

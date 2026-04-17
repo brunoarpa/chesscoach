@@ -73,7 +73,7 @@ export async function createLessonRequest(formData: FormData) {
   if (coach.verificationStatus !== "VERIFIED") {
     return { error: "Coach is not verified" };
   }
-  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt);
+  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min);
   if (effectiveAvailability !== "AVAILABLE") {
     return { error: effectiveAvailability === "BUSY" ? "This coach is currently busy and not accepting new lesson requests" : "This coach is not currently accepting students" };
   }

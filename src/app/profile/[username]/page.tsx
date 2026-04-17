@@ -168,7 +168,7 @@ export default async function ProfilePage({
 
   // Check if coach has completed any paid lessons (for new coach warning)
   let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
-  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt);
+  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachPricePer5Min);
   if (user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
     const paidCompleted = await prisma.lessonRequest.findFirst({
       where: {

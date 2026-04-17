@@ -30,10 +30,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
         if (!isValid) return null;
 
-        // Update last active
+        // Update last active — force UNAVAILABLE if inactive 24h+ or no price set
+        const wasInactive = (Date.now() - user.lastActiveAt.getTime()) >= 24 * 60 * 60 * 1000;
+        const shouldForceUnavailable =
+          (wasInactive || user.coachPricePer5Min === null) &&
+          user.coachAvailability !== "UNAVAILABLE";
+
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+          data: {
+            lastActiveAt: new Date(),
+            activityStatus: "ACTIVE",
+            ...(shouldForceUnavailable ? { coachAvailability: "UNAVAILABLE" } : {}),
+          },
         });
 
         return {

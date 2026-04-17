@@ -40,9 +40,21 @@ export function ChessComVerificationForm() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Submitting..." : "Submit for Verification"}
           </Button>
-          <p className="text-xs text-muted-foreground">
-            An admin will verify your account by checking your chess.com profile.
-          </p>
+          <div className="rounded-md bg-muted p-3 space-y-2">
+            <p className="text-xs font-medium">How verification works:</p>
+            <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1">
+              <li>Enter your chess.com username above and submit.</li>
+              <li>
+                Send a message on chess.com to{" "}
+                <span className="font-semibold text-foreground">ChessCoachVerification</span>{" "}
+                with your website username so we can confirm you own the account.
+              </li>
+              <li>An admin will review and verify your account.</li>
+            </ol>
+            <p className="text-xs text-muted-foreground">
+              You may also be contacted by an admin to complete this step.
+            </p>
+          </div>
         </form>
       </CardContent>
     </Card>

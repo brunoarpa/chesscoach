@@ -110,7 +110,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                 <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                   <CardContent className="pt-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.lastActiveAt ? getEffectiveAvailability(coach.coachAvailability, new Date(coach.lastActiveAt)) : coach.coachAvailability] ?? "bg-gray-400"}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.lastActiveAt ? getEffectiveAvailability(coach.coachAvailability, new Date(coach.lastActiveAt), coach.coachPricePer5Min) : coach.coachAvailability] ?? "bg-gray-400"}`} />
                       <div>
                         <span className="font-medium">{coach.username}</span>
                         {coach.chessRating && (

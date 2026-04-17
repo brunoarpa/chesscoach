@@ -10,10 +10,27 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  // Check if coach needs to be forced UNAVAILABLE (inactive 24h+ or no price)
+  const userCheck = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { lastActiveAt: true, coachAvailability: true, coachPricePer5Min: true },
+  });
+
+  const wasInactive = userCheck
+    ? (Date.now() - userCheck.lastActiveAt.getTime()) >= 24 * 60 * 60 * 1000
+    : false;
+  const shouldForceUnavailable = userCheck
+    ? (wasInactive || userCheck.coachPricePer5Min === null) && userCheck.coachAvailability !== "UNAVAILABLE"
+    : false;
+
   // Update activity and fetch user data
   const currentUser = await prisma.user.update({
     where: { id: session.user.id },
-    data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+    data: {
+      lastActiveAt: new Date(),
+      activityStatus: "ACTIVE",
+      ...(shouldForceUnavailable ? { coachAvailability: "UNAVAILABLE" } : {}),
+    },
     select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true },
   });
 
