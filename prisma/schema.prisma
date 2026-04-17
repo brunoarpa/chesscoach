@@ -267,8 +267,8 @@ model Payout {
   status  PayoutStatus @default(PENDING)
   
   stripeTransferId String?
-  periodStart      DateTime
-  periodEnd        DateTime
+  periodStart      DateTime?
+  periodEnd        DateTime?
   
   createdAt DateTime @default(now())
   

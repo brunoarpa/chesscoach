@@ -59,7 +59,7 @@ export function StripeConnectSetup() {
       <CardContent>
         {isFullyOnboarded ? (
           <p className="text-sm text-muted-foreground">
-            Your bank account is connected. Earnings are paid out automatically on the 1st of each month.
+            Your bank account is connected. You can withdraw your earnings anytime from your wallet.
           </p>
         ) : isPending ? (
           <div className="space-y-2">

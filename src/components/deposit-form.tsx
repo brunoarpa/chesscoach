@@ -7,16 +7,22 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-const PROCESSING_FEE = 0.50;
+const FEE_FLAT = 0.40;
+const FEE_PERCENT = 0.02;
 const MIN_DEPOSIT = 5;
-const MAX_DEPOSIT = 10;
+const MAX_DEPOSIT = 20;
+
+function calculateFee(amount: number): number {
+  return FEE_FLAT + Math.ceil(amount * FEE_PERCENT * 100) / 100;
+}
 
 export function DepositForm() {
   const [amount, setAmount] = useState("5.00");
   const [loading, setLoading] = useState(false);
 
   const depositValue = Number(amount) || 0;
-  const totalCharge = depositValue + PROCESSING_FEE;
+  const fee = calculateFee(depositValue);
+  const totalCharge = depositValue + fee;
 
   async function handleDeposit() {
     const cents = Math.round(depositValue * 100);
@@ -84,8 +90,8 @@ export function DepositForm() {
               <span>€{depositValue.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Processing fee</span>
-              <span>€{PROCESSING_FEE.toFixed(2)}</span>
+              <span className="text-muted-foreground">Processing fee (€0.40 + 2%)</span>
+              <span>€{fee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-medium border-t pt-1">
               <span>Total charge</span>

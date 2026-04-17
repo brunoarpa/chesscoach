@@ -131,7 +131,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Student Wallet</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Deposit funds via Stripe. Your balance is used across all coaches — no per-lesson payment friction.
+              Deposit funds via Stripe. A small processing fee (€0.40 + 2%) applies. Your balance is used across all coaches — no per-lesson payment friction.
               When you request a lesson, funds are reserved until the lesson completes or is cancelled.
             </CardContent>
           </Card>
@@ -142,7 +142,7 @@ export default async function HowItWorksPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               When a lesson completes, earnings move to your pending balance.
-              At the end of each month, pending earnings are paid out to your connected Stripe account.
+              Withdraw anytime from your wallet (minimum €5.00). A small fee of €0.40 + 2% applies per withdrawal.
             </CardContent>
           </Card>
         </div>

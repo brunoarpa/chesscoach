@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DepositForm } from "@/components/deposit-form";
+import { WithdrawForm } from "@/components/withdraw-form";
 import { StripeConnectSetup } from "@/components/stripe-connect-setup";
 
 export default async function WalletPage() {
@@ -78,6 +79,9 @@ export default async function WalletPage() {
         <>
           <Separator className="my-8" />
           <StripeConnectSetup />
+          <div className="mt-4">
+            <WithdrawForm pendingEarnings={user.pendingEarnings} />
+          </div>
         </>
       )}
 
@@ -105,7 +109,7 @@ export default async function WalletPage() {
                       </>
                     )}
                     {tx.type === "LESSON_REFUND" && "Refund"}
-                    {tx.type === "PAYOUT" && "Monthly Payout"}
+                    {tx.type === "PAYOUT" && "Withdrawal"}
                   </span>
                   <div className="text-xs text-muted-foreground">
                     {new Date(tx.createdAt).toLocaleDateString()}
