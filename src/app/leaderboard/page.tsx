@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { getActivityDotColor, getEffectiveAvailability } from "@/lib/utils";
 
@@ -48,7 +49,55 @@ export default async function LeaderboardPage() {
           No coaches on the leaderboard yet.
         </p>
       ) : (
-        <Table>
+        <>
+          {/* Mobile card layout */}
+          <div className="md:hidden space-y-3">
+            {coaches.map((coach, i) => {
+              const availability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min);
+              return (
+                <Card key={coach.username}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-muted-foreground">#{i + 1}</span>
+                        <Link href={`/profile/${coach.username}`} className="font-medium hover:underline">
+                          {coach.username}
+                        </Link>
+                      </div>
+                      {availability === "AVAILABLE" ? (
+                        <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
+                      ) : availability === "BUSY" ? (
+                        <Badge variant="destructive">Busy</Badge>
+                      ) : (
+                        <Badge variant="secondary">Unavailable</Badge>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">Coach Rating</span>
+                      <span className="text-right font-mono font-medium">{Math.round(coach.coachElo)}</span>
+                      <span className="text-muted-foreground">Chess Rating</span>
+                      <span className="text-right">{coach.chessRating ?? "—"}</span>
+                      <span className="text-muted-foreground">Lessons</span>
+                      <span className="text-right">{coach.lessonsGiven}</span>
+                      <span className="text-muted-foreground">Students</span>
+                      <span className="text-right">{coach.playersTaught}</span>
+                      <span className="text-muted-foreground">Price/5min</span>
+                      <span className="text-right">{coach.coachPricePer5Min !== null ? `€${(coach.coachPricePer5Min / 100).toFixed(2)}` : "—"}</span>
+                      <span className="text-muted-foreground">Last Active</span>
+                      <span className="text-right flex items-center justify-end gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${getActivityDotColor(coach.lastActiveAt)}`} />
+                        {formatRelativeTime(coach.lastActiveAt)}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Desktop table layout */}
+          <div className="hidden md:block">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">Position</TableHead>
@@ -109,6 +158,8 @@ export default async function LeaderboardPage() {
             ))}
           </TableBody>
         </Table>
+          </div>
+        </>
       )}
     </div>
   );

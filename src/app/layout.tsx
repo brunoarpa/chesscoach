@@ -38,13 +38,13 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-1">{children}</main>
           <footer className="border-t py-6 text-center text-sm text-muted-foreground">
-            <div className="container mx-auto flex items-center justify-center gap-4 px-4">
+            <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 px-4">
               <span>&copy; {new Date().getFullYear()} ChessCoach</span>
-              <span>&middot;</span>
+              <span className="hidden sm:inline">&middot;</span>
               <Link href="/terms" className="hover:underline">Terms of Service</Link>
-              <span>&middot;</span>
+              <span className="hidden sm:inline">&middot;</span>
               <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
-              <span>&middot;</span>
+              <span className="hidden sm:inline">&middot;</span>
               <a href="mailto:chesscoach.training@gmail.com" className="hover:underline">Contact</a>
             </div>
           </footer>

@@ -17,7 +17,7 @@ interface ChessComProfile {
 
 /**
  * Fetch a player's chess rating from chess.com.
- * Priority: rapid → blitz → bullet → daily
+ * Uses the maximum of rapid and blitz ratings, then falls back to bullet → daily.
  */
 export async function fetchChessComRating(
   chessComUsername: string
@@ -31,10 +31,16 @@ export async function fetchChessComRating(
 
     const stats: ChessComStats = await res.json();
 
-    // Priority: rapid → blitz → bullet → daily
+    const rapid = stats.chess_rapid?.last?.rating;
+    const blitz = stats.chess_blitz?.last?.rating;
+
+    // Use max of rapid and blitz if either exists
+    if (rapid != null && blitz != null) return Math.max(rapid, blitz);
+    if (rapid != null) return rapid;
+    if (blitz != null) return blitz;
+
+    // Fallback: bullet → daily
     return (
-      stats.chess_rapid?.last?.rating ??
-      stats.chess_blitz?.last?.rating ??
       stats.chess_bullet?.last?.rating ??
       stats.chess_daily?.last?.rating ??
       null
