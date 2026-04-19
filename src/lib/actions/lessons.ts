@@ -11,7 +11,7 @@ import { calculateCoachElo } from "@/lib/elo";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
-  durationMinutes: z.coerce.number().int().min(5).max(480),
+  timeSlotId: z.string().cuid().optional(),
   isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
   communicationMethod: z.enum(["CALL", "CHAT"]).optional(),
   message: z.string().max(500).optional(),
@@ -23,7 +23,7 @@ export async function createLessonRequest(formData: FormData) {
 
   const parsed = lessonRequestInputSchema.safeParse({
     coachId: formData.get("coachId"),
-    durationMinutes: formData.get("durationMinutes"),
+    timeSlotId: formData.get("timeSlotId") || undefined,
     isTrial: formData.get("isTrial") ?? "false",
     communicationMethod: formData.get("communicationMethod") || undefined,
     message: formData.get("message") || undefined,
@@ -33,7 +33,7 @@ export async function createLessonRequest(formData: FormData) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { coachId, durationMinutes, isTrial, communicationMethod, message } = parsed.data;
+  const { coachId, timeSlotId, isTrial, communicationMethod, message } = parsed.data;
 
   if (coachId === session.user.id) {
     return { error: "You cannot request a lesson from yourself" };
@@ -42,7 +42,7 @@ export async function createLessonRequest(formData: FormData) {
   // Check suspension
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { isSuspended: true, hasActiveDispute: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true, verificationStatus: true },
+    select: { isSuspended: true, hasActiveDispute: true, walletBalance: true, reservedBalance: true, freeTrialsRemaining: true },
   });
 
   if (!currentUser) return { error: "User not found" };
@@ -52,15 +52,13 @@ export async function createLessonRequest(formData: FormData) {
   if (currentUser.hasActiveDispute) {
     return { error: "You have an active lesson dispute. Please wait for admin resolution before requesting new lessons." };
   }
-  if (currentUser.verificationStatus !== "VERIFIED") {
-    return { error: "You must verify your chess.com account before requesting lessons. Visit your profile to get started." };
-  }
 
   // Get coach to calculate price
   const coach = await prisma.user.findUnique({
     where: { id: coachId },
     select: {
-      coachPricePer5Min: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
       verificationStatus: true,
       activityStatus: true,
       coachAvailability: true,
@@ -73,9 +71,9 @@ export async function createLessonRequest(formData: FormData) {
   if (coach.verificationStatus !== "VERIFIED") {
     return { error: "Coach is not verified" };
   }
-  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min);
+  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice);
   if (effectiveAvailability !== "AVAILABLE") {
-    return { error: effectiveAvailability === "BUSY" ? "This coach is currently busy and not accepting new lesson requests" : "This coach is not currently accepting students" };
+    return { error: "This coach is not currently accepting students" };
   }
 
   // Check if coach has blocked this student
@@ -121,9 +119,16 @@ export async function createLessonRequest(formData: FormData) {
 
     estimatedCost = 0;
   } else {
-    if (!coach.coachPricePer5Min) return { error: "Coach doesn't offer lessons" };
-    const blocks = Math.ceil(durationMinutes / 5);
-    estimatedCost = coach.coachPricePer5Min * blocks;
+    // Determine price based on communication method
+    let slotPrice: number;
+    if (communicationMethod === "CALL") {
+      if (!coach.coachCallPrice) return { error: "Coach doesn't offer call lessons" };
+      slotPrice = coach.coachCallPrice;
+    } else {
+      if (!coach.coachChatPrice) return { error: "Coach doesn't offer chat lessons" };
+      slotPrice = coach.coachChatPrice;
+    }
+    estimatedCost = slotPrice; // 1 slot = 15 min
   }
 
   // Check student wallet (skip for free trials)
@@ -134,16 +139,34 @@ export async function createLessonRequest(formData: FormData) {
     }
   }
 
-  // Prevent duplicate pending requests for the same coach
-  const existingPending = await prisma.lessonRequest.findFirst({
-    where: {
-      studentId: session.user.id,
-      coachId,
-      status: "PENDING",
-    },
-  });
-  if (existingPending) {
-    return { error: "You already have a pending request with this coach" };
+  // Validate and lock timeslot if provided
+  let slotData: { timeSlotId?: string; scheduledStartAt?: Date; scheduledEndAt?: Date; acceptanceDeadline?: Date } = {};
+  if (timeSlotId) {
+    const slot = await prisma.timeSlot.findUnique({
+      where: { id: timeSlotId },
+    });
+    if (!slot) return { error: "Time slot not found" };
+    if (slot.coachId !== coachId) return { error: "Slot does not belong to this coach" };
+    if (slot.status !== "AVAILABLE") return { error: "This slot is no longer available" };
+
+    // Must be at least 2h from now
+    const now = new Date();
+    if (slot.startTime.getTime() < now.getTime() + 2 * 60 * 60 * 1000) {
+      return { error: "Cannot book a slot less than 2 hours away" };
+    }
+
+    // Compute acceptance deadline: min(now + 24h, slotStart - 2h)
+    const deadline = new Date(Math.min(
+      now.getTime() + 24 * 60 * 60 * 1000,
+      slot.startTime.getTime() - 2 * 60 * 60 * 1000
+    ));
+
+    slotData = {
+      timeSlotId: slot.id,
+      scheduledStartAt: slot.startTime,
+      scheduledEndAt: slot.endTime,
+      acceptanceDeadline: deadline,
+    };
   }
 
   // Create request and reserve funds (or decrement free trial)
@@ -153,11 +176,12 @@ export async function createLessonRequest(formData: FormData) {
         studentId: session.user.id,
         coachId,
         type: "LESSON",
-        durationMinutes,
+        durationMinutes: 15,
         estimatedCost,
         isTrial,
         communicationMethod: communicationMethod as "CALL" | "CHAT" | undefined,
         message: message?.trim() || null,
+        ...slotData,
       },
     }),
     prisma.user.update({
@@ -170,6 +194,13 @@ export async function createLessonRequest(formData: FormData) {
         activityStatus: "ACTIVE",
       },
     }),
+    // Mark slot as booked
+    ...(timeSlotId
+      ? [prisma.timeSlot.update({
+          where: { id: timeSlotId },
+          data: { status: "BOOKED" },
+        })]
+      : []),
   ];
 
   await prisma.$transaction(txOps);
@@ -228,6 +259,13 @@ export async function respondToLessonRequest(
               data: { reservedBalance: { decrement: request.estimatedCost } },
             }),
           ]),
+      // Release the timeslot back to available
+      ...(request.timeSlotId
+        ? [prisma.timeSlot.update({
+            where: { id: request.timeSlotId },
+            data: { status: "AVAILABLE" },
+          })]
+        : []),
       prisma.user.update({
         where: { id: session.user.id },
         data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
@@ -430,6 +468,13 @@ export async function cancelLessonRequest(requestId: string) {
             data: { reservedBalance: { decrement: request.estimatedCost } },
           }),
         ]),
+    // Release the timeslot back to available
+    ...(request.timeSlotId
+      ? [prisma.timeSlot.update({
+          where: { id: request.timeSlotId },
+          data: { status: "AVAILABLE" },
+        })]
+      : []),
   ];
 
   await prisma.$transaction(txOps);
@@ -488,6 +533,166 @@ export async function disputeLesson(requestId: string, reason: string) {
       },
     }),
   ]);
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+const NO_SHOW_BUFFER_MS = 5 * 60 * 1000; // 5 minutes after scheduled start
+const NO_SHOW_ELO_PENALTY = 50;
+
+export async function reportNoShow(requestId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  const request = await prisma.lessonRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      student: { select: { username: true } },
+      coach: { select: { username: true } },
+    },
+  });
+
+  if (!request) return { error: "Request not found" };
+
+  const isCoach = request.coachId === session.user.id;
+  const isStudent = request.studentId === session.user.id;
+  if (!isCoach && !isStudent) return { error: "Not authorized" };
+
+  if (request.status !== "ACCEPTED" && request.status !== "IN_PROGRESS") {
+    return { error: "Lesson must be active to report a no-show" };
+  }
+
+  if (!request.scheduledStartAt) {
+    return { error: "No scheduled start time" };
+  }
+
+  const now = Date.now();
+  const startTime = new Date(request.scheduledStartAt).getTime();
+
+  // Must be past the buffer window
+  if (now < startTime + NO_SHOW_BUFFER_MS) {
+    return { error: "Please wait at least 5 minutes after the scheduled start time" };
+  }
+
+  if (isStudent) {
+    // Student reporting coach no-show
+    if (request.coachJoinedAt) {
+      return { error: "Coach has already joined the lesson" };
+    }
+
+    await prisma.$transaction([
+      prisma.lessonRequest.update({
+        where: { id: requestId },
+        data: { status: "NO_SHOW" },
+      }),
+      // Refund student
+      ...(request.isTrial
+        ? []
+        : [
+            prisma.user.update({
+              where: { id: request.studentId },
+              data: { reservedBalance: { decrement: request.estimatedCost } },
+            }),
+          ]),
+      // Apply ELO penalty to coach
+      prisma.user.update({
+        where: { id: request.coachId },
+        data: {
+          coachRatingPenalty: { increment: NO_SHOW_ELO_PENALTY },
+        },
+      }),
+      // Release timeslot
+      ...(request.timeSlotId
+        ? [prisma.timeSlot.update({ where: { id: request.timeSlotId }, data: { status: "AVAILABLE" } })]
+        : []),
+      prisma.abuseFlag.create({
+        data: {
+          userId: request.coachId,
+          type: "COACH_NO_SHOW",
+          severity: "HIGH",
+          details: `Coach "${request.coach.username}" did not join lesson with student "${request.student.username}". Student refunded, ELO penalty applied.`,
+          relatedLessonId: requestId,
+          relatedUserId: request.studentId,
+        },
+      }),
+    ]);
+
+    // Recalculate coach ELO
+    const newElo = await calculateCoachElo(request.coachId);
+    await prisma.user.update({
+      where: { id: request.coachId },
+      data: { coachElo: newElo },
+    });
+  } else {
+    // Coach reporting student no-show — coach gets paid
+    if (request.studentJoinedAt) {
+      return { error: "Student has already joined the lesson" };
+    }
+
+    await prisma.$transaction([
+      prisma.lessonRequest.update({
+        where: { id: requestId },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+          coachConfirmed: true,
+          studentConfirmed: true,
+        },
+      }),
+      ...(request.isTrial
+        ? []
+        : [
+            // Move from reserved to actual payment
+            prisma.user.update({
+              where: { id: request.studentId },
+              data: {
+                reservedBalance: { decrement: request.estimatedCost },
+              },
+            }),
+            prisma.user.update({
+              where: { id: request.coachId },
+              data: {
+                pendingEarnings: { increment: request.estimatedCost },
+                totalEarningsAllTime: { increment: request.estimatedCost },
+                lessonsGiven: { increment: 1 },
+              },
+            }),
+            prisma.transaction.create({
+              data: {
+                userId: request.studentId,
+                type: "LESSON_PAYMENT",
+                amount: -request.estimatedCost,
+                lessonRequestId: requestId,
+              },
+            }),
+            prisma.transaction.create({
+              data: {
+                userId: request.coachId,
+                type: "LESSON_PAYMENT",
+                amount: request.estimatedCost,
+                lessonRequestId: requestId,
+              },
+            }),
+            prisma.earningRecord.create({
+              data: {
+                userId: request.coachId,
+                amount: request.estimatedCost,
+              },
+            }),
+          ]),
+      prisma.abuseFlag.create({
+        data: {
+          userId: request.studentId,
+          type: "STUDENT_NO_SHOW",
+          severity: "MEDIUM",
+          details: `Student "${request.student.username}" did not join lesson with coach "${request.coach.username}". Coach paid for the lesson.`,
+          relatedLessonId: requestId,
+          relatedUserId: request.coachId,
+        },
+      }),
+    ]);
+  }
 
   revalidatePath("/dashboard");
   return { success: true };
@@ -641,6 +846,13 @@ export async function declineAcceptedLesson(requestId: string) {
             data: { reservedBalance: { decrement: request.estimatedCost } },
           }),
         ]),
+    // Release the timeslot back to available
+    ...(request.timeSlotId
+      ? [prisma.timeSlot.update({
+          where: { id: request.timeSlotId },
+          data: { status: "AVAILABLE" },
+        })]
+      : []),
     prisma.user.update({
       where: { id: session.user.id },
       data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },

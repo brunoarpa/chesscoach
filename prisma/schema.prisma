@@ -27,7 +27,12 @@ enum ActivityStatus {
 
 enum CoachAvailability {
   AVAILABLE
-  BUSY
+  UNAVAILABLE
+}
+
+enum TimeSlotStatus {
+  AVAILABLE
+  BOOKED
   UNAVAILABLE
 }
 
@@ -58,6 +63,7 @@ enum LessonRequestStatus {
   COMPLETED
   CANCELLED
   DISPUTED
+  NO_SHOW
 }
 
 enum LessonCommunicationMethod {
@@ -86,6 +92,8 @@ enum AbuseFlagType {
   STUDENT_SPAM
   MULTI_ACCOUNT_SUSPECTED
   LESSON_DISPUTE
+  COACH_NO_SHOW
+  STUDENT_NO_SHOW
 }
 
 enum AbuseFlagSeverity {
@@ -96,22 +104,26 @@ enum AbuseFlagSeverity {
 
 model User {
   id            String   @id @default(cuid())
-  username      String   @unique
-  email         String?  @unique
-  passwordHash  String
+  username      String?  @unique
+  email         String   @unique
+  emailVerified DateTime?
+  image         String?
   role          UserRole @default(USER)
 
   // Chess.com verification
   chessComUsername    String?  @unique
   verificationStatus VerificationStatus @default(NONE)
+  verificationCode   String?  // auto-verification code for chess.com location
 
   // Profile info
   continent             Continent?
   chessRating           Int?
-  coachPricePer5Min     Int?      // cents
+  coachChatPrice        Int?      // cents per 15-min slot (chat)
+  coachCallPrice        Int?      // cents per 15-min slot (call)
   communicationPreference CommunicationPreference @default(CHAT_ONLY)
   chessComAccountAge    DateTime? // when the chess.com account was created
   bio                   String?
+  timezone              String?   // IANA timezone (e.g., "Europe/London")
 
   // Stats
   lessonsGiven   Int @default(0)
@@ -125,7 +137,8 @@ model User {
   totalEarningsAllTime Int @default(0) // cents
 
   // Coach ELO
-  coachElo Float @default(1000)
+  coachElo           Float @default(1000)
+  coachRatingPenalty Float @default(0) // penalty for no-shows etc.
 
   // Coaching availability
   coachAvailability CoachAvailability @default(AVAILABLE)
@@ -150,14 +163,11 @@ model User {
   stripeCustomerId       String?
   stripeConnectAccountId String?
 
-  // Password reset
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
+  accounts          Account[]
   reviewsGiven      Review[]        @relation("ReviewFrom")
   reviewsReceived   Review[]        @relation("ReviewTo")
   lessonRequestsAsStudent LessonRequest[] @relation("Student")
@@ -172,12 +182,34 @@ model User {
   favouritedBy      Favourite[]     @relation("FavouriteCoach")
   blockedStudents   Block[]         @relation("BlockingCoach")
   blockedByCoaches  Block[]         @relation("BlockedStudent")
+  timeSlotTemplates TimeSlotTemplate[]
+  timeSlots         TimeSlot[]
+  chatMessagesSent  ChatMessage[]
 
   @@index([coachElo(sort: Desc)])
   @@index([activityStatus])
   @@index([verificationStatus])
   @@index([continent])
-  @@index([resetToken])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Review {
@@ -211,11 +243,22 @@ model LessonRequest {
   coach     User   @relation("Coach", fields: [coachId], references: [id])
   
   type            LessonType
-  durationMinutes Int
-  estimatedCost   Int       // cents
-  isTrial         Boolean   @default(false)
+  durationMinutes Int            @default(15) // always 15 for timeslot system
+  estimatedCost   Int            // cents
+  isTrial         Boolean        @default(false)
   communicationMethod LessonCommunicationMethod?
   message         String?
+  
+  // Timeslot scheduling
+  timeSlotId        String?
+  timeSlot          TimeSlot?  @relation(fields: [timeSlotId], references: [id])
+  scheduledStartAt  DateTime?
+  scheduledEndAt    DateTime?
+  acceptanceDeadline DateTime?
+  
+  // Join tracking (for no-show detection)
+  coachJoinedAt   DateTime?
+  studentJoinedAt DateTime?
   
   status          LessonRequestStatus @default(PENDING)
   studentStartConfirmed Boolean @default(false)
@@ -228,13 +271,16 @@ model LessonRequest {
   respondedAt DateTime?
   completedAt DateTime?
   
-  reviews Review[]
+  reviews      Review[]
   transactions Transaction[]
-  abuseFlags AbuseFlag[]
+  abuseFlags   AbuseFlag[]
+  chatMessages ChatMessage[]
   
   @@index([studentId])
   @@index([coachId])
   @@index([status])
+  @@index([timeSlotId])
+  @@index([scheduledStartAt])
 }
 
 model Transaction {
@@ -391,4 +437,64 @@ model Block {
   @@unique([coachId, studentId])
   @@index([coachId])
   @@index([studentId])
+}
+
+model TimeSlotTemplate {
+  id          String @id @default(cuid())
+  
+  coachId     String
+  coach       User   @relation(fields: [coachId], references: [id])
+  
+  dayOfWeek   Int    // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  startHour   Int    // 0-23
+  startMinute Int    // 0 or 15 or 30 or 45
+  
+  createdAt   DateTime @default(now())
+  
+  timeSlots   TimeSlot[]
+  
+  @@unique([coachId, dayOfWeek, startHour, startMinute])
+  @@index([coachId])
+}
+
+model TimeSlot {
+  id          String         @id @default(cuid())
+  
+  coachId     String
+  coach       User           @relation(fields: [coachId], references: [id])
+  
+  templateId  String?
+  template    TimeSlotTemplate? @relation(fields: [templateId], references: [id])
+  
+  startTime   DateTime
+  endTime     DateTime
+  status      TimeSlotStatus @default(AVAILABLE)
+  
+  createdAt   DateTime @default(now())
+  
+  lessonRequests LessonRequest[]
+  
+  @@unique([coachId, startTime])
+  @@index([coachId])
+  @@index([startTime])
+  @@index([status])
+}
+
+model ChatMessage {
+  id              String   @id @default(cuid())
+  
+  lessonRequestId String
+  lessonRequest   LessonRequest @relation(fields: [lessonRequestId], references: [id])
+  
+  senderId        String
+  sender          User   @relation(fields: [senderId], references: [id])
+  
+  content         String
+  readAt          DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([lessonRequestId])
+  @@index([senderId])
+  @@index([createdAt])
 }

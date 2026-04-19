@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ReviewList } from "@/components/review-list";
 import { LessonRequestForm } from "@/components/lesson-request-form";
+import { SlotPicker } from "@/components/slot-picker";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
 import { fetchChessComRating } from "@/lib/chess-com";
+import { getAvailableSlots } from "@/lib/actions/timeslots";
 import { FavouriteButton } from "@/components/favourite-button";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -168,7 +170,7 @@ export default async function ProfilePage({
 
   // Check if coach has completed any paid lessons (for new coach warning)
   let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
-  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachPricePer5Min);
+  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachChatPrice, user.coachCallPrice);
   if (user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
     const paidCompleted = await prisma.lessonRequest.findFirst({
       where: {
@@ -184,6 +186,17 @@ export default async function ProfilePage({
   const chessComAgeStr = user.chessComAccountAge
     ? formatAccountAge(user.chessComAccountAge)
     : null;
+
+  // Fetch available slots for the coach
+  let availableSlots: Array<{ id: string; startTime: string; endTime: string }> = [];
+  if (!isOwnProfile && user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
+    const rawSlots = await getAvailableSlots(user.id);
+    availableSlots = rawSlots.map((s) => ({
+      id: s.id,
+      startTime: s.startTime.toISOString(),
+      endTime: s.endTime.toISOString(),
+    }));
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -206,9 +219,6 @@ export default async function ProfilePage({
             )}
             {user.verificationStatus === "VERIFIED" && effectiveAvailability === "UNAVAILABLE" && (
               <Badge variant="secondary">Unavailable</Badge>
-            )}
-            {user.verificationStatus === "VERIFIED" && effectiveAvailability === "BUSY" && (
-              <Badge variant="destructive">Busy</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
@@ -258,10 +268,16 @@ export default async function ProfilePage({
                     <strong>{continentLabels[user.continent]}</strong>
                   </div>
                 )}
-                {user.coachPricePer5Min !== null && (
+                {user.coachChatPrice !== null && (
                   <div>
-                    <span className="text-muted-foreground">Price/5min:</span>{" "}
-                    <strong>€{(user.coachPricePer5Min / 100).toFixed(2)}</strong>
+                    <span className="text-muted-foreground">Chat Price/slot:</span>{" "}
+                    <strong>€{(user.coachChatPrice / 100).toFixed(2)}</strong>
+                  </div>
+                )}
+                {user.coachCallPrice !== null && (
+                  <div>
+                    <span className="text-muted-foreground">Call Price/slot:</span>{" "}
+                    <strong>€{(user.coachCallPrice / 100).toFixed(2)}</strong>
                   </div>
                 )}
                 <div>
@@ -374,21 +390,33 @@ export default async function ProfilePage({
             <ChessComVerificationForm />
           )}
 
-          {/* Lesson request for other profiles */}
+          {/* Lesson booking for other profiles */}
           {!isOwnProfile &&
             session?.user &&
             user.verificationStatus === "VERIFIED" &&
             effectiveAvailability === "AVAILABLE" &&
-            studentVerified &&
             !isBlocked && (
-              <LessonRequestForm
-                coachId={user.id}
-                coachPricePer5Min={user.coachPricePer5Min}
-                coachCommunicationPreference={user.communicationPreference}
-                availableBalance={studentAvailableBalance ?? 0}
-                freeTrialsRemaining={freeTrialsRemaining}
-                hasCompletedPaidLesson={hasCompletedPaidLesson}
-              />
+              availableSlots.length > 0 ? (
+                <SlotPicker
+                  coachId={user.id}
+                  coachChatPrice={user.coachChatPrice}
+                  coachCallPrice={user.coachCallPrice}
+                  coachCommunicationPreference={user.communicationPreference}
+                  availableBalance={studentAvailableBalance ?? 0}
+                  freeTrialsRemaining={freeTrialsRemaining}
+                  slots={availableSlots}
+                />
+              ) : (
+                <LessonRequestForm
+                  coachId={user.id}
+                  coachChatPrice={user.coachChatPrice}
+                  coachCallPrice={user.coachCallPrice}
+                  coachCommunicationPreference={user.communicationPreference}
+                  availableBalance={studentAvailableBalance ?? 0}
+                  freeTrialsRemaining={freeTrialsRemaining}
+                  hasCompletedPaidLesson={hasCompletedPaidLesson}
+                />
+              )
             )}
           {!isOwnProfile && isBlocked && session?.user && (
             <Card>
@@ -397,31 +425,6 @@ export default async function ProfilePage({
               </CardContent>
             </Card>
           )}
-          {!isOwnProfile &&
-            session?.user &&
-            user.verificationStatus === "VERIFIED" &&
-            effectiveAvailability === "AVAILABLE" &&
-            !studentVerified && (
-              <Card>
-                <CardContent className="pt-6 text-center text-sm text-muted-foreground">
-                  You must verify your chess.com account before requesting lessons.{" "}
-                  <Link href="/profile/edit" className="underline">Verify now</Link>
-                </CardContent>
-              </Card>
-            )}
-          {!isOwnProfile &&
-            user.verificationStatus === "VERIFIED" &&
-            effectiveAvailability === "BUSY" && (
-              <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    <span className="font-medium">Busy</span>
-                  </div>
-                  This coach is currently busy and not accepting new lesson requests.
-                </CardContent>
-              </Card>
-            )}
           {!isOwnProfile &&
             user.verificationStatus === "VERIFIED" &&
             effectiveAvailability === "UNAVAILABLE" && (

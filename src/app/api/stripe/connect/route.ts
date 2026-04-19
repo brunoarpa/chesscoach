@@ -23,7 +23,8 @@ export async function POST() {
     where: { id: session.user.id },
     select: {
       verificationStatus: true,
-      coachPricePer5Min: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
       stripeConnectAccountId: true,
       isSuspended: true,
     },
@@ -42,7 +43,7 @@ export async function POST() {
     return NextResponse.json({ error: "You must be a verified coach to set up payouts" }, { status: 403 });
   }
 
-  if (!user.coachPricePer5Min) {
+  if (!user.coachChatPrice && !user.coachCallPrice) {
     return NextResponse.json({ error: "Set your coaching prices before setting up payouts" }, { status: 400 });
   }
 

@@ -13,15 +13,14 @@ import { toast } from "sonner";
 
 const statuses = [
   { value: "AVAILABLE" as const, label: "Available", badgeClass: "bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400" },
-  { value: "BUSY" as const, label: "Busy", badgeVariant: "destructive" as const },
   { value: "UNAVAILABLE" as const, label: "Unavailable", badgeVariant: "secondary" as const },
 ];
 
 export function AvailabilityToggle({ initialStatus }: { initialStatus: string }) {
   const [status, setStatus] = useState(initialStatus);
-  const current = statuses.find((s) => s.value === status) ?? statuses[2];
+  const current = statuses.find((s) => s.value === status) ?? statuses[1];
 
-  async function handleChange(newStatus: "AVAILABLE" | "BUSY" | "UNAVAILABLE") {
+  async function handleChange(newStatus: "AVAILABLE" | "UNAVAILABLE") {
     const prevStatus = status;
     setStatus(newStatus);
     const result = await updateCoachAvailability(newStatus);

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { calculateCoachElo } from "@/lib/elo";
 
 /**
  * Update activity status for all users based on lastActiveAt.
@@ -85,11 +86,16 @@ export async function updateActivityStatuses() {
  */
 export async function expirePendingRequests() {
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const now = new Date();
 
+  // Expire requests that are either older than 3 days OR past their acceptance deadline
   const expiredRequests = await prisma.lessonRequest.findMany({
     where: {
       status: "PENDING",
-      createdAt: { lt: threeDaysAgo },
+      OR: [
+        { createdAt: { lt: threeDaysAgo } },
+        { acceptanceDeadline: { lt: now } },
+      ],
     },
   });
 
@@ -112,6 +118,13 @@ export async function expirePendingRequests() {
               data: { reservedBalance: { decrement: request.estimatedCost } },
             }),
           ]),
+      // Release the timeslot back to available
+      ...(request.timeSlotId
+        ? [prisma.timeSlot.update({
+            where: { id: request.timeSlotId },
+            data: { status: "AVAILABLE" },
+          })]
+        : []),
     ];
     await prisma.$transaction(txOps);
   }
@@ -320,6 +333,159 @@ export async function detectConfirmationDisputes() {
           relatedUserId,
         },
       });
+    }
+  }
+}
+
+const NO_SHOW_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+const NO_SHOW_ELO_PENALTY = 50;
+
+/**
+ * Auto-detect no-shows for ACCEPTED/IN_PROGRESS lessons
+ * where the scheduled time + 5 min buffer has passed.
+ */
+export async function detectNoShows() {
+  const bufferCutoff = new Date(Date.now() - NO_SHOW_BUFFER_MS);
+
+  // Find active lessons past their start time + buffer where someone hasn't joined
+  const lessons = await prisma.lessonRequest.findMany({
+    where: {
+      status: { in: ["ACCEPTED", "IN_PROGRESS"] },
+      scheduledStartAt: { not: null, lte: bufferCutoff },
+      OR: [
+        { coachJoinedAt: null },
+        { studentJoinedAt: null },
+      ],
+    },
+    include: {
+      student: { select: { username: true } },
+      coach: { select: { username: true } },
+    },
+  });
+
+  for (const lesson of lessons) {
+    if (!lesson.coachJoinedAt && !lesson.studentJoinedAt) {
+      // Neither joined — expire, refund student
+      const txOps = [
+        prisma.lessonRequest.update({
+          where: { id: lesson.id },
+          data: { status: "EXPIRED" },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { reservedBalance: { decrement: lesson.estimatedCost } },
+              }),
+            ]),
+        ...(lesson.timeSlotId
+          ? [prisma.timeSlot.update({ where: { id: lesson.timeSlotId }, data: { status: "AVAILABLE" } })]
+          : []),
+      ];
+      await prisma.$transaction(txOps);
+    } else if (!lesson.coachJoinedAt) {
+      // Coach didn't join — no-show
+      await prisma.$transaction([
+        prisma.lessonRequest.update({
+          where: { id: lesson.id },
+          data: { status: "NO_SHOW" },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { reservedBalance: { decrement: lesson.estimatedCost } },
+              }),
+            ]),
+        prisma.user.update({
+          where: { id: lesson.coachId },
+          data: { coachRatingPenalty: { increment: NO_SHOW_ELO_PENALTY } },
+        }),
+        ...(lesson.timeSlotId
+          ? [prisma.timeSlot.update({ where: { id: lesson.timeSlotId }, data: { status: "AVAILABLE" } })]
+          : []),
+        prisma.abuseFlag.create({
+          data: {
+            userId: lesson.coachId,
+            type: "COACH_NO_SHOW",
+            severity: "HIGH",
+            details: `Coach "${lesson.coach.username}" did not join scheduled lesson with student "${lesson.student.username}". Auto-detected by system. Student refunded.`,
+            relatedLessonId: lesson.id,
+            relatedUserId: lesson.studentId,
+          },
+        }),
+      ]);
+
+      const newElo = await calculateCoachElo(lesson.coachId);
+      await prisma.user.update({
+        where: { id: lesson.coachId },
+        data: { coachElo: newElo },
+      });
+    } else if (!lesson.studentJoinedAt) {
+      // Student didn't join — coach gets paid
+      await prisma.$transaction([
+        prisma.lessonRequest.update({
+          where: { id: lesson.id },
+          data: {
+            status: "COMPLETED",
+            completedAt: new Date(),
+            coachConfirmed: true,
+            studentConfirmed: true,
+          },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: {
+                  reservedBalance: { decrement: lesson.estimatedCost },
+                },
+              }),
+              prisma.user.update({
+                where: { id: lesson.coachId },
+                data: {
+                  pendingEarnings: { increment: lesson.estimatedCost },
+                  totalEarningsAllTime: { increment: lesson.estimatedCost },
+                  lessonsGiven: { increment: 1 },
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.studentId,
+                  type: "LESSON_PAYMENT",
+                  amount: -lesson.estimatedCost,
+                  lessonRequestId: lesson.id,
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.coachId,
+                  type: "LESSON_PAYMENT",
+                  amount: lesson.estimatedCost,
+                  lessonRequestId: lesson.id,
+                },
+              }),
+              prisma.earningRecord.create({
+                data: {
+                  userId: lesson.coachId,
+                  amount: lesson.estimatedCost,
+                },
+              }),
+            ]),
+        prisma.abuseFlag.create({
+          data: {
+            userId: lesson.studentId,
+            type: "STUDENT_NO_SHOW",
+            severity: "MEDIUM",
+            details: `Student "${lesson.student.username}" did not join scheduled lesson with coach "${lesson.coach.username}". Auto-detected. Coach paid.`,
+            relatedLessonId: lesson.id,
+            relatedUserId: lesson.coachId,
+          },
+        }),
+      ]);
     }
   }
 }

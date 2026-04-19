@@ -33,7 +33,8 @@ export default async function LeaderboardPage() {
       activityStatus: true,
       lastActiveAt: true,
       coachAvailability: true,
-      coachPricePer5Min: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
     },
   });
 
@@ -53,7 +54,7 @@ export default async function LeaderboardPage() {
           {/* Mobile card layout */}
           <div className="md:hidden space-y-3">
             {coaches.map((coach, i) => {
-              const availability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min);
+              const availability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice);
               return (
                 <Card key={coach.username}>
                   <CardContent className="pt-4">
@@ -66,8 +67,6 @@ export default async function LeaderboardPage() {
                       </div>
                       {availability === "AVAILABLE" ? (
                         <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                      ) : availability === "BUSY" ? (
-                        <Badge variant="destructive">Busy</Badge>
                       ) : (
                         <Badge variant="secondary">Unavailable</Badge>
                       )}
@@ -81,8 +80,8 @@ export default async function LeaderboardPage() {
                       <span className="text-right">{coach.lessonsGiven}</span>
                       <span className="text-muted-foreground">Students</span>
                       <span className="text-right">{coach.playersTaught}</span>
-                      <span className="text-muted-foreground">Price/5min</span>
-                      <span className="text-right">{coach.coachPricePer5Min !== null ? `€${(coach.coachPricePer5Min / 100).toFixed(2)}` : "—"}</span>
+                      <span className="text-muted-foreground">Price/slot</span>
+                      <span className="text-right">{coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}</span>
                       <span className="text-muted-foreground">Last Active</span>
                       <span className="text-right flex items-center justify-end gap-1.5">
                         <span className={`w-2 h-2 rounded-full ${getActivityDotColor(coach.lastActiveAt)}`} />
@@ -105,7 +104,7 @@ export default async function LeaderboardPage() {
               <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>
               <TableHead className="text-right">Lessons</TableHead>
-              <TableHead className="text-right">Price/5min</TableHead>
+              <TableHead className="text-right">Price/slot</TableHead>
               <TableHead className="text-right">Students</TableHead>
               <TableHead className="text-center">Last Active</TableHead>
               <TableHead className="text-center">Status</TableHead>
@@ -134,7 +133,7 @@ export default async function LeaderboardPage() {
                 </TableCell>
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">
-                  {coach.coachPricePer5Min !== null ? `€${(coach.coachPricePer5Min / 100).toFixed(2)}` : "—"}
+                  {coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}
                 </TableCell>
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">
@@ -146,10 +145,8 @@ export default async function LeaderboardPage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  {getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min) === "AVAILABLE" ? (
+                  {getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE" ? (
                     <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                  ) : getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachPricePer5Min) === "BUSY" ? (
-                    <Badge variant="destructive">Busy</Badge>
                   ) : (
                     <Badge variant="secondary">Unavailable</Badge>
                   )}

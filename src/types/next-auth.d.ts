@@ -5,9 +5,10 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      username: string;
+      username: string | null;
       role: UserRole;
       verificationStatus: VerificationStatus;
+      needsUsername: boolean;
     } & DefaultSession["user"];
   }
 }

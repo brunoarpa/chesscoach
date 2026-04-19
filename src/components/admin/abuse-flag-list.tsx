@@ -37,6 +37,8 @@ const typeLabels: Record<string, string> = {
   STUDENT_SPAM: "Student Spam",
   MULTI_ACCOUNT_SUSPECTED: "Multi-Account Suspected",
   LESSON_DISPUTE: "Lesson Dispute",
+  COACH_NO_SHOW: "Coach No-Show",
+  STUDENT_NO_SHOW: "Student No-Show",
 };
 
 export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
@@ -124,8 +126,13 @@ export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
                 </p>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                {flag.type === "LESSON_DISPUTE" && flag.relatedLesson ? (
+                {(flag.type === "LESSON_DISPUTE" || flag.type === "COACH_NO_SHOW" || flag.type === "STUDENT_NO_SHOW") && flag.relatedLesson ? (
                   <>
+                    {flag.relatedLesson.id && (
+                      <a href={`/admin/lesson/${flag.relatedLesson.id}/chat`} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="ghost">View Chat</Button>
+                      </a>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => handleDisputeResolution(flag.relatedLesson!.id, "refund")}>
                       Refund Student
                     </Button>

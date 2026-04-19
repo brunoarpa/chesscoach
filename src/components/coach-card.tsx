@@ -32,7 +32,8 @@ interface Props {
   username: string;
   chessRating: number | null;
   continent: string | null;
-  coachPricePer5Min: number | null;
+  coachChatPrice: number | null;
+  coachCallPrice: number | null;
   communicationPreference: string;
   coachElo: number;
   activityStatus: string;
@@ -69,10 +70,8 @@ export function CoachCard(props: Props) {
             <p className="text-sm text-muted-foreground mb-3">
               <span className="flex items-center gap-1.5">
                 ♟ Chess Coach
-                {getEffectiveAvailability(props.coachAvailability, props.lastActiveAt, props.coachPricePer5Min) === "AVAILABLE" ? (
+                {getEffectiveAvailability(props.coachAvailability, props.lastActiveAt, props.coachChatPrice, props.coachCallPrice) === "AVAILABLE" ? (
                   <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                ) : getEffectiveAvailability(props.coachAvailability, props.lastActiveAt, props.coachPricePer5Min) === "BUSY" ? (
-                  <Badge variant="destructive">Busy</Badge>
                 ) : (
                   <Badge variant="secondary">Unavailable</Badge>
                 )}
@@ -92,8 +91,11 @@ export function CoachCard(props: Props) {
               {props.continent && (
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {continentLabels[props.continent]}</span>
               )}
-              {props.coachPricePer5Min !== null && (
-                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> €{(props.coachPricePer5Min / 100).toFixed(2)}/5min</span>
+              {props.coachChatPrice !== null && (
+                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> €{(props.coachChatPrice / 100).toFixed(2)}/slot (chat)</span>
+              )}
+              {props.coachCallPrice !== null && (
+                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> €{(props.coachCallPrice / 100).toFixed(2)}/slot (call)</span>
               )}
               <span className="flex items-center gap-1">
                 {props.communicationPreference === "CHAT_AND_CALL" ? (

@@ -1,131 +1,37 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { signupSchema } from "@/lib/validations";
-import { signIn, auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { chessComUsernameExists } from "@/lib/chess-com";
+import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation } from "@/lib/chess-com";
+import crypto from "crypto";
 
-async function getClientIp() {
-  const h = await headers();
-  return getClientIpFromHeaders(h);
-}
+export async function setUsername(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
 
-export async function signup(formData: FormData) {
-  const ip = await getClientIp();
-  const { success } = await rateLimit(`signup:${ip}`, { maxAttempts: 5, windowMs: 15 * 60 * 1000 });
-  if (!success) {
-    return { error: "Too many signup attempts. Please try again later." };
+  const username = (formData.get("username") as string)?.trim();
+  if (!username) return { error: "Username is required" };
+  if (username.length < 3 || username.length > 20) {
+    return { error: "Username must be between 3 and 20 characters" };
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return { error: "Username can only contain letters, numbers, and underscores" };
   }
 
-  const raw = {
-    username: formData.get("username") as string,
-    password: formData.get("password") as string,
-    confirmPassword: formData.get("confirmPassword") as string,
-    email: (formData.get("email") as string) || "",
-    continent: (formData.get("continent") as string) || undefined,
-  };
-
-  const parsed = signupSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
-
-  const { username, password, email, continent } = parsed.data;
-
-  // Check username uniqueness
-  const existingUser = await prisma.user.findUnique({ where: { username } });
-  if (existingUser) {
+  const existing = await prisma.user.findUnique({ where: { username } });
+  if (existing && existing.id !== session.user.id) {
     return { error: "Username already taken" };
   }
 
-  // Check email uniqueness if provided
-  if (email) {
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingEmail) {
-      return { error: "Email already in use" };
-    }
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  await prisma.user.create({
-    data: {
-      username,
-      passwordHash,
-      email: email || null,
-      continent: continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
-      signupIp: ip,
-    },
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { username },
   });
 
-  // Check for other accounts from same IP (created in last 7 days)
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const sameIpAccounts = await prisma.user.findMany({
-    where: {
-      signupIp: ip,
-      username: { not: username },
-      createdAt: { gte: sevenDaysAgo },
-    },
-    select: { id: true, username: true },
-  });
-
-  if (sameIpAccounts.length > 0) {
-    const newUser = await prisma.user.findUnique({ where: { username }, select: { id: true } });
-    if (newUser) {
-      for (const otherAccount of sameIpAccounts) {
-        await prisma.abuseFlag.create({
-          data: {
-            userId: newUser.id,
-            type: "MULTI_ACCOUNT_SUSPECTED",
-            severity: "MEDIUM",
-            details: `Multiple accounts created from same IP (${ip}) within 7 days. Other account: ${otherAccount.username}`,
-            relatedUserId: otherAccount.id,
-          },
-        });
-      }
-    }
-  }
-
-  // Auto sign in after signup
-  await signIn("credentials", {
-    username,
-    password,
-    redirect: false,
-  });
-
-  redirect("/how-it-works");
-}
-
-export async function login(_prevState: unknown, formData: FormData) {
-  const username = formData.get("username") as string;
-  const password = formData.get("password") as string;
-
-  if (!username || !password) {
-    return { error: "Username and password are required" };
-  }
-
-  const ip = await getClientIp();
-  const { success } = await rateLimit(`login:${ip}`, { maxAttempts: 10, windowMs: 15 * 60 * 1000 });
-  if (!success) {
-    return { error: "Too many login attempts. Please try again later." };
-  }
-
-  try {
-    await signIn("credentials", {
-      username,
-      password,
-      redirect: false,
-    });
-  } catch {
-    return { error: "Invalid username or password" };
-  }
-
-  redirect("/dashboard");
+  revalidatePath("/dashboard");
+  return { success: true };
 }
 
 export async function updateProfile(formData: FormData) {
@@ -137,26 +43,32 @@ export async function updateProfile(formData: FormData) {
   const raw = {
     username: (formData.get("username") as string)?.trim() || undefined,
     continent: (formData.get("continent") as string) || undefined,
-    coachPricePer5Min: formData.get("coachPricePer5Min")
-      ? Number(formData.get("coachPricePer5Min"))
+    coachChatPrice: formData.get("coachChatPrice")
+      ? Number(formData.get("coachChatPrice"))
+      : undefined,
+    coachCallPrice: formData.get("coachCallPrice")
+      ? Number(formData.get("coachCallPrice"))
       : undefined,
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
     bio: (formData.get("bio") as string) || undefined,
     coachAvailability: (formData.get("coachAvailability") as string) || "AVAILABLE",
+    timezone: (formData.get("timezone") as string) || undefined,
   };
 
   // Validate and handle username change
-  let newUsername = session.user.username;
-  if (raw.username && raw.username !== session.user.username) {
-    // Validate username format
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { username: true },
+  });
+  let newUsername = currentUser?.username ?? null;
+  if (raw.username && raw.username !== currentUser?.username) {
     if (raw.username.length < 3 || raw.username.length > 20) {
       return { error: "Username must be between 3 and 20 characters" };
     }
     if (!/^[a-zA-Z0-9_]+$/.test(raw.username)) {
       return { error: "Username can only contain letters, numbers, and underscores" };
     }
-    // Check uniqueness
     const existingUser = await prisma.user.findUnique({ where: { username: raw.username } });
     if (existingUser && existingUser.id !== session.user.id) {
       return { error: "Username already taken" };
@@ -164,10 +76,11 @@ export async function updateProfile(formData: FormData) {
     newUsername = raw.username;
   }
 
-  // If no price is set, force availability to UNAVAILABLE
-  const priceInCents = raw.coachPricePer5Min ? Math.round(raw.coachPricePer5Min * 100) : null;
-  let availability = raw.coachAvailability as "AVAILABLE" | "BUSY" | "UNAVAILABLE";
-  if (!priceInCents && availability === "AVAILABLE") {
+  const chatPriceInCents = raw.coachChatPrice ? Math.round(raw.coachChatPrice * 100) : null;
+  const callPriceInCents = raw.coachCallPrice ? Math.round(raw.coachCallPrice * 100) : null;
+  let availability = raw.coachAvailability as "AVAILABLE" | "UNAVAILABLE";
+  const hasPrice = chatPriceInCents !== null || callPriceInCents !== null;
+  if (!hasPrice && availability === "AVAILABLE") {
     availability = "UNAVAILABLE";
   }
 
@@ -176,29 +89,33 @@ export async function updateProfile(formData: FormData) {
     data: {
       username: newUsername,
       continent: raw.continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
-      coachPricePer5Min: priceInCents,
+      coachChatPrice: chatPriceInCents,
+      coachCallPrice: callPriceInCents,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,
       coachAvailability: availability,
+      timezone: raw.timezone || null,
       lastActiveAt: new Date(),
       activityStatus: "ACTIVE",
     },
   });
 
-  redirect("/profile/" + newUsername);
+  if (newUsername) {
+    redirect("/profile/" + newUsername);
+  }
+  redirect("/profile/edit");
 }
 
-export async function updateCoachAvailability(newStatus: "AVAILABLE" | "BUSY" | "UNAVAILABLE") {
+export async function updateCoachAvailability(newStatus: "AVAILABLE" | "UNAVAILABLE") {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
-  // Prevent setting to AVAILABLE without a price
   if (newStatus === "AVAILABLE") {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { coachPricePer5Min: true },
+      select: { coachChatPrice: true, coachCallPrice: true },
     });
-    if (!user?.coachPricePer5Min) {
+    if (!user?.coachChatPrice && !user?.coachCallPrice) {
       return { error: "You must set a price before setting yourself as available. Go to Edit Profile to set your price." };
     }
   }
@@ -222,47 +139,84 @@ export async function submitChessComUsername(formData: FormData) {
     return { error: "Not authenticated" };
   }
 
-  // Check current verification status - only allow if NONE or REJECTED
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { verificationStatus: true },
   });
-  if (!currentUser) {
-    return { error: "User not found" };
-  }
-  if (currentUser.verificationStatus === "PENDING") {
-    return { error: "You already have a pending verification request" };
-  }
+  if (!currentUser) return { error: "User not found" };
   if (currentUser.verificationStatus === "VERIFIED") {
     return { error: "Your account is already verified" };
   }
 
   const chessComUsername = formData.get("chessComUsername") as string;
-  if (!chessComUsername) {
-    return { error: "Chess.com username is required" };
-  }
+  if (!chessComUsername) return { error: "Chess.com username is required" };
 
-  // Validate that the chess.com username exists
   const exists = await chessComUsernameExists(chessComUsername);
   if (!exists) {
     return { error: "This chess.com username was not found. Please check the spelling." };
   }
 
-  // Check if already taken
-  const existing = await prisma.user.findUnique({
-    where: { chessComUsername },
-  });
+  const existing = await prisma.user.findUnique({ where: { chessComUsername } });
   if (existing && existing.id !== session.user.id) {
     return { error: "This chess.com username is already linked to another account" };
   }
+
+  // Generate a unique verification code
+  const verificationCode = crypto.randomBytes(4).toString("hex").toUpperCase();
 
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
       chessComUsername,
+      verificationCode,
       verificationStatus: "PENDING",
     },
   });
 
+  return { success: true, verificationCode };
+}
+
+export async function verifyChessComLocation() {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { chessComUsername: true, verificationCode: true, verificationStatus: true },
+  });
+
+  if (!user) return { error: "User not found" };
+  if (user.verificationStatus === "VERIFIED") return { error: "Already verified" };
+  if (!user.chessComUsername || !user.verificationCode) {
+    return { error: "Please submit your chess.com username first" };
+  }
+
+  // Fetch location from chess.com API
+  const location = await fetchChessComLocation(user.chessComUsername);
+  if (location === null) {
+    return { error: "Could not fetch your chess.com profile. Try again." };
+  }
+
+  if (!location.toUpperCase().includes(user.verificationCode)) {
+    return { error: `Verification code not found in your chess.com location. Make sure your Location field contains: ${user.verificationCode}` };
+  }
+
+  // Verification passed — fetch rating and profile
+  const [rating, profile] = await Promise.all([
+    fetchChessComRating(user.chessComUsername),
+    fetchChessComProfile(user.chessComUsername),
+  ]);
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      verificationStatus: "VERIFIED",
+      chessRating: rating,
+      chessComAccountAge: profile?.joined ?? null,
+      verificationCode: null,
+    },
+  });
+
+  revalidatePath("/dashboard");
   return { success: true };
 }

@@ -21,10 +21,12 @@ const continents = [
 interface Props {
   username: string;
   continent: string | null;
-  coachPricePer5Min?: number;
+  coachChatPrice?: number;
+  coachCallPrice?: number;
   communicationPreference: string;
   bio?: string;
   coachAvailability: string;
+  timezone?: string;
 }
 
 export function ProfileEditForm(props: Props) {
@@ -71,6 +73,20 @@ export function ProfileEditForm(props: Props) {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="timezone">Timezone</Label>
+            <Input
+              id="timezone"
+              name="timezone"
+              defaultValue={props.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+              placeholder="e.g. Europe/London"
+              list="timezones"
+            />
+            <p className="text-xs text-muted-foreground">
+              Your timezone for scheduling. Detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="bio">Bio</Label>
             <Textarea
               id="bio"
@@ -83,18 +99,33 @@ export function ProfileEditForm(props: Props) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="coachPricePer5Min">Price per 5 min (€)</Label>
+              <Label htmlFor="coachChatPrice">Chat lesson price per slot (€)</Label>
               <Input
-                id="coachPricePer5Min"
-                name="coachPricePer5Min"
+                id="coachChatPrice"
+                name="coachChatPrice"
                 type="number"
                 step="0.01"
                 min="0"
-                defaultValue={props.coachPricePer5Min}
-                placeholder="Leave empty if not coaching"
+                defaultValue={props.coachChatPrice}
+                placeholder="e.g. 2.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="coachCallPrice">Call lesson price per slot (€)</Label>
+              <Input
+                id="coachCallPrice"
+                name="coachCallPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={props.coachCallPrice}
+                placeholder="e.g. 5.00"
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Each slot is 15 minutes. Leave empty if not coaching that type.
+          </p>
 
           <div className="space-y-2">
             <Label>Communication Preference</Label>
@@ -128,12 +159,6 @@ export function ProfileEditForm(props: Props) {
                     Available
                   </span>
                 </SelectItem>
-                <SelectItem value="BUSY">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
-                    Busy
-                  </span>
-                </SelectItem>
                 <SelectItem value="UNAVAILABLE">
                   <span className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
@@ -143,7 +168,7 @@ export function ProfileEditForm(props: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Available: accepting requests (requires a price). Busy: visible but not accepting requests. Unavailable: not accepting requests. You are automatically set to unavailable after 24 hours of inactivity — you must manually set yourself back to available.
+              Available: accepting requests (requires a price). Unavailable: not accepting requests. You are automatically set to unavailable after 24 hours of inactivity.
             </p>
           </div>
 

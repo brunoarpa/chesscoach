@@ -90,6 +90,28 @@ export async function chessComUsernameExists(
 }
 
 /**
+ * Fetch a player's "location" field from their chess.com profile.
+ * Used for auto-verification: the user sets a verification code in their location.
+ * Returns null on error, empty string if no location set.
+ */
+export async function fetchChessComLocation(
+  chessComUsername: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`,
+      { next: { revalidate: 0 } }
+    );
+    if (!res.ok) return null;
+
+    const profile = await res.json();
+    return (profile.location as string) ?? "";
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch a player's current chess.com username (handles renames).
  */
 export async function fetchChessComCurrentUsername(

@@ -26,12 +26,13 @@ interface Request {
   isTrial: boolean;
   communicationMethod: string | null;
   message: string | null;
+  scheduledStartAt: string | null;
   studentStartConfirmed: boolean;
   coachStartConfirmed: boolean;
   studentConfirmed: boolean;
   coachConfirmed: boolean;
   createdAt: string;
-  coach: { username: string; chessComUsername: string | null };
+  coach: { username: string | null; chessComUsername: string | null };
   reviews: MyReview[];
 }
 
@@ -40,7 +41,8 @@ interface FavouriteCoach {
   username: string;
   coachAvailability: string;
   chessRating: number | null;
-  coachPricePer5Min: number | null;
+  coachChatPrice: number | null;
+  coachCallPrice: number | null;
   lastActiveAt: string | null;
 }
 
@@ -57,7 +59,6 @@ const statusColors: Record<string, string> = {
 
 const availabilityColors: Record<string, string> = {
   AVAILABLE: "bg-green-500",
-  BUSY: "bg-red-500",
   UNAVAILABLE: "bg-gray-400",
 };
 
@@ -67,6 +68,7 @@ function RequestMeta({ request }: { request: Request }) {
       <span className="text-sm text-muted-foreground ml-2">
         Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
+        {request.scheduledStartAt && ` · ${new Date(request.scheduledStartAt).toLocaleString()}`}
       </span>
       {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
     </>
@@ -110,7 +112,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                 <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                   <CardContent className="pt-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.lastActiveAt ? getEffectiveAvailability(coach.coachAvailability, new Date(coach.lastActiveAt), coach.coachPricePer5Min) : coach.coachAvailability] ?? "bg-gray-400"}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${availabilityColors[coach.lastActiveAt ? getEffectiveAvailability(coach.coachAvailability, new Date(coach.lastActiveAt), coach.coachChatPrice, coach.coachCallPrice) : coach.coachAvailability] ?? "bg-gray-400"}`} />
                       <div>
                         <span className="font-medium">{coach.username}</span>
                         {coach.chessRating && (
@@ -120,9 +122,9 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                         )}
                       </div>
                     </div>
-                    {coach.coachPricePer5Min != null && (
+                    {coach.coachChatPrice != null && (
                       <span className="text-sm text-muted-foreground">
-                        €{(coach.coachPricePer5Min / 100).toFixed(2)}/5min
+                        €{(coach.coachChatPrice / 100).toFixed(2)}/slot
                       </span>
                     )}
                   </CardContent>
@@ -312,8 +314,11 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             </div>
           </div>
           <div className="flex gap-2">
+            <Link href={`/lesson/${request.id}`}>
+              <Button size="sm" variant="default">Join Lesson</Button>
+            </Link>
             {!request.studentStartConfirmed && (
-              <Button size="sm" onClick={handleConfirmStart} disabled={loading}>
+              <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
                 Confirm Start
               </Button>
             )}
@@ -372,7 +377,10 @@ function StudentActiveCard({ request }: { request: Request }) {
           </div>
           {!request.studentConfirmed && (
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={handleConfirm} disabled={loading}>
+              <Link href={`/lesson/${request.id}`}>
+                <Button size="sm" variant="default">Join Lesson</Button>
+              </Link>
+              <Button size="sm" variant="outline" onClick={handleConfirm} disabled={loading}>
                 Confirm & Pay
               </Button>
               <Button size="sm" variant="destructive" onClick={() => setShowDispute(!showDispute)} disabled={loading}>

@@ -1,37 +1,20 @@
 import { z } from "zod";
 
-export const signupSchema = z.object({
+export const usernameSchema = z.object({
   username: z
     .string()
     .min(3, "Username must be at least 3 characters")
     .max(20, "Username must be at most 20 characters")
     .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(100),
-  confirmPassword: z.string(),
-  email: z
-    .string()
-    .email("Invalid email address")
-    .optional()
-    .or(z.literal("")),
-  continent: z.enum(["AFRICA", "ASIA", "EUROPE", "NORTH_AMERICA", "SOUTH_AMERICA", "OCEANIA"]).optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-export const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
 });
 
 export const profileEditSchema = z.object({
   continent: z.enum(["AFRICA", "ASIA", "EUROPE", "NORTH_AMERICA", "SOUTH_AMERICA", "OCEANIA"]).optional(),
-  coachPricePer5Min: z.coerce.number().min(0).optional(),
+  coachChatPrice: z.coerce.number().min(0).optional(),
+  coachCallPrice: z.coerce.number().min(0).optional(),
   communicationPreference: z.enum(["CHAT_ONLY", "CHAT_AND_CALL"]),
   bio: z.string().max(500).optional(),
+  timezone: z.string().optional(),
 });
 
 export const chessComUsernameSchema = z.object({
@@ -43,7 +26,7 @@ export const chessComUsernameSchema = z.object({
 
 export const lessonRequestSchema = z.object({
   coachId: z.string().min(1),
-  durationMinutes: z.coerce.number().min(5).max(480),
+  timeSlotId: z.string().min(1),
 });
 
 export const reviewSchema = z.object({
@@ -56,21 +39,7 @@ export const depositSchema = z.object({
   amount: z.coerce.number().min(500, "Minimum deposit is €5.00"), // cents
 });
 
-export const resetPasswordRequestSchema = z.object({
-  email: z.string().email("Invalid email address"),
-});
-
-export const resetPasswordSchema = z.object({
-  token: z.string().min(1),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-export type SignupInput = z.infer<typeof signupSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
+export type UsernameInput = z.infer<typeof usernameSchema>;
 export type ProfileEditInput = z.infer<typeof profileEditSchema>;
 export type LessonRequestInput = z.infer<typeof lessonRequestSchema>;
 export type ReviewInput = z.infer<typeof reviewSchema>;

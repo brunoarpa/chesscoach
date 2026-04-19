@@ -12,10 +12,12 @@ export default async function ProfileEditPage() {
     select: {
       username: true,
       continent: true,
-      coachPricePer5Min: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
       communicationPreference: true,
       bio: true,
       coachAvailability: true,
+      timezone: true,
     },
   });
 
@@ -25,12 +27,14 @@ export default async function ProfileEditPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
       <ProfileEditForm
-        username={user.username}
+        username={user.username ?? ""}
         continent={user.continent}
-        coachPricePer5Min={user.coachPricePer5Min ? user.coachPricePer5Min / 100 : undefined}
+        coachChatPrice={user.coachChatPrice ? user.coachChatPrice / 100 : undefined}
+        coachCallPrice={user.coachCallPrice ? user.coachCallPrice / 100 : undefined}
         communicationPreference={user.communicationPreference}
         bio={user.bio ?? undefined}
         coachAvailability={user.coachAvailability}
+        timezone={user.timezone ?? undefined}
       />
     </div>
   );

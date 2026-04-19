@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { recalculateAllElos } from "@/lib/elo";
-import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes } from "@/lib/activity";
+import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes, detectNoShows } from "@/lib/activity";
 import { refreshAllChessComRatings } from "@/lib/chess-com";
 import { prisma } from "@/lib/prisma";
+import { generateUpcomingSlots } from "@/lib/actions/timeslots";
 
 // This endpoint should be called daily by a cron job
 // In Vercel, configure in vercel.json: { "crons": [{ "path": "/api/cron/daily", "schedule": "0 6 * * *" }] }
@@ -23,9 +24,19 @@ export async function GET(request: Request) {
       expirePendingRequests(),
       refreshAllChessComRatings(),
       detectConfirmationDisputes(),
+      detectNoShows(),
       // Purge expired rate-limit rows
       prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
     ]);
+
+    // Generate upcoming time slots for all coaches with templates
+    const coachesWithTemplates = await prisma.timeSlotTemplate.findMany({
+      select: { coachId: true },
+      distinct: ["coachId"],
+    });
+    await Promise.all(
+      coachesWithTemplates.map((c) => generateUpcomingSlots(c.coachId))
+    );
 
     return NextResponse.json({ success: true, timestamp: new Date().toISOString() });
   } catch (error) {

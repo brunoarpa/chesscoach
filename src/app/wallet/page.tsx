@@ -19,7 +19,8 @@ export default async function WalletPage() {
       pendingEarnings: true,
       totalEarningsAllTime: true,
       verificationStatus: true,
-      coachPricePer5Min: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
     },
   });
 
@@ -75,7 +76,7 @@ export default async function WalletPage() {
 
       <DepositForm />
 
-      {user.verificationStatus === "VERIFIED" && user.coachPricePer5Min && (
+      {user.verificationStatus === "VERIFIED" && (user.coachChatPrice || user.coachCallPrice) && (
         <>
           <Separator className="my-8" />
           <StripeConnectSetup />

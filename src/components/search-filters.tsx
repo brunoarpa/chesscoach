@@ -145,12 +145,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
                 Available
               </span>
             </SelectItem>
-            <SelectItem value="BUSY">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                Busy
-              </span>
-            </SelectItem>
             <SelectItem value="UNAVAILABLE">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />

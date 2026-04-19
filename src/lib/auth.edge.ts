@@ -1,17 +1,13 @@
 import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 
 // Edge-compatible auth config (no Prisma imports)
 // Used by middleware only - lighter version without DB access
 export const { auth: authMiddleware } = NextAuth({
   providers: [
-    Credentials({
-      credentials: {
-        username: { label: "Username", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      // authorize is never called from middleware, just needs provider shape
-      authorize: () => null,
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
   callbacks: {

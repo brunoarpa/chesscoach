@@ -5,6 +5,7 @@ import { calculateCoachElo } from "@/lib/elo";
 import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
+import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -13,14 +14,14 @@ export default async function DashboardPage() {
   // Check if coach needs to be forced UNAVAILABLE (inactive 24h+ or no price)
   const userCheck = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { lastActiveAt: true, coachAvailability: true, coachPricePer5Min: true },
+    select: { lastActiveAt: true, coachAvailability: true, coachChatPrice: true, coachCallPrice: true },
   });
 
   const wasInactive = userCheck
     ? (Date.now() - userCheck.lastActiveAt.getTime()) >= 24 * 60 * 60 * 1000
     : false;
   const shouldForceUnavailable = userCheck
-    ? (wasInactive || userCheck.coachPricePer5Min === null) && userCheck.coachAvailability !== "UNAVAILABLE"
+    ? (wasInactive || (userCheck.coachChatPrice === null && userCheck.coachCallPrice === null)) && userCheck.coachAvailability !== "UNAVAILABLE"
     : false;
 
   // Update activity and fetch user data
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
     });
   }
 
-  const [incomingRequests, outgoingRequests, favouriteCoaches] = await Promise.all([
+  const [incomingRequests, outgoingRequests, favouriteCoaches, weeklyTemplates] = await Promise.all([
     // Coach incoming
     prisma.lessonRequest.findMany({
       where: { coachId: session.user.id },
@@ -78,11 +79,18 @@ export default async function DashboardPage() {
             username: true,
             coachAvailability: true,
             chessRating: true,
-            coachPricePer5Min: true,
+            coachChatPrice: true,
+            coachCallPrice: true,
             lastActiveAt: true,
           },
         },
       },
+    }),
+    // Weekly schedule templates (for coaches)
+    prisma.timeSlotTemplate.findMany({
+      where: { coachId: session.user.id },
+      select: { dayOfWeek: true, startHour: true, startMinute: true },
+      orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }, { startMinute: "asc" }],
     }),
   ]);
 
@@ -117,6 +125,11 @@ export default async function DashboardPage() {
           requests={JSON.parse(JSON.stringify(incomingRequests))}
           coachAvailability={currentUser.coachAvailability}
         />
+        {currentUser.verificationStatus === "VERIFIED" && (
+          <div className="mt-6">
+            <CoachScheduleEditor initialTemplates={weeklyTemplates} />
+          </div>
+        )}
       </section>
 
       <hr className="my-8 border-border" />

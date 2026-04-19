@@ -23,7 +23,7 @@ export default authMiddleware((req) => {
   }
 
   // Protected routes that require authentication
-  const protectedPaths = ["/dashboard", "/wallet", "/profile/edit"];
+  const protectedPaths = ["/dashboard", "/wallet", "/profile/edit", "/lesson"];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtected && !req.auth) {
@@ -51,5 +51,5 @@ export default authMiddleware((req) => {
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/wallet/:path*", "/profile/edit/:path*", "/admin/:path*", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/wallet/:path*", "/profile/edit/:path*", "/admin/:path*", "/lesson/:path*", "/api/:path*"],
 };

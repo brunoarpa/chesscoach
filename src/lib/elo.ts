@@ -20,7 +20,7 @@ type PrismaLike = Pick<typeof prisma, "user" | "earningRecord">;
 export async function calculateCoachElo(userId: string, db: PrismaLike = prisma): Promise<number> {
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { createdAt: true, lastActiveAt: true },
+    select: { createdAt: true, lastActiveAt: true, coachRatingPenalty: true },
   });
 
   if (!user) return BASE_RATING + ACTIVITY_BONUS + EARNING_BONUS;
@@ -51,12 +51,15 @@ export async function calculateCoachElo(userId: string, db: PrismaLike = prisma)
   const earningDecayFactor = Math.exp(-EARNING_DECAY * daysSinceEarning);
   const earningsBoost = EARNINGS_MULTIPLIER * Math.log(1 + totalDollars);
 
-  return Math.round(
+  const penalty = user.coachRatingPenalty ?? 0;
+
+  return Math.max(0, Math.round(
     BASE_RATING +
     ACTIVITY_BONUS * activityFactor +
     EARNING_BONUS * earningDecayFactor +
-    earningsBoost
-  );
+    earningsBoost -
+    penalty
+  ));
 }
 
 /**

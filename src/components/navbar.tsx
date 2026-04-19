@@ -19,8 +19,8 @@ export async function Navbar() {
     coachAvailability = user?.coachAvailability ?? null;
   }
 
-  const username = (session?.user as unknown as Record<string, unknown>)?.username as string | undefined;
-  const isAdmin = (session?.user as unknown as Record<string, unknown>)?.role === "ADMIN";
+  const username = session?.user?.username ?? null;
+  const isAdmin = session?.user?.role === "ADMIN";
 
   return (
     <header className="border-b bg-background">
@@ -49,12 +49,14 @@ export async function Navbar() {
               <Link href="/wallet" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
                 Wallet
               </Link>
-              <Link
-                href={`/profile/${username}`}
-                className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-              >
-                Profile
-              </Link>
+              {username && (
+                <Link
+                  href={`/profile/${username}`}
+                  className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+                >
+                  Profile
+                </Link>
+              )}
               {isAdmin && (
                 <Link href="/admin" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors text-red-500">
                   Admin
@@ -63,16 +65,9 @@ export async function Navbar() {
               <SignOutButton />
             </>
           ) : (
-            <>
-              <Link href="/login">
-                <Button variant="ghost" size="sm">
-                  Log in
-                </Button>
-              </Link>
-              <Link href="/signup">
-                <Button size="sm">Sign up</Button>
-              </Link>
-            </>
+            <Link href="/login">
+              <Button size="sm">Sign in</Button>
+            </Link>
           )}
           {coachAvailability && <AvailabilityToggle initialStatus={coachAvailability} />}
           <ThemeToggle />
@@ -84,7 +79,7 @@ export async function Navbar() {
           <ThemeToggle />
           <MobileNav
             isLoggedIn={!!session?.user}
-            username={username}
+            username={username ?? undefined}
             isAdmin={isAdmin}
           />
         </div>

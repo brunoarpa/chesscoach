@@ -7,7 +7,7 @@ interface Review {
   rating: number;
   comment: string | null;
   createdAt: Date;
-  fromUser: { username: string };
+  fromUser: { username: string | null };
   totalPaid?: number; // cents
 }
 
@@ -29,7 +29,7 @@ export function ReviewList({ reviews, showTotalPaid }: Props) {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">
-                  {review.fromUser.username}
+                  {review.fromUser.username ?? "Unknown"}
                 </span>
                 {showTotalPaid && review.totalPaid != null && review.totalPaid > 0 && (
                   <span className="text-xs text-muted-foreground">

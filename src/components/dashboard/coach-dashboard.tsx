@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
 
 interface MyReview {
   id: string;
@@ -24,12 +25,14 @@ interface Request {
   isTrial: boolean;
   communicationMethod: string | null;
   message: string | null;
+  scheduledStartAt: string | null;
   studentStartConfirmed: boolean;
   coachStartConfirmed: boolean;
   studentConfirmed: boolean;
   coachConfirmed: boolean;
+  studentId: string;
   createdAt: string;
-  student: { username: string; chessComUsername: string | null };
+  student: { username: string | null; chessComUsername: string | null };
   reviews: MyReview[];
 }
 
@@ -46,7 +49,6 @@ const statusColors: Record<string, string> = {
 
 const availabilityConfig: Record<string, { color: string; label: string }> = {
   AVAILABLE: { color: "bg-green-500", label: "Available" },
-  BUSY: { color: "bg-red-500", label: "Busy" },
   UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
 };
 
@@ -56,6 +58,7 @@ function RequestMeta({ request }: { request: Request }) {
       <span className="text-sm text-muted-foreground ml-2">
         Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
+        {request.scheduledStartAt && ` · ${new Date(request.scheduledStartAt).toLocaleString()}`}
       </span>
       {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
     </>
@@ -78,8 +81,6 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
       <div className={`flex items-center gap-3 p-3 rounded-lg border ${
         coachAvailability === "AVAILABLE"
           ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30"
-          : coachAvailability === "BUSY"
-          ? "border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/30"
           : "border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-950/30"
       }`}>
         <span className={`w-3 h-3 rounded-full ${availabilityConfig[coachAvailability]?.color ?? "bg-gray-400"}`} />
@@ -89,8 +90,6 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
         <span className="text-sm text-muted-foreground">
           {coachAvailability === "AVAILABLE"
             ? "— You are accepting lesson requests"
-            : coachAvailability === "BUSY"
-            ? "— Students cannot send you new requests"
             : "— Students cannot send you new requests"}
         </span>
       </div>
@@ -212,7 +211,7 @@ function PendingRequestCard({ request }: { request: Request }) {
 
   async function handleBlock() {
     setBlockLoading(true);
-    const result = await blockStudent(request.student.username);
+    const result = await blockStudent(request.studentId);
     setBlockLoading(false);
     if (typeof result === "object" && "error" in result) toast.error(result.error);
     else toast.success("Student blocked.");
@@ -291,8 +290,11 @@ function AcceptedLessonCard({ request, role }: { request: Request; role: "coach"
             </div>
           </div>
           <div className="flex gap-2">
+            <Link href={`/lesson/${request.id}`}>
+              <Button size="sm" variant="default">Join Lesson</Button>
+            </Link>
             {!myStartConfirmed && (
-              <Button size="sm" onClick={handleConfirmStart} disabled={loading}>
+              <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
                 Confirm Start
               </Button>
             )}
@@ -345,9 +347,14 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
             </div>
           </div>
           {!myConfirmed && (
-            <Button size="sm" onClick={handleConfirm} disabled={loading}>
-              Mark Complete
-            </Button>
+            <div className="flex gap-2">
+              <Link href={`/lesson/${request.id}`}>
+                <Button size="sm" variant="default">Join Lesson</Button>
+              </Link>
+              <Button size="sm" variant="outline" onClick={handleConfirm} disabled={loading}>
+                Mark Complete
+              </Button>
+            </div>
           )}
         </div>
       </CardContent>
@@ -355,7 +362,7 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
   );
 }
 
-function CompletedCard({ request, otherUser }: { request: Request; otherUser: { username: string } }) {
+function CompletedCard({ request, otherUser }: { request: Request; otherUser: { username: string | null } }) {
   const existingReview = request.reviews?.[0] ?? null;
   const [showReview, setShowReview] = useState(false);
   const [rating, setRating] = useState(existingReview?.rating?.toString() ?? "5");

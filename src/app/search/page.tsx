@@ -59,11 +59,11 @@ export default async function SearchPage({
   }
 
   if (params.minPrice || params.maxPrice) {
-    where.coachPricePer5Min = {};
+    where.coachChatPrice = {};
     if (params.minPrice)
-      where.coachPricePer5Min.gte = Math.round(Number(params.minPrice) * 100);
+      where.coachChatPrice.gte = Math.round(Number(params.minPrice) * 100);
     if (params.maxPrice)
-      where.coachPricePer5Min.lte = Math.round(Number(params.maxPrice) * 100);
+      where.coachChatPrice.lte = Math.round(Number(params.maxPrice) * 100);
   }
 
   if (params.communication && params.communication !== "any") {
@@ -75,7 +75,7 @@ export default async function SearchPage({
   }
 
   if (params.availability && params.availability !== "all") {
-    where.coachAvailability = params.availability as "AVAILABLE" | "BUSY" | "UNAVAILABLE";
+    where.coachAvailability = params.availability as "AVAILABLE" | "UNAVAILABLE";
   }
 
   if (params.lastSeen && params.lastSeen !== "any") {
@@ -108,7 +108,8 @@ export default async function SearchPage({
       username: true,
       chessRating: true,
       continent: true,
-      coachPricePer5Min: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
       communicationPreference: true,
       coachElo: true,
       activityStatus: true,
@@ -146,10 +147,11 @@ export default async function SearchPage({
                   <CoachCard
                     key={coach.id}
                     id={coach.id}
-                    username={coach.username}
+                    username={coach.username ?? "unknown"}
                     chessRating={coach.chessRating}
                     continent={coach.continent}
-                    coachPricePer5Min={coach.coachPricePer5Min}
+                    coachChatPrice={coach.coachChatPrice}
+                    coachCallPrice={coach.coachCallPrice}
                     communicationPreference={coach.communicationPreference}
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}

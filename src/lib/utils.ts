@@ -29,9 +29,11 @@ export function getActivityDotColor(lastActiveAt: Date): string {
 export function getEffectiveAvailability(
   coachAvailability: string,
   lastActiveAt: Date,
-  coachPricePer5Min?: number | null,
+  coachChatPrice?: number | null,
+  coachCallPrice?: number | null,
 ): string {
-  if (coachPricePer5Min === null || coachPricePer5Min === undefined) return "UNAVAILABLE";
+  const hasPrice = (coachChatPrice != null && coachChatPrice > 0) || (coachCallPrice != null && coachCallPrice > 0);
+  if (!hasPrice) return "UNAVAILABLE";
   const hours = (Date.now() - lastActiveAt.getTime()) / (1000 * 60 * 60);
   if (hours >= 24 && coachAvailability !== "UNAVAILABLE") return "UNAVAILABLE";
   return coachAvailability;
