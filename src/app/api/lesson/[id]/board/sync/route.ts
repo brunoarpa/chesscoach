@@ -41,10 +41,12 @@ export async function POST(
   }
 
   const pusher = getPusherServer();
-  await pusher.trigger(`private-lesson-${id}`, event, {
-    ...data,
-    senderId: session.user.id,
-  });
+  if (pusher) {
+    await pusher.trigger(`private-lesson-${id}`, event, {
+      ...data,
+      senderId: session.user.id,
+    });
+  }
 
   // If reset, clear persisted PGN too
   if (event === "board:reset") {

@@ -38,6 +38,8 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
   // Subscribe to Pusher for real-time messages
   useEffect(() => {
     const pusher = getPusherClient();
+    if (!pusher) return; // Pusher not configured — rely on polling
+
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
 
     channel.bind("chat:message", (data: { message: Message }) => {

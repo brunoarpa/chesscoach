@@ -29,6 +29,8 @@ export function useBoardSync({
 
   useEffect(() => {
     const pusher = getPusherClient();
+    if (!pusher) return; // Pusher not configured — skip real-time sync
+
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
     channelRef.current = channel;
 

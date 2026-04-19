@@ -39,6 +39,9 @@ export async function POST(request: Request) {
   }
 
   const pusher = getPusherServer();
+  if (!pusher) {
+    return NextResponse.json({ error: "Real-time not configured" }, { status: 503 });
+  }
   const authResponse = pusher.authorizeChannel(socketId, channelName);
 
   return NextResponse.json(authResponse);

@@ -73,11 +73,13 @@ export async function PATCH(
 
   // Broadcast move update via Pusher
   const pusher = getPusherServer();
-  await pusher.trigger(`private-lesson-${id}`, "board:moves", {
-    moveHistory,
-    currentMoveIndex,
-    senderId: session.user.id,
-  });
+  if (pusher) {
+    await pusher.trigger(`private-lesson-${id}`, "board:moves", {
+      moveHistory,
+      currentMoveIndex,
+      senderId: session.user.id,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

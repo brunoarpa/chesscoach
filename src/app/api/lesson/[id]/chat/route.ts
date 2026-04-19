@@ -106,9 +106,11 @@ export async function POST(
 
   // Broadcast via Pusher for real-time delivery
   const pusher = getPusherServer();
-  await pusher.trigger(`private-lesson-${id}`, "chat:message", {
-    message: JSON.parse(JSON.stringify(message)),
-  });
+  if (pusher) {
+    await pusher.trigger(`private-lesson-${id}`, "chat:message", {
+      message: JSON.parse(JSON.stringify(message)),
+    });
+  }
 
   return NextResponse.json({ message });
 }
