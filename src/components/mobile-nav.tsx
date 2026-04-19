@@ -72,10 +72,7 @@ export function MobileNav({ isLoggedIn, username, isAdmin }: MobileNavProps) {
             <>
               <div className="border-t my-2" />
               <MobileLink href="/login" onClose={() => setOpen(false)}>
-                Log in
-              </MobileLink>
-              <MobileLink href="/signup" onClose={() => setOpen(false)}>
-                Sign up
+                Sign in
               </MobileLink>
             </>
           )}

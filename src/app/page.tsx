@@ -28,7 +28,7 @@ export default async function Home() {
             </Button>
           </Link>
         ) : (
-          <Link href="/signup">
+          <Link href="/login">
             <Button size="lg" variant="outline">
               Get Started
             </Button>

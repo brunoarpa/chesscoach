@@ -1,8 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -10,44 +8,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = credentials?.email as string | undefined;
-        const password = credentials?.password as string | undefined;
-        if (!email || !password) return null;
-
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || !user.passwordHash) return null;
-
-        const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
-
-        // Block banned users
-        if (user.verificationStatus === "REJECTED" && user.activityStatus === "INACTIVE") {
-          return null;
-        }
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-        });
-
-        return { id: user.id, email: user.email, name: user.username };
-      },
-    }),
   ],
   callbacks: {
     async signIn({ user, account }) {
       if (!account) return false;
-
-      // Credentials login — already validated in authorize()
-      if (account.provider === "credentials") return true;
-
       if (account.provider !== "google") return false;
       if (!user.email) return false;
 
@@ -118,25 +82,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true;
     },
     async jwt({ token, user, account }) {
-      if (user) {
-        // On initial sign-in (both Google and Credentials)
-        if (account?.provider === "credentials") {
-          // user.id is already the DB id from authorize()
-          token.id = user.id;
-          const dbUser = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { role: true },
-          });
-          if (dbUser) token.role = dbUser.role;
-        } else if (account && user.email) {
-          const dbUser = await prisma.user.findUnique({
-            where: { email: user.email },
-            select: { id: true, role: true },
-          });
-          if (dbUser) {
-            token.id = dbUser.id;
-            token.role = dbUser.role;
-          }
+      if (user && account && user.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email },
+          select: { id: true, role: true },
+        });
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.role = dbUser.role;
         }
       }
       return token;

@@ -225,8 +225,8 @@ export default async function HowItWorksPage() {
               <Button size="lg" variant="outline">Go to Dashboard</Button>
             </Link>
           ) : (
-            <Link href="/signup">
-              <Button size="lg" variant="outline">Create Account</Button>
+            <Link href="/login">
+              <Button size="lg" variant="outline">Get Started</Button>
             </Link>
           )}
         </div>

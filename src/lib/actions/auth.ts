@@ -1,54 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth, signIn } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation } from "@/lib/chess-com";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
-
-export async function signup(formData: FormData) {
-  const email = (formData.get("email") as string)?.trim();
-  const password = formData.get("password") as string;
-  const username = (formData.get("username") as string)?.trim();
-
-  if (!email || !password || !username) return { error: "All fields are required" };
-  if (password.length < 8) return { error: "Password must be at least 8 characters" };
-  if (username.length < 3 || username.length > 20) return { error: "Username must be 3-20 characters" };
-  if (!/^[a-zA-Z0-9_]+$/.test(username)) return { error: "Username can only contain letters, numbers, and underscores" };
-
-  const existingEmail = await prisma.user.findUnique({ where: { email } });
-  if (existingEmail) return { error: "Email already in use" };
-
-  const existingUsername = await prisma.user.findUnique({ where: { username } });
-  if (existingUsername) return { error: "Username already taken" };
-
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  await prisma.user.create({
-    data: { email, username, passwordHash },
-  });
-
-  await signIn("credentials", { email, password, redirectTo: "/dashboard" });
-}
-
-export async function login(formData: FormData) {
-  const email = (formData.get("email") as string)?.trim();
-  const password = formData.get("password") as string;
-
-  if (!email || !password) return { error: "Email and password are required" };
-
-  try {
-    await signIn("credentials", { email, password, redirectTo: "/dashboard" });
-  } catch (error: unknown) {
-    // NextAuth throws NEXT_REDIRECT on success — let it propagate
-    if (error instanceof Error && error.message?.includes("NEXT_REDIRECT")) throw error;
-    // Check for the redirect digest pattern used by Next.js
-    if (error && typeof error === "object" && "digest" in error) throw error;
-    return { error: "Invalid email or password" };
-  }
-}
 
 export async function setUsername(formData: FormData) {
   const session = await auth();
