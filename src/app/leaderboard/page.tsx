@@ -80,8 +80,12 @@ export default async function LeaderboardPage() {
                       <span className="text-right">{coach.lessonsGiven}</span>
                       <span className="text-muted-foreground">Students</span>
                       <span className="text-right">{coach.playersTaught}</span>
-                      <span className="text-muted-foreground">Price/slot</span>
+                      <span className="text-muted-foreground">Chat price</span>
                       <span className="text-right">{coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}</span>
+                      {coach.coachCallPrice !== null && (
+                        <><span className="text-muted-foreground">Call price</span>
+                        <span className="text-right">€{(coach.coachCallPrice / 100).toFixed(2)}</span></>
+                      )}
                       <span className="text-muted-foreground">Last Active</span>
                       <span className="text-right flex items-center justify-end gap-1.5">
                         <span className={`w-2 h-2 rounded-full ${getActivityDotColor(coach.lastActiveAt)}`} />
@@ -104,7 +108,8 @@ export default async function LeaderboardPage() {
               <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>
               <TableHead className="text-right">Lessons</TableHead>
-              <TableHead className="text-right">Price/slot</TableHead>
+              <TableHead className="text-right">Chat Price</TableHead>
+              <TableHead className="text-right">Call Price</TableHead>
               <TableHead className="text-right">Students</TableHead>
               <TableHead className="text-center">Last Active</TableHead>
               <TableHead className="text-center">Status</TableHead>
@@ -134,6 +139,9 @@ export default async function LeaderboardPage() {
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">
                   {coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  {coach.coachCallPrice !== null ? `€${(coach.coachCallPrice / 100).toFixed(2)}` : "—"}
                 </TableCell>
                 <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">

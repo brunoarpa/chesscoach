@@ -23,7 +23,7 @@ export default async function HowItWorksPage() {
             <div className="text-3xl font-bold mb-2">1.</div>
             <h3 className="font-semibold mb-1">Sign Up &amp; Verify</h3>
             <p className="text-sm text-muted-foreground">
-              Create an account and link your chess.com profile
+              Create an account and verify your chess.com username
             </p>
           </CardContent>
         </Card>

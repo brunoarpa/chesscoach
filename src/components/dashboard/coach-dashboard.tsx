@@ -31,6 +31,7 @@ interface Request {
   studentConfirmed: boolean;
   coachConfirmed: boolean;
   studentId: string;
+  disputeReason: string | null;
   createdAt: string;
   student: { username: string | null; chessComUsername: string | null };
   reviews: MyReview[];
@@ -142,8 +143,14 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
                     </div>
                     <Badge variant="destructive">Disputed — Under Review</Badge>
                   </div>
+                  {r.disputeReason && (
+                    <div className="mt-2 p-2 bg-destructive/10 rounded text-sm">
+                      <span className="text-xs font-medium text-destructive">Reason: </span>
+                      {r.disputeReason}
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-2">
-                    The student has raised a dispute. An admin will review and may contact you via email or Chess.com.
+                    The student has raised a dispute. An admin will review this.
                   </p>
                 </CardContent>
               </Card>
@@ -278,11 +285,6 @@ function AcceptedLessonCard({ request, role }: { request: Request; role: "coach"
           <div>
             <span className="font-medium">{otherUser.username}</span>
             <RequestMeta request={request} />
-            {otherUser.chessComUsername && (
-              <div className="text-sm mt-1">
-                <a href={`https://www.chess.com/member/${otherUser.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
-              </div>
-            )}
             <div className="text-xs text-muted-foreground mt-1">
               {myStartConfirmed ? "✓ You confirmed start" : "⏳ Confirm when lesson starts"}
               {" · "}
@@ -335,11 +337,6 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
           <div>
             <span className="font-medium">{otherUser.username}</span>
             <RequestMeta request={request} />
-            {otherUser.chessComUsername && (
-              <div className="text-sm mt-1">
-                <a href={`https://www.chess.com/member/${otherUser.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
-              </div>
-            )}
             <div className="text-xs text-muted-foreground mt-1">
               {myConfirmed ? "✓ You confirmed completion" : "⏳ Awaiting your confirmation"}
               {" · "}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Chess, Square } from "chess.js";
-import { Chessboard, type PieceDropHandlerArgs } from "react-chessboard";
+import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow } from "react-chessboard";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Upload } from "lucide-react";
+import { EvalBar } from "./eval-bar";
 
 interface Props {
   lessonId: string;
@@ -15,38 +15,79 @@ interface Props {
 }
 
 export function ChessBoard({ lessonId, userId, isCoach }: Props) {
-  const [game, setGame] = useState(new Chess());
+  // The canonical move history — all moves from start position
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
-  const [arrows, setArrows] = useState<Array<[Square, Square]>>([]);
+  const [importError, setImportError] = useState("");
+  const [arrows, setArrows] = useState<Arrow[]>([]);
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+  const [highlightedSquares, setHighlightedSquares] = useState<Record<string, React.CSSProperties>>({});
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Full move history from the game
-  const allMoves = useMemo(() => game.history(), [game]);
+  // Derive game state from moveHistory + currentMoveIndex
+  const getGameAtIndex = useCallback((moves: string[], index: number) => {
+    const g = new Chess();
+    for (let i = 0; i <= index && i < moves.length; i++) {
+      g.move(moves[i]);
+    }
+    return g;
+  }, []);
 
-  function makeMove(sourceSquare: string, targetSquare: string, piece: string) {
-    const gameCopy = new Chess(game.fen());
+  const game = getGameAtIndex(moveHistory, currentMoveIndex);
 
-    // Handle promotions
-    const isPromotion = piece[1] === "P" && (targetSquare[1] === "8" || targetSquare[1] === "1");
+  // Get legal moves for selected piece
+  const legalMoveSquares = selectedSquare
+    ? game.moves({ square: selectedSquare, verbose: true }).map((m) => m.to)
+    : [];
+
+  // Build square styles: selected square + legal moves + right-click highlights
+  const squareStyles: Record<string, React.CSSProperties> = { ...highlightedSquares };
+
+  if (selectedSquare) {
+    squareStyles[selectedSquare] = {
+      ...squareStyles[selectedSquare],
+      backgroundColor: "rgba(255, 255, 0, 0.4)",
+    };
+    for (const sq of legalMoveSquares) {
+      squareStyles[sq] = {
+        ...squareStyles[sq],
+        background: game.get(sq as Square)
+          ? "radial-gradient(circle, transparent 55%, rgba(0, 0, 0, 0.3) 55%)"
+          : "radial-gradient(circle, rgba(0, 0, 0, 0.2) 25%, transparent 25%)",
+      };
+    }
+  }
+
+  function makeMove(sourceSquare: string, targetSquare: string, piece?: string) {
+    // If we're not at the end of history, truncate future moves
+    const currentHistory = moveHistory.slice(0, currentMoveIndex + 1);
+
+    const gameCopy = getGameAtIndex(currentHistory, currentHistory.length - 1);
+
+    const isPromotion =
+      piece && piece.toLowerCase().includes("p") &&
+      (targetSquare[1] === "8" || targetSquare[1] === "1");
 
     try {
-      gameCopy.move({
+      const moveResult = gameCopy.move({
         from: sourceSquare,
         to: targetSquare,
         promotion: isPromotion ? "q" : undefined,
       });
+      if (!moveResult) return false;
     } catch {
       return false;
     }
 
-    setGame(gameCopy);
-    const newHistory = gameCopy.history();
+    const newHistory = [...currentHistory, gameCopy.history().pop()!];
     setMoveHistory(newHistory);
     setCurrentMoveIndex(newHistory.length - 1);
     setArrows([]);
+    setSelectedSquare(null);
+    setHighlightedSquares({});
     return true;
   }
 
@@ -55,89 +96,123 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
     return makeMove(sourceSquare, targetSquare, piece.pieceType);
   }
 
+  function onSquareClick({ square }: SquareHandlerArgs) {
+    // Clear right-click highlights on any left click
+    setHighlightedSquares({});
+
+    if (selectedSquare) {
+      // Try to move to clicked square
+      if (legalMoveSquares.includes(square as Square)) {
+        const piece = game.get(selectedSquare);
+        makeMove(selectedSquare, square, piece?.type);
+        return;
+      }
+      // Clicked same square — deselect
+      if (square === selectedSquare) {
+        setSelectedSquare(null);
+        return;
+      }
+    }
+
+    // Select new piece if it exists and belongs to current turn
+    const piece = game.get(square as Square);
+    if (piece && piece.color === game.turn()) {
+      setSelectedSquare(square as Square);
+    } else {
+      setSelectedSquare(null);
+    }
+  }
+
+  function onSquareRightClick({ square }: SquareHandlerArgs) {
+    setSelectedSquare(null);
+    setHighlightedSquares((prev) => {
+      const copy = { ...prev };
+      if (copy[square]) {
+        delete copy[square];
+      } else {
+        copy[square] = { backgroundColor: "rgba(235, 97, 80, 0.8)" };
+      }
+      return copy;
+    });
+  }
+
   const goToStart = useCallback(() => {
-    const fresh = new Chess();
-    // Replay moves up to start
     setCurrentMoveIndex(-1);
-    // We need a way to show position at any point
-    setGame(fresh);
+    setSelectedSquare(null);
+    setHighlightedSquares({});
   }, []);
 
   const goBack = useCallback(() => {
-    if (currentMoveIndex < 0) return;
-    const fresh = new Chess();
-    for (let i = 0; i < currentMoveIndex; i++) {
-      fresh.move(moveHistory[i]);
-    }
-    setCurrentMoveIndex(currentMoveIndex - 1);
-    setGame(fresh);
-  }, [currentMoveIndex, moveHistory]);
+    setCurrentMoveIndex((i) => Math.max(-1, i - 1));
+    setSelectedSquare(null);
+    setHighlightedSquares({});
+  }, []);
 
   const goForward = useCallback(() => {
-    if (currentMoveIndex >= moveHistory.length - 1) return;
-    const fresh = new Chess();
-    for (let i = 0; i <= currentMoveIndex + 1; i++) {
-      fresh.move(moveHistory[i]);
-    }
-    setCurrentMoveIndex(currentMoveIndex + 1);
-    setGame(fresh);
-  }, [currentMoveIndex, moveHistory]);
+    setCurrentMoveIndex((i) => Math.min(moveHistory.length - 1, i + 1));
+    setSelectedSquare(null);
+    setHighlightedSquares({});
+  }, [moveHistory.length]);
 
   const goToEnd = useCallback(() => {
-    const fresh = new Chess();
-    for (const move of moveHistory) {
-      fresh.move(move);
-    }
     setCurrentMoveIndex(moveHistory.length - 1);
-    setGame(fresh);
-  }, [moveHistory]);
+    setSelectedSquare(null);
+    setHighlightedSquares({});
+  }, [moveHistory.length]);
 
   const resetBoard = useCallback(() => {
-    setGame(new Chess());
     setMoveHistory([]);
     setCurrentMoveIndex(-1);
     setArrows([]);
+    setSelectedSquare(null);
+    setHighlightedSquares({});
   }, []);
+
+  // Keyboard arrow navigation
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+      if (e.key === "ArrowLeft") { e.preventDefault(); goBack(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); goForward(); }
+      else if (e.key === "Home") { e.preventDefault(); goToStart(); }
+      else if (e.key === "End") { e.preventDefault(); goToEnd(); }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goBack, goForward, goToStart, goToEnd]);
 
   function handleImport() {
     const text = importText.trim();
     if (!text) return;
+    setImportError("");
 
+    // Try loading as PGN first
     try {
       const imported = new Chess();
-      // Try loading as PGN first
       imported.loadPgn(text);
       const newHistory = imported.history();
-      setGame(imported);
-      setMoveHistory(newHistory);
-      setCurrentMoveIndex(newHistory.length - 1);
-      setShowImport(false);
-      setImportText("");
-      return;
+      if (newHistory.length > 0) {
+        setMoveHistory(newHistory);
+        setCurrentMoveIndex(newHistory.length - 1);
+        setShowImport(false);
+        setImportText("");
+        return;
+      }
     } catch {
       // Not valid PGN
     }
 
-    try {
-      // Try loading as FEN
-      const imported = new Chess(text);
-      setGame(imported);
-      setMoveHistory([]);
-      setCurrentMoveIndex(-1);
-      setShowImport(false);
-      setImportText("");
+    // Try as game link (Lichess or Chess.com)
+    if (text.includes("lichess.org") || text.includes("chess.com")) {
+      handleLinkImport(text);
       return;
-    } catch {
-      // Not valid FEN either
     }
 
-    // Try extracting game link
-    handleLinkImport(text);
+    setImportError("Could not parse as PGN or game link. Paste a valid PGN or Lichess/Chess.com game link.");
   }
 
   async function handleLinkImport(url: string) {
     try {
-      // Lichess link
       if (url.includes("lichess.org")) {
         const gameId = url.split("/").find((p) => p.length === 8 || p.length === 12) || url.split("/").pop();
         const res = await fetch(`https://lichess.org/game/export/${gameId}?pgnInJson=true`, {
@@ -146,21 +221,56 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
         if (res.ok) {
           const data = await res.json();
           if (data.pgn) {
-            const imported = new Chess();
-            imported.loadPgn(data.pgn);
-            const newHistory = imported.history();
-            setGame(imported);
-            setMoveHistory(newHistory);
-            setCurrentMoveIndex(newHistory.length - 1);
-            setShowImport(false);
-            setImportText("");
+            loadPgnString(data.pgn);
             return;
           }
         }
+        setImportError("Could not load Lichess game.");
+        return;
+      }
+
+      if (url.includes("chess.com")) {
+        // Extract game ID from various chess.com URL formats
+        // e.g. https://www.chess.com/game/live/167440485866?move=0
+        // e.g. https://www.chess.com/game/live/167440485866
+        const match = url.match(/chess\.com\/(?:game\/(?:live|daily)|live|daily)\/(\d+)/);
+        if (match) {
+          const gameId = match[1];
+          const res = await fetch(`https://api.chess.com/pub/game/live/${gameId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.pgn) {
+              loadPgnString(data.pgn);
+              return;
+            }
+          }
+          // Try daily games endpoint too
+          const res2 = await fetch(`https://api.chess.com/pub/game/daily/${gameId}`);
+          if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2.pgn) {
+              loadPgnString(data2.pgn);
+              return;
+            }
+          }
+        }
+        setImportError("Could not load Chess.com game. Make sure the link is a valid game URL.");
+        return;
       }
     } catch {
-      // Link import failed
+      setImportError("Failed to fetch game from link.");
     }
+  }
+
+  function loadPgnString(pgn: string) {
+    const imported = new Chess();
+    imported.loadPgn(pgn);
+    const newHistory = imported.history();
+    setMoveHistory(newHistory);
+    setCurrentMoveIndex(newHistory.length - 1);
+    setShowImport(false);
+    setImportText("");
+    setImportError("");
   }
 
   // Display moves in pairs (white + black)
@@ -174,20 +284,25 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full max-w-[560px]">
-      {/* Board */}
-      <div className="w-full aspect-square">
+    <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
+      {/* Board + Eval Bar */}
+      <div className="flex gap-1 w-full">
+        <EvalBar fen={game.fen()} boardOrientation={boardOrientation} />
+        <div className="flex-1 aspect-square">
         <Chessboard
           options={{
             position: game.fen(),
             onPieceDrop: onDrop,
+            onSquareClick: onSquareClick,
+            onSquareRightClick: onSquareRightClick,
             boardOrientation: boardOrientation,
-            arrows: arrows as unknown as import("react-chessboard").Arrow[],
+            arrows: arrows,
+            squareStyles: squareStyles,
             animationDurationInMs: 200,
             allowDrawingArrows: true,
+            onArrowsChange: ({ arrows: newArrows }: { arrows: Arrow[] }) => setArrows(newArrows),
           }}
-        />
-      </div>
+        />        </div>      </div>
 
       {/* Move navigation */}
       <div className="flex items-center gap-1">
@@ -225,13 +340,7 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
                 <button
                   type="button"
                   className={`ml-0.5 px-0.5 rounded ${currentMoveIndex === (pair.num - 1) * 2 ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                  onClick={() => {
-                    const idx = (pair.num - 1) * 2;
-                    const fresh = new Chess();
-                    for (let i = 0; i <= idx; i++) fresh.move(moveHistory[i]);
-                    setGame(fresh);
-                    setCurrentMoveIndex(idx);
-                  }}
+                  onClick={() => setCurrentMoveIndex((pair.num - 1) * 2)}
                 >
                   {pair.white}
                 </button>
@@ -239,13 +348,7 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
                   <button
                     type="button"
                     className={`ml-0.5 px-0.5 rounded ${currentMoveIndex === (pair.num - 1) * 2 + 1 ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                    onClick={() => {
-                      const idx = (pair.num - 1) * 2 + 1;
-                      const fresh = new Chess();
-                      for (let i = 0; i <= idx; i++) fresh.move(moveHistory[i]);
-                      setGame(fresh);
-                      setCurrentMoveIndex(idx);
-                    }}
+                    onClick={() => setCurrentMoveIndex((pair.num - 1) * 2 + 1)}
                   >
                     {pair.black}
                   </button>
@@ -260,18 +363,19 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
       {showImport && (
         <div className="w-full space-y-2 p-3 rounded border bg-background">
           <p className="text-xs text-muted-foreground">
-            Paste a PGN, FEN, or Lichess game link:
+            Paste a PGN or a Lichess / Chess.com game link:
           </p>
           <Textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder="1. e4 e5 2. Nf3... or FEN string, or https://lichess.org/..."
+            placeholder="1. e4 e5 2. Nf3... or https://lichess.org/... or https://chess.com/game/live/..."
             rows={3}
             className="font-mono text-xs"
           />
+          {importError && <p className="text-xs text-destructive">{importError}</p>}
           <div className="flex gap-2">
             <Button size="sm" onClick={handleImport}>Import</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setShowImport(false); setImportText(""); }}>Cancel</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setShowImport(false); setImportText(""); setImportError(""); }}>Cancel</Button>
           </div>
         </div>
       )}

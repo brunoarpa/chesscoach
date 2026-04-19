@@ -302,11 +302,6 @@ function StudentAcceptedCard({ request }: { request: Request }) {
           <div>
             <span className="font-medium">{request.coach.username}</span>
             <RequestMeta request={request} />
-            {request.coach.chessComUsername && (
-              <div className="text-sm mt-1">
-                <a href={`https://www.chess.com/member/${request.coach.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
-              </div>
-            )}
             <div className="text-xs text-muted-foreground mt-1">
               {request.studentStartConfirmed ? "✓ You confirmed start" : "⏳ Confirm when lesson starts"}
               {" · "}
@@ -354,7 +349,7 @@ function StudentActiveCard({ request }: { request: Request }) {
     const result = await disputeLesson(request.id, disputeReason.trim());
     setLoading(false);
     if (result.error) toast.error(result.error);
-    else toast.success("Dispute submitted. An admin will review and contact you via email or Chess.com.");
+    else toast.success("Dispute submitted. An admin will review.");
   }
 
   return (
@@ -364,11 +359,6 @@ function StudentActiveCard({ request }: { request: Request }) {
           <div>
             <span className="font-medium">{request.coach.username}</span>
             <RequestMeta request={request} />
-            {request.coach.chessComUsername && (
-              <div className="text-sm mt-1">
-                <a href={`https://www.chess.com/member/${request.coach.chessComUsername}`} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Chess.com Profile ↗</a>
-              </div>
-            )}
             <div className="text-xs text-muted-foreground mt-1">
               {request.studentConfirmed ? "✓ You confirmed completion" : "⏳ Awaiting your confirmation"}
               {" · "}
