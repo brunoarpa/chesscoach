@@ -27,6 +27,7 @@ interface Props {
   communicationMethod: string | null;
   initialMessages: Message[];
   otherJoined: boolean;
+  initialBoardPgn: string;
 }
 
 export function LessonSession({
@@ -41,6 +42,7 @@ export function LessonSession({
   communicationMethod,
   initialMessages,
   otherJoined,
+  initialBoardPgn,
 }: Props) {
   const [activeTab, setActiveTab] = useState<string>("board");
   const isCall = communicationMethod === "CALL";
@@ -74,7 +76,7 @@ export function LessonSession({
       <div className="hidden md:flex flex-1 min-h-0">
         {/* Board */}
         <div className="flex-1 flex items-center justify-center p-4">
-          <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} />
+          <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
         </div>
 
         {/* Side panel */}
@@ -108,7 +110,7 @@ export function LessonSession({
             {isCall && <TabsTrigger value="video">Video</TabsTrigger>}
           </TabsList>
           <TabsContent value="board" className="flex-1 flex items-center justify-center p-2 m-0">
-            <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} />
+            <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
           </TabsContent>
           <TabsContent value="chat" className="flex-1 min-h-0 m-0">
             <ChatPanel

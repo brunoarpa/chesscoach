@@ -16,10 +16,8 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Load Stockfish from CDN via blob worker (cross-origin workaround)
-    const cdnUrl = "https://cdn.jsdelivr.net/npm/stockfish@18/bin/stockfish-18-single.js";
-    const blob = new Blob([`importScripts("${cdnUrl}")`], { type: "application/javascript" });
-    const worker = new Worker(URL.createObjectURL(blob));
+    // Load Stockfish from self-hosted files in /public/stockfish/
+    const worker = new Worker("/stockfish/stockfish-18-lite-single.js");
     workerRef.current = worker;
 
     worker.onmessage = (e: MessageEvent) => {

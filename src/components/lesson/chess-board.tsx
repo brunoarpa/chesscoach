@@ -7,17 +7,37 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Upload } from "lucide-react";
 import { EvalBar } from "./eval-bar";
+import { useBoardSync } from "@/hooks/use-board-sync";
 
 interface Props {
   lessonId: string;
   userId: string;
   isCoach: boolean;
+  initialBoardPgn?: string;
 }
 
-export function ChessBoard({ lessonId, userId, isCoach }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props) {
   // The canonical move history — all moves from start position
-  const [moveHistory, setMoveHistory] = useState<string[]>([]);
-  const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
+  const [moveHistory, setMoveHistory] = useState<string[]>(() => {
+    if (initialBoardPgn) {
+      try {
+        const g = new Chess();
+        g.loadPgn(initialBoardPgn);
+        return g.history();
+      } catch { return []; }
+    }
+    return [];
+  });
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(() => {
+    if (initialBoardPgn) {
+      try {
+        const g = new Chess();
+        g.loadPgn(initialBoardPgn);
+        return g.history().length - 1;
+      } catch { return -1; }
+    }
+    return -1;
+  });
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
@@ -26,6 +46,68 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [highlightedSquares, setHighlightedSquares] = useState<Record<string, React.CSSProperties>>({});
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Track pending right-click highlight to avoid conflict with arrow drawing
+  const pendingHighlightRef = useRef<{ square: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  // Track if we're currently drawing an arrow (right-click drag)
+  const isDrawingArrowRef = useRef(false);
+
+  // Skip broadcasting for remote updates
+  const isRemoteUpdateRef = useRef(false);
+
+  // ---- Board Sync ----
+  const onRemoteMoves = useCallback((remoteMoves: string[], remoteIndex: number) => {
+    isRemoteUpdateRef.current = true;
+    setMoveHistory(remoteMoves);
+    setCurrentMoveIndex(remoteIndex);
+    setSelectedSquare(null);
+    isRemoteUpdateRef.current = false;
+  }, []);
+
+  const onRemoteNavigate = useCallback((remoteIndex: number) => {
+    isRemoteUpdateRef.current = true;
+    setCurrentMoveIndex(remoteIndex);
+    setSelectedSquare(null);
+    isRemoteUpdateRef.current = false;
+  }, []);
+
+  const onRemoteArrows = useCallback((remoteArrows: Arrow[]) => {
+    isRemoteUpdateRef.current = true;
+    setArrows(remoteArrows);
+    isRemoteUpdateRef.current = false;
+  }, []);
+
+  const onRemoteHighlights = useCallback((remoteHighlights: Record<string, React.CSSProperties>) => {
+    isRemoteUpdateRef.current = true;
+    setHighlightedSquares(remoteHighlights);
+    isRemoteUpdateRef.current = false;
+  }, []);
+
+  const onRemoteReset = useCallback(() => {
+    isRemoteUpdateRef.current = true;
+    setMoveHistory([]);
+    setCurrentMoveIndex(-1);
+    setArrows([]);
+    setSelectedSquare(null);
+    setHighlightedSquares({});
+    isRemoteUpdateRef.current = false;
+  }, []);
+
+  const {
+    broadcastMoves,
+    broadcastNavigate,
+    broadcastArrows,
+    broadcastHighlights,
+    broadcastReset,
+  } = useBoardSync({
+    lessonId,
+    userId,
+    onRemoteMoves,
+    onRemoteNavigate,
+    onRemoteArrows,
+    onRemoteHighlights,
+    onRemoteReset,
+  });
 
   // Derive game state from moveHistory + currentMoveIndex
   const getGameAtIndex = useCallback((moves: string[], index: number) => {
@@ -83,11 +165,17 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
     }
 
     const newHistory = [...currentHistory, gameCopy.history().pop()!];
+    const newIndex = newHistory.length - 1;
     setMoveHistory(newHistory);
-    setCurrentMoveIndex(newHistory.length - 1);
+    setCurrentMoveIndex(newIndex);
     setArrows([]);
     setSelectedSquare(null);
     setHighlightedSquares({});
+
+    // Broadcast move to other participant
+    if (!isRemoteUpdateRef.current) {
+      broadcastMoves(newHistory, newIndex);
+    }
     return true;
   }
 
@@ -97,8 +185,11 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
   }
 
   function onSquareClick({ square }: SquareHandlerArgs) {
-    // Clear right-click highlights on any left click
-    setHighlightedSquares({});
+    // Clear right-click highlights and arrows on any left click
+    if (Object.keys(highlightedSquares).length > 0) {
+      setHighlightedSquares({});
+    }
+    setArrows([]);
 
     if (selectedSquare) {
       // Try to move to clicked square
@@ -125,40 +216,93 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
 
   function onSquareRightClick({ square }: SquareHandlerArgs) {
     setSelectedSquare(null);
-    setHighlightedSquares((prev) => {
-      const copy = { ...prev };
-      if (copy[square]) {
-        delete copy[square];
-      } else {
-        copy[square] = { backgroundColor: "rgba(235, 97, 80, 0.8)" };
+
+    // Cancel any pending highlight from a previous right-click
+    if (pendingHighlightRef.current) {
+      clearTimeout(pendingHighlightRef.current.timer);
+      pendingHighlightRef.current = null;
+    }
+
+    // Defer the highlight — if an arrow drag starts, onArrowsChange will cancel this
+    const timer = setTimeout(() => {
+      pendingHighlightRef.current = null;
+      setHighlightedSquares((prev) => {
+        const copy = { ...prev };
+        if (copy[square]) {
+          delete copy[square];
+        } else {
+          copy[square] = { backgroundColor: "rgba(235, 97, 80, 0.8)" };
+        }
+        // Broadcast highlights
+        if (!isRemoteUpdateRef.current) {
+          broadcastHighlights(copy);
+        }
+        return copy;
+      });
+    }, 150);
+
+    pendingHighlightRef.current = { square, timer };
+  }
+
+  function handleArrowsChange({ arrows: newArrows }: { arrows: Arrow[] }) {
+    // Cancel pending right-click highlight — user was drawing an arrow, not highlighting
+    if (pendingHighlightRef.current) {
+      clearTimeout(pendingHighlightRef.current.timer);
+      pendingHighlightRef.current = null;
+    }
+
+    // Toggle: if the same arrow already exists, remove it
+    if (newArrows.length > arrows.length) {
+      const newest = newArrows[newArrows.length - 1];
+      const existingIdx = arrows.findIndex(
+        (a) => a.startSquare === newest.startSquare && a.endSquare === newest.endSquare
+      );
+      if (existingIdx !== -1) {
+        const toggled = arrows.filter((_, i) => i !== existingIdx);
+        setArrows(toggled);
+        if (!isRemoteUpdateRef.current) broadcastArrows(toggled);
+        return;
       }
-      return copy;
-    });
+    }
+
+    setArrows(newArrows);
+    if (!isRemoteUpdateRef.current) broadcastArrows(newArrows);
   }
 
   const goToStart = useCallback(() => {
     setCurrentMoveIndex(-1);
     setSelectedSquare(null);
     setHighlightedSquares({});
-  }, []);
+    if (!isRemoteUpdateRef.current) broadcastNavigate(-1);
+  }, [broadcastNavigate]);
 
   const goBack = useCallback(() => {
-    setCurrentMoveIndex((i) => Math.max(-1, i - 1));
+    setCurrentMoveIndex((i) => {
+      const newIdx = Math.max(-1, i - 1);
+      if (!isRemoteUpdateRef.current) broadcastNavigate(newIdx);
+      return newIdx;
+    });
     setSelectedSquare(null);
     setHighlightedSquares({});
-  }, []);
+  }, [broadcastNavigate]);
 
   const goForward = useCallback(() => {
-    setCurrentMoveIndex((i) => Math.min(moveHistory.length - 1, i + 1));
+    setCurrentMoveIndex((i) => {
+      const newIdx = Math.min(moveHistory.length - 1, i + 1);
+      if (!isRemoteUpdateRef.current) broadcastNavigate(newIdx);
+      return newIdx;
+    });
     setSelectedSquare(null);
     setHighlightedSquares({});
-  }, [moveHistory.length]);
+  }, [moveHistory.length, broadcastNavigate]);
 
   const goToEnd = useCallback(() => {
-    setCurrentMoveIndex(moveHistory.length - 1);
+    const newIdx = moveHistory.length - 1;
+    setCurrentMoveIndex(newIdx);
     setSelectedSquare(null);
     setHighlightedSquares({});
-  }, [moveHistory.length]);
+    if (!isRemoteUpdateRef.current) broadcastNavigate(newIdx);
+  }, [moveHistory.length, broadcastNavigate]);
 
   const resetBoard = useCallback(() => {
     setMoveHistory([]);
@@ -166,7 +310,8 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
     setArrows([]);
     setSelectedSquare(null);
     setHighlightedSquares({});
-  }, []);
+    if (!isRemoteUpdateRef.current) broadcastReset();
+  }, [broadcastReset]);
 
   // Keyboard arrow navigation
   useEffect(() => {
@@ -196,6 +341,7 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
         setCurrentMoveIndex(newHistory.length - 1);
         setShowImport(false);
         setImportText("");
+        broadcastMoves(newHistory, newHistory.length - 1);
         return;
       }
     } catch {
@@ -230,31 +376,17 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
       }
 
       if (url.includes("chess.com")) {
-        // Extract game ID from various chess.com URL formats
-        // e.g. https://www.chess.com/game/live/167440485866?move=0
-        // e.g. https://www.chess.com/game/live/167440485866
-        const match = url.match(/chess\.com\/(?:game\/(?:live|daily)|live|daily)\/(\d+)/);
-        if (match) {
-          const gameId = match[1];
-          const res = await fetch(`https://api.chess.com/pub/game/live/${gameId}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.pgn) {
-              loadPgnString(data.pgn);
-              return;
-            }
-          }
-          // Try daily games endpoint too
-          const res2 = await fetch(`https://api.chess.com/pub/game/daily/${gameId}`);
-          if (res2.ok) {
-            const data2 = await res2.json();
-            if (data2.pgn) {
-              loadPgnString(data2.pgn);
-              return;
-            }
+        // Use server-side proxy to avoid CORS issues
+        const res = await fetch(`/api/chess-com/game?url=${encodeURIComponent(url)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pgn) {
+            loadPgnString(data.pgn);
+            return;
           }
         }
-        setImportError("Could not load Chess.com game. Make sure the link is a valid game URL.");
+        const errorData = await res.json().catch(() => null);
+        setImportError(errorData?.error ?? "Could not load Chess.com game. Make sure the link is a valid game URL.");
         return;
       }
     } catch {
@@ -271,6 +403,14 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
     setShowImport(false);
     setImportText("");
     setImportError("");
+    broadcastMoves(newHistory, newHistory.length - 1);
+  }
+
+  function handleMoveClick(index: number) {
+    setCurrentMoveIndex(index);
+    setSelectedSquare(null);
+    setHighlightedSquares({});
+    if (!isRemoteUpdateRef.current) broadcastNavigate(index);
   }
 
   // Display moves in pairs (white + black)
@@ -300,7 +440,9 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
             squareStyles: squareStyles,
             animationDurationInMs: 200,
             allowDrawingArrows: true,
-            onArrowsChange: ({ arrows: newArrows }: { arrows: Arrow[] }) => setArrows(newArrows),
+            clearArrowsOnClick: false,
+            clearArrowsOnPositionChange: true,
+            onArrowsChange: handleArrowsChange,
           }}
         />        </div>      </div>
 
@@ -340,7 +482,7 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
                 <button
                   type="button"
                   className={`ml-0.5 px-0.5 rounded ${currentMoveIndex === (pair.num - 1) * 2 ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                  onClick={() => setCurrentMoveIndex((pair.num - 1) * 2)}
+                  onClick={() => handleMoveClick((pair.num - 1) * 2)}
                 >
                   {pair.white}
                 </button>
@@ -348,7 +490,7 @@ export function ChessBoard({ lessonId, userId, isCoach }: Props) {
                   <button
                     type="button"
                     className={`ml-0.5 px-0.5 rounded ${currentMoveIndex === (pair.num - 1) * 2 + 1 ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                    onClick={() => setCurrentMoveIndex((pair.num - 1) * 2 + 1)}
+                    onClick={() => handleMoveClick((pair.num - 1) * 2 + 1)}
                   >
                     {pair.black}
                   </button>

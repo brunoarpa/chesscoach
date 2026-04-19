@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send } from "lucide-react";
+import { getPusherClient } from "@/lib/pusher-client";
 
 interface Message {
   id: string;
@@ -34,7 +35,28 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
     }
   }, [messages]);
 
-  // Poll for new messages every 3s
+  // Subscribe to Pusher for real-time messages
+  useEffect(() => {
+    const pusher = getPusherClient();
+    const channel = pusher.subscribe(`private-lesson-${lessonId}`);
+
+    channel.bind("chat:message", (data: { message: Message }) => {
+      // Don't add our own messages (already added optimistically)
+      if (data.message.senderId === userId) return;
+      setMessages((prev) => {
+        // Prevent duplicates
+        if (prev.some((m) => m.id === data.message.id)) return prev;
+        return [...prev, data.message];
+      });
+    });
+
+    return () => {
+      channel.unbind("chat:message");
+      // Don't unsubscribe — board sync uses the same channel
+    };
+  }, [lessonId, userId]);
+
+  // Fallback: poll every 30s in case Pusher connection drops
   const fetchMessages = useCallback(async () => {
     try {
       const res = await fetch(`/api/lesson/${lessonId}/chat`);
@@ -48,7 +70,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
   }, [lessonId]);
 
   useEffect(() => {
-    pollRef.current = setInterval(fetchMessages, 3000);
+    pollRef.current = setInterval(fetchMessages, 30000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };

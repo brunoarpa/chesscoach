@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && npm run copy-stockfish",
+    "copy-stockfish": "mkdir -p public/stockfish && cp node_modules/stockfish/bin/stockfish-18-lite-single.js public/stockfish/ && cp node_modules/stockfish/bin/stockfish-18-lite-single.wasm public/stockfish/",
     "start": "next start",
     "lint": "eslint"
   },
@@ -26,6 +27,8 @@
     "peerjs": "^1.5.5",
     "pg": "^8.20.0",
     "prisma": "^7.7.0",
+    "pusher": "^5.3.3",
+    "pusher-js": "^8.5.0",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-chessboard": "^5.10.0",

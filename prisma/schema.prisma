@@ -267,6 +267,7 @@ model LessonRequest {
   studentConfirmed Boolean @default(false)
   coachConfirmed   Boolean @default(false)
   disputeReason    String?
+  boardPgn         String?
   
   createdAt   DateTime  @default(now())
   respondedAt DateTime?

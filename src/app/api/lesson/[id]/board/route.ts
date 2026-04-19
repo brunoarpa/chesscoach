@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPusherServer } from "@/lib/pusher";
 
+// GET: Load persisted board state
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -14,10 +15,9 @@ export async function GET(
 
   const { id } = await params;
 
-  // Verify the user is a participant
   const lesson = await prisma.lessonRequest.findUnique({
     where: { id },
-    select: { studentId: true, coachId: true },
+    select: { studentId: true, coachId: true, boardPgn: true },
   });
 
   if (!lesson) {
@@ -28,32 +28,11 @@ export async function GET(
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
-  const messages = await prisma.chatMessage.findMany({
-    where: { lessonRequestId: id },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      senderId: true,
-      content: true,
-      createdAt: true,
-      readAt: true,
-    },
-  });
-
-  // Mark unread messages from the other user as read
-  await prisma.chatMessage.updateMany({
-    where: {
-      lessonRequestId: id,
-      senderId: { not: session.user.id },
-      readAt: null,
-    },
-    data: { readAt: new Date() },
-  });
-
-  return NextResponse.json({ messages });
+  return NextResponse.json({ boardPgn: lesson.boardPgn ?? "" });
 }
 
-export async function POST(
+// PATCH: Persist board state + broadcast via Pusher
+export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -64,7 +43,6 @@ export async function POST(
 
   const { id } = await params;
 
-  // Verify the user is a participant
   const lesson = await prisma.lessonRequest.findUnique({
     where: { id },
     select: { studentId: true, coachId: true, status: true },
@@ -79,36 +57,27 @@ export async function POST(
   }
 
   if (lesson.status !== "ACCEPTED" && lesson.status !== "IN_PROGRESS") {
-    return NextResponse.json({ error: "Lesson is not active" }, { status: 400 });
+    return NextResponse.json({ error: "Lesson not active" }, { status: 400 });
   }
 
   const body = await request.json();
-  const content = typeof body.content === "string" ? body.content.trim() : "";
+  const { boardPgn, moveHistory, currentMoveIndex } = body;
 
-  if (!content || content.length > 1000) {
-    return NextResponse.json({ error: "Message must be 1-1000 characters" }, { status: 400 });
+  // Persist PGN to DB
+  if (typeof boardPgn === "string") {
+    await prisma.lessonRequest.update({
+      where: { id },
+      data: { boardPgn },
+    });
   }
 
-  const message = await prisma.chatMessage.create({
-    data: {
-      lessonRequestId: id,
-      senderId: session.user.id,
-      content,
-    },
-    select: {
-      id: true,
-      senderId: true,
-      content: true,
-      createdAt: true,
-      readAt: true,
-    },
-  });
-
-  // Broadcast via Pusher for real-time delivery
+  // Broadcast move update via Pusher
   const pusher = getPusherServer();
-  await pusher.trigger(`private-lesson-${id}`, "chat:message", {
-    message: JSON.parse(JSON.stringify(message)),
+  await pusher.trigger(`private-lesson-${id}`, "board:moves", {
+    moveHistory,
+    currentMoveIndex,
+    senderId: session.user.id,
   });
 
-  return NextResponse.json({ message });
+  return NextResponse.json({ ok: true });
 }

@@ -83,6 +83,7 @@ export default async function LessonPage({
         communicationMethod={lesson.communicationMethod}
         initialMessages={JSON.parse(JSON.stringify(lesson.chatMessages))}
         otherJoined={isCoach ? !!lesson.studentJoinedAt : !!lesson.coachJoinedAt}
+        initialBoardPgn={lesson.boardPgn ?? ""}
       />
     </div>
   );
