@@ -47,10 +47,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
   const [highlightedSquares, setHighlightedSquares] = useState<Record<string, React.CSSProperties>>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Track pending right-click highlight to avoid conflict with arrow drawing
-  const pendingHighlightRef = useRef<{ square: string; timer: ReturnType<typeof setTimeout> } | null>(null);
-  // Track if we're currently drawing an arrow (right-click drag)
-  const isDrawingArrowRef = useRef(false);
+  // Track right-click start square to distinguish highlight (same-square) from arrow drag (cross-square)
+  const rightClickStartRef = useRef<string | null>(null);
 
   // Skip broadcasting for remote updates
   const isRemoteUpdateRef = useRef(false);
@@ -185,11 +183,15 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
   }
 
   function onSquareClick({ square }: SquareHandlerArgs) {
-    // Clear right-click highlights and arrows on any left click
+    // Clear right-click highlights and arrows on any left click (like chess.com)
     if (Object.keys(highlightedSquares).length > 0) {
       setHighlightedSquares({});
+      if (!isRemoteUpdateRef.current) broadcastHighlights({});
     }
-    setArrows([]);
+    if (arrows.length > 0) {
+      setArrows([]);
+      if (!isRemoteUpdateRef.current) broadcastArrows([]);
+    }
 
     if (selectedSquare) {
       // Try to move to clicked square
@@ -214,59 +216,47 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
     }
   }
 
-  function onSquareRightClick({ square }: SquareHandlerArgs) {
-    setSelectedSquare(null);
-
-    // Cancel any pending highlight from a previous right-click
-    if (pendingHighlightRef.current) {
-      clearTimeout(pendingHighlightRef.current.timer);
-      pendingHighlightRef.current = null;
+  function onSquareMouseDown({ square }: SquareHandlerArgs, e: React.MouseEvent) {
+    if (e.button === 2) {
+      // Record where the right-click started
+      rightClickStartRef.current = square;
     }
+  }
 
-    // Defer the highlight — if an arrow drag starts, onArrowsChange will cancel this
-    const timer = setTimeout(() => {
-      pendingHighlightRef.current = null;
-      setHighlightedSquares((prev) => {
-        const copy = { ...prev };
-        if (copy[square]) {
-          delete copy[square];
-        } else {
-          copy[square] = { backgroundColor: "rgba(235, 97, 80, 0.8)" };
-        }
-        // Broadcast highlights
-        if (!isRemoteUpdateRef.current) {
-          broadcastHighlights(copy);
-        }
-        return copy;
-      });
-    }, 150);
-
-    pendingHighlightRef.current = { square, timer };
+  function onSquareMouseUp({ square }: SquareHandlerArgs, e: React.MouseEvent) {
+    if (e.button === 2 && rightClickStartRef.current) {
+      if (rightClickStartRef.current === square) {
+        // Same square: toggle highlight (like chess.com right-click)
+        setSelectedSquare(null);
+        setHighlightedSquares((prev) => {
+          const copy = { ...prev };
+          if (copy[square]) {
+            delete copy[square];
+          } else {
+            copy[square] = { backgroundColor: "rgba(235, 97, 80, 0.8)" };
+          }
+          if (!isRemoteUpdateRef.current) {
+            broadcastHighlights(copy);
+          }
+          return copy;
+        });
+      }
+      // Cross-square: library handles arrow drawing internally
+      rightClickStartRef.current = null;
+    }
   }
 
   function handleArrowsChange({ arrows: newArrows }: { arrows: Arrow[] }) {
-    // Cancel pending right-click highlight — user was drawing an arrow, not highlighting
-    if (pendingHighlightRef.current) {
-      clearTimeout(pendingHighlightRef.current.timer);
-      pendingHighlightRef.current = null;
-    }
-
-    // Toggle: if the same arrow already exists, remove it
-    if (newArrows.length > arrows.length) {
-      const newest = newArrows[newArrows.length - 1];
-      const existingIdx = arrows.findIndex(
-        (a) => a.startSquare === newest.startSquare && a.endSquare === newest.endSquare
+    // Merge internal arrows with our controlled arrows (remote) for broadcasting
+    // The library's internalArrows are reported here; our `arrows` state has remote arrows
+    const combined = [...arrows];
+    for (const a of newArrows) {
+      const exists = combined.some(
+        (e) => e.startSquare === a.startSquare && e.endSquare === a.endSquare
       );
-      if (existingIdx !== -1) {
-        const toggled = arrows.filter((_, i) => i !== existingIdx);
-        setArrows(toggled);
-        if (!isRemoteUpdateRef.current) broadcastArrows(toggled);
-        return;
-      }
+      if (!exists) combined.push(a);
     }
-
-    setArrows(newArrows);
-    if (!isRemoteUpdateRef.current) broadcastArrows(newArrows);
+    if (!isRemoteUpdateRef.current) broadcastArrows(combined);
   }
 
   const goToStart = useCallback(() => {
@@ -434,13 +424,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
             position: game.fen(),
             onPieceDrop: onDrop,
             onSquareClick: onSquareClick,
-            onSquareRightClick: onSquareRightClick,
+            onSquareMouseDown: onSquareMouseDown,
+            onSquareMouseUp: onSquareMouseUp,
             boardOrientation: boardOrientation,
             arrows: arrows,
             squareStyles: squareStyles,
             animationDurationInMs: 200,
             allowDrawingArrows: true,
-            clearArrowsOnClick: false,
+            clearArrowsOnClick: true,
             clearArrowsOnPositionChange: true,
             onArrowsChange: handleArrowsChange,
           }}

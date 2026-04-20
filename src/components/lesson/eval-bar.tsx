@@ -14,17 +14,27 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const [bestLine, setBestLine] = useState<string>("");
   const [depth, setDepth] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentFenRef = useRef<string>("");
 
   useEffect(() => {
+    let terminated = false;
     // Load Stockfish from self-hosted files in /public/stockfish/
     const worker = new Worker("/stockfish/stockfish-18-lite-single.js");
     workerRef.current = worker;
 
+    worker.onerror = () => {
+      if (!terminated) setIsReady(false);
+    };
+
     worker.onmessage = (e: MessageEvent) => {
+      if (terminated) return;
       const line = typeof e.data === "string" ? e.data : e.data?.data;
       if (!line || typeof line !== "string") return;
 
       if (line.includes("uciok")) {
+        worker.postMessage("setoption name Threads value 1");
+        worker.postMessage("setoption name Hash value 16");
         worker.postMessage("isready");
       }
       if (line.includes("readyok")) {
@@ -51,18 +61,34 @@ export function EvalBar({ fen, boardOrientation }: Props) {
     };
 
     worker.postMessage("uci");
-    return () => { worker.terminate(); };
+    return () => {
+      terminated = true;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      worker.terminate();
+      workerRef.current = null;
+    };
   }, []);
 
   const analyze = useCallback((position: string) => {
-    if (!workerRef.current || !isReady) return;
-    workerRef.current.postMessage("stop");
-    workerRef.current.postMessage(`position fen ${position}`);
-    workerRef.current.postMessage("go depth 18");
+    const worker = workerRef.current;
+    if (!worker || !isReady) return;
+    currentFenRef.current = position;
+    worker.postMessage("stop");
+    worker.postMessage("ucinewgame");
+    worker.postMessage(`position fen ${position}`);
+    worker.postMessage("go depth 18");
   }, [isReady]);
 
   useEffect(() => {
-    if (fen && isReady) analyze(fen);
+    if (!fen || !isReady) return;
+    // Debounce rapid position changes (e.g. clicking through moves quickly)
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      analyze(fen);
+    }, 200);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [fen, isReady, analyze]);
 
   // Calculate bar percentage (from white's perspective)
