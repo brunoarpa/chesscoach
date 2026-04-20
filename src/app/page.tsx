@@ -22,11 +22,19 @@ export default async function Home() {
           <Button size="lg">Find a Coach</Button>
         </Link>
         {session?.user ? (
-          <Link href="/dashboard">
-            <Button size="lg" variant="outline">
-              Dashboard
-            </Button>
-          </Link>
+          session.user.needsUsername ? (
+            <Link href="/setup-username">
+              <Button size="lg" variant="outline">
+                Set Up Your Profile →
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/dashboard">
+              <Button size="lg" variant="outline">
+                Dashboard
+              </Button>
+            </Link>
+          )
         ) : (
           <Link href="/login">
             <Button size="lg" variant="outline">

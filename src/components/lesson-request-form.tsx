@@ -96,11 +96,17 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
                 <SelectValue placeholder="Select method" />
               </SelectTrigger>
               <SelectContent>
-                {coachChatPrice !== null && (
-                  <SelectItem value="CHAT">Chat (&euro;{(coachChatPrice / 100).toFixed(2)}/slot)</SelectItem>
+                {/* For free trials, show options based on coach preference (price not required).
+                    For paid lessons, only show options where the coach has set a price. */}
+                {(isTrial || coachChatPrice !== null) && (
+                  <SelectItem value="CHAT">
+                    {isTrial ? "Chat (free trial)" : `Chat (\u20ac${(coachChatPrice! / 100).toFixed(2)}/slot)`}
+                  </SelectItem>
                 )}
-                {coachCommunicationPreference === "CHAT_AND_CALL" && coachCallPrice !== null && (
-                  <SelectItem value="CALL">Call (&euro;{(coachCallPrice / 100).toFixed(2)}/slot)</SelectItem>
+                {coachCommunicationPreference === "CHAT_AND_CALL" && (isTrial || coachCallPrice !== null) && (
+                  <SelectItem value="CALL">
+                    {isTrial ? "Call (free trial)" : `Call (\u20ac${(coachCallPrice! / 100).toFixed(2)}/slot)`}
+                  </SelectItem>
                 )}
               </SelectContent>
             </Select>

@@ -6,10 +6,17 @@ import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
+import { expirePendingRequests } from "@/lib/activity";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  // Redirect Google users (and anyone without a username) to set up their profile first.
+  if (session.user.needsUsername) redirect("/setup-username");
+
+  // Expire any overdue pending requests (runs inline so deadlines are accurate, not just at 6am cron).
+  expirePendingRequests().catch(() => {});
 
   // Check if coach needs to be forced UNAVAILABLE (inactive 24h+ or no price)
   const userCheck = await prisma.user.findUnique({

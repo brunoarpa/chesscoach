@@ -60,7 +60,11 @@ export function useBoardSync({
     });
 
     return () => {
-      channel.unbind_all();
+      channel.unbind("board:moves");
+      channel.unbind("board:navigate");
+      channel.unbind("board:arrows");
+      channel.unbind("board:highlights");
+      channel.unbind("board:reset");
       pusher.unsubscribe(`private-lesson-${lessonId}`);
       channelRef.current = null;
     };

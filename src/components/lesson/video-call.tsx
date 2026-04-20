@@ -3,11 +3,19 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
+import { getPusherClient } from "@/lib/pusher-client";
+
+export interface CallActions {
+  start: () => void;
+  end: () => void;
+}
 
 interface Props {
   lessonId: string;
   userId: string;
   isCoach: boolean;
+  onCallStatusChange?: (inCall: boolean) => void;
+  callActionsRef?: React.MutableRefObject<CallActions | null>;
 }
 
 function getIceServers(): RTCIceServer[] {
@@ -24,9 +32,10 @@ function getIceServers(): RTCIceServer[] {
   return servers;
 }
 
-export function VideoCall({ lessonId, userId, isCoach }: Props) {
+export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, callActionsRef }: Props) {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [remoteInCall, setRemoteInCall] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +187,39 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
     cleanup();
   }, [cleanup]);
 
+  // Expose start/end actions to parent via ref.
+  useEffect(() => {
+    if (callActionsRef) {
+      callActionsRef.current = { start: startCall, end: endCall };
+    }
+  }, [callActionsRef, startCall, endCall]);
+
+  // Notify parent when connected state changes; also broadcast via Pusher.
+  useEffect(() => {
+    onCallStatusChange?.(connected);
+    fetch(`/api/lesson/${lessonId}/board/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "call:status", data: { joined: connected } }),
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected]);
+
+  // Subscribe to Pusher for remote call status.
+  useEffect(() => {
+    const pusher = getPusherClient();
+    if (!pusher) return;
+    const channel = pusher.subscribe(`private-lesson-${lessonId}`);
+    const handler = (data: { joined: boolean; senderId: string }) => {
+      if (data.senderId !== userId) setRemoteInCall(data.joined);
+    };
+    channel.bind("call:status", handler);
+    return () => {
+      channel.unbind("call:status", handler);
+      pusher.unsubscribe(`private-lesson-${lessonId}`);
+    };
+  }, [lessonId, userId]);
+
   // Track mounted state and always cleanup resources on unmount.
   useEffect(() => {
     mountedRef.current = true;
@@ -220,7 +262,11 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
         {!connected && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/80">
             <p className="text-sm text-muted-foreground">
-              {connecting ? "Connecting..." : "Waiting for call..."}
+              {connecting
+                ? "Connecting..."
+                : remoteInCall
+                  ? "Other participant is in the call…"
+                  : "Waiting for other participant to join"}
             </p>
           </div>
         )}
@@ -280,10 +326,12 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
 
       <p className="text-[11px] text-center text-muted-foreground">
         {connected
-          ? "In call now"
-          : connecting
-            ? "Joining call..."
-            : "Not in call yet. Click Join Call to connect."}
+          ? "In call · both connected"
+          : remoteInCall
+            ? "Other participant is in the call — join to connect"
+            : connecting
+              ? "Joining call…"
+              : "Other participant hasn't joined the call yet"}
       </p>
     </div>
   );

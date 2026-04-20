@@ -17,6 +17,7 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const pendingFenRef = useRef<string | null>(null);
   const activeFenRef = useRef<string>("");
   const activeTurnRef = useRef<"w" | "b">("w");
+  const isAnalyzingRef = useRef(false);
 
   useEffect(() => {
     let terminated = false;
@@ -61,14 +62,16 @@ export function EvalBar({ fen, boardOrientation }: Props) {
         }
       }
 
-      if (line.startsWith("bestmove") && pendingFenRef.current && pendingFenRef.current !== activeFenRef.current) {
-        const nextFen = pendingFenRef.current;
-        pendingFenRef.current = null;
-        if (nextFen) {
-          activeFenRef.current = nextFen;
-          activeTurnRef.current = nextFen.split(" ")[1] === "b" ? "b" : "w";
-          worker.postMessage("stop");
-          worker.postMessage(`position fen ${nextFen}`);
+      // When Stockfish finishes (or is stopped), check if there's a queued position to analyze.
+      if (line.startsWith("bestmove")) {
+        isAnalyzingRef.current = false;
+        const next = pendingFenRef.current;
+        if (next) {
+          pendingFenRef.current = null;
+          activeFenRef.current = next;
+          activeTurnRef.current = next.split(" ")[1] === "b" ? "b" : "w";
+          isAnalyzingRef.current = true;
+          worker.postMessage(`position fen ${next}`);
           worker.postMessage("go movetime 350");
         }
       }
@@ -80,6 +83,7 @@ export function EvalBar({ fen, boardOrientation }: Props) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       worker.terminate();
       workerRef.current = null;
+      isAnalyzingRef.current = false;
     };
   }, []);
 
@@ -87,19 +91,23 @@ export function EvalBar({ fen, boardOrientation }: Props) {
     const worker = workerRef.current;
     if (!worker || !isReady) return;
 
-    // Queue only the latest position when user plays quickly.
-    if (activeFenRef.current === position) return;
+    // Always store the latest position as pending.
     pendingFenRef.current = position;
 
-    const nextFen = pendingFenRef.current;
-    pendingFenRef.current = null;
-    if (!nextFen) return;
-
-    activeFenRef.current = nextFen;
-    activeTurnRef.current = nextFen.split(" ")[1] === "b" ? "b" : "w";
-    worker.postMessage("stop");
-    worker.postMessage(`position fen ${nextFen}`);
-    worker.postMessage("go movetime 350");
+    if (isAnalyzingRef.current) {
+      // Stockfish is busy — send stop. The bestmove handler will start the queued position.
+      worker.postMessage("stop");
+    } else {
+      // Idle — start analysis immediately.
+      const next = pendingFenRef.current;
+      pendingFenRef.current = null;
+      if (!next || next === activeFenRef.current) return;
+      activeFenRef.current = next;
+      activeTurnRef.current = next.split(" ")[1] === "b" ? "b" : "w";
+      isAnalyzingRef.current = true;
+      worker.postMessage(`position fen ${next}`);
+      worker.postMessage("go movetime 350");
+    }
   }, [isReady]);
 
   useEffect(() => {

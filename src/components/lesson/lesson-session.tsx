@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChessBoard } from "@/components/lesson/chess-board";
 import { ChatPanel } from "@/components/lesson/chat-panel";
-import { VideoCall } from "@/components/lesson/video-call";
+import { VideoCall, type CallActions } from "@/components/lesson/video-call";
 import { LessonControls } from "@/components/lesson/lesson-controls";
+import { Button } from "@/components/ui/button";
+import { Phone, PhoneOff } from "lucide-react";
 
 interface Message {
   id: string;
@@ -45,24 +47,45 @@ export function LessonSession({
   initialBoardPgn,
 }: Props) {
   const [activeTab, setActiveTab] = useState<string>("board");
+  const [inCall, setInCall] = useState(false);
+  const callActionsRef = useRef<CallActions | null>(null);
   const isCall = communicationMethod === "CALL";
   const otherName = isCoach ? studentName : coachName;
   const lessonModeLabel = communicationMethod === "CALL" ? "Call Lesson" : "Chat Lesson";
+
+  const handleCallStatusChange = useCallback((connected: boolean) => {
+    setInCall(connected);
+  }, []);
+
+  const handleJoinCall = useCallback(() => {
+    callActionsRef.current?.start();
+    setActiveTab("video"); // switch to video tab on mobile
+  }, []);
+
+  const handleLeaveCall = useCallback(() => {
+    callActionsRef.current?.end();
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-sm font-semibold">
             Lesson with {otherName}
           </h1>
           <span className="text-[11px] px-2 py-0.5 rounded-full border text-muted-foreground">
             {lessonModeLabel}
           </span>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full border ${otherJoined ? "text-green-600 border-green-500/40" : "text-amber-600 border-amber-500/40"}`}>
-            {otherJoined ? "Other participant joined" : "Waiting for other participant"}
-          </span>
+          {isCall ? (
+            <span className={`text-[11px] px-2 py-0.5 rounded-full border ${inCall ? "text-green-600 border-green-500/40" : "text-amber-600 border-amber-500/40"}`}>
+              {inCall ? "You are in the call" : otherJoined ? "Other participant is on the page" : "Waiting for other participant"}
+            </span>
+          ) : (
+            <span className={`text-[11px] px-2 py-0.5 rounded-full border ${otherJoined ? "text-green-600 border-green-500/40" : "text-amber-600 border-amber-500/40"}`}>
+              {otherJoined ? "Other participant joined" : "Waiting for other participant"}
+            </span>
+          )}
           {scheduledStartAt && (
             <span className="text-xs text-muted-foreground">
               {new Date(scheduledStartAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -70,13 +93,28 @@ export function LessonSession({
             </span>
           )}
         </div>
-        <LessonControls
-          lessonId={lessonId}
-          lessonStatus={lessonStatus}
-          isCoach={isCoach}
-          scheduledStartAt={scheduledStartAt}
-          otherJoined={otherJoined}
-        />
+        <div className="flex items-center gap-2">
+          {isCall && (
+            inCall ? (
+              <Button size="sm" variant="destructive" onClick={handleLeaveCall}>
+                <PhoneOff className="h-3.5 w-3.5 mr-1" />
+                Leave Call
+              </Button>
+            ) : (
+              <Button size="sm" onClick={handleJoinCall} className="animate-pulse">
+                <Phone className="h-3.5 w-3.5 mr-1" />
+                Join Call
+              </Button>
+            )
+          )}
+          <LessonControls
+            lessonId={lessonId}
+            lessonStatus={lessonStatus}
+            isCoach={isCoach}
+            scheduledStartAt={scheduledStartAt}
+            otherJoined={otherJoined}
+          />
+        </div>
       </div>
 
       {/* Desktop layout */}
@@ -94,6 +132,8 @@ export function LessonSession({
                 lessonId={lessonId}
                 userId={userId}
                 isCoach={isCoach}
+                onCallStatusChange={handleCallStatusChange}
+                callActionsRef={callActionsRef}
               />
             </div>
           )}
@@ -133,6 +173,8 @@ export function LessonSession({
                 lessonId={lessonId}
                 userId={userId}
                 isCoach={isCoach}
+                onCallStatusChange={handleCallStatusChange}
+                callActionsRef={callActionsRef}
               />
             </TabsContent>
           )}
