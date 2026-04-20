@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { X, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -39,6 +40,11 @@ const steps = [
 
 export function LessonFlowGuide() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname?.startsWith("/lesson/")) {
+    return null;
+  }
 
   return (
     <>

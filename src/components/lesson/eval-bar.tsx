@@ -11,11 +11,12 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const workerRef = useRef<Worker | null>(null);
   const [evaluation, setEvaluation] = useState<number>(0); // in centipawns
   const [mate, setMate] = useState<number | null>(null);
-  const [bestLine, setBestLine] = useState<string>("");
   const [depth, setDepth] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const currentFenRef = useRef<string>("");
+  const pendingFenRef = useRef<string | null>(null);
+  const activeFenRef = useRef<string>("");
+  const activeTurnRef = useRef<"w" | "b">("w");
 
   useEffect(() => {
     let terminated = false;
@@ -44,19 +45,32 @@ export function EvalBar({ fen, boardOrientation }: Props) {
         const depthMatch = line.match(/depth (\d+)/);
         const cpMatch = line.match(/score cp (-?\d+)/);
         const mateMatch = line.match(/score mate (-?\d+)/);
-        const pvMatch = line.match(/ pv (.+)/);
+        const perspective = activeTurnRef.current === "w" ? 1 : -1;
 
         if (depthMatch) setDepth(parseInt(depthMatch[1]));
 
         if (mateMatch) {
-          setMate(parseInt(mateMatch[1]));
-          setEvaluation(parseInt(mateMatch[1]) > 0 ? 10000 : -10000);
+          const sideToMoveMate = parseInt(mateMatch[1]);
+          const whitePerspectiveMate = sideToMoveMate * perspective;
+          setMate(whitePerspectiveMate);
+          setEvaluation(whitePerspectiveMate > 0 ? 10000 : -10000);
         } else if (cpMatch) {
           setMate(null);
-          setEvaluation(parseInt(cpMatch[1]));
+          const sideToMoveCp = parseInt(cpMatch[1]);
+          setEvaluation(sideToMoveCp * perspective);
         }
+      }
 
-        if (pvMatch) setBestLine(pvMatch[1].split(" ").slice(0, 5).join(" "));
+      if (line.startsWith("bestmove") && pendingFenRef.current && pendingFenRef.current !== activeFenRef.current) {
+        const nextFen = pendingFenRef.current;
+        pendingFenRef.current = null;
+        if (nextFen) {
+          activeFenRef.current = nextFen;
+          activeTurnRef.current = nextFen.split(" ")[1] === "b" ? "b" : "w";
+          worker.postMessage("stop");
+          worker.postMessage(`position fen ${nextFen}`);
+          worker.postMessage("go movetime 350");
+        }
       }
     };
 
@@ -72,11 +86,20 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const analyze = useCallback((position: string) => {
     const worker = workerRef.current;
     if (!worker || !isReady) return;
-    currentFenRef.current = position;
+
+    // Queue only the latest position when user plays quickly.
+    if (activeFenRef.current === position) return;
+    pendingFenRef.current = position;
+
+    const nextFen = pendingFenRef.current;
+    pendingFenRef.current = null;
+    if (!nextFen) return;
+
+    activeFenRef.current = nextFen;
+    activeTurnRef.current = nextFen.split(" ")[1] === "b" ? "b" : "w";
     worker.postMessage("stop");
-    worker.postMessage("ucinewgame");
-    worker.postMessage(`position fen ${position}`);
-    worker.postMessage("go depth 18");
+    worker.postMessage(`position fen ${nextFen}`);
+    worker.postMessage("go movetime 350");
   }, [isReady]);
 
   useEffect(() => {
@@ -99,8 +122,6 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const evalText = mate !== null
     ? `M${Math.abs(mate)}`
     : `${evaluation >= 0 ? "+" : ""}${(evaluation / 100).toFixed(1)}`;
-
-  const isWhiteAdvantage = evaluation > 0;
 
   return (
     <div className="flex flex-col items-center gap-0.5 h-full select-none">

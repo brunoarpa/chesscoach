@@ -40,9 +40,6 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
   const retryCountRef = useRef(0);
   const mountedRef = useRef(true);
 
-  // Use random suffix to avoid stale peer ID collisions
-  const peerIdSuffix = useRef(`${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
-  const myPeerId = `lesson-${lessonId}-${isCoach ? "coach" : "student"}-${peerIdSuffix.current}`;
   const otherRole = isCoach ? "student" : "coach";
 
   const cleanup = useCallback(() => {
@@ -62,17 +59,8 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
     }
   }, []);
 
-  const tryCallOtherPeer = useCallback(async (peer: import("peerjs").default, stream: MediaStream) => {
-    // List possible peer IDs for the other role by trying to call
-    // Since peer IDs have random suffixes, we can't know the exact ID
-    // Instead, we rely on the other peer calling us when they connect
-    // But also attempt to call with a pattern
-    // The solution: both sides call each other, and the incoming call handler answers
-    // So we just need to wait for the other side to also be connected
-  }, []);
-
   const startCall = useCallback(async () => {
-    if (peerRef.current) return;
+    if (peerRef.current || connecting) return;
 
     setConnecting(true);
     setError(null);
@@ -156,12 +144,11 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
             retryTimerRef.current = setTimeout(attemptCall, delay);
           }
         } else if (err.type === "unavailable-id") {
-          // Stale peer ID — destroy and retry with new suffix
+          // Stale peer ID from another open tab/session
           peer.destroy();
           peerRef.current = null;
           if (retryCountRef.current < 3 && mountedRef.current) {
             retryCountRef.current++;
-            peerIdSuffix.current = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             retryTimerRef.current = setTimeout(() => startCall(), 1000);
           } else if (mountedRef.current) {
             setError("Connection error. Please refresh the page.");
@@ -191,18 +178,14 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
     cleanup();
   }, [cleanup]);
 
-  // Auto-start the call on mount
+  // Track mounted state and always cleanup resources on unmount.
   useEffect(() => {
     mountedRef.current = true;
-    const timer = setTimeout(() => {
-      startCall();
-    }, 500);
     return () => {
-      clearTimeout(timer);
       mountedRef.current = false;
       cleanup();
     };
-  }, [startCall, cleanup]);
+  }, [cleanup]);
 
   const toggleVideo = useCallback(() => {
     if (localStreamRef.current) {
@@ -257,12 +240,20 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
 
       {/* Controls */}
       <div className="flex items-center justify-center gap-2">
-        {!connected && !connecting ? (
+        {!connected && !connecting && (
           <Button size="sm" onClick={startCall}>
             <Phone className="h-4 w-4 mr-1" />
-            Retry Call
+            Join Call
           </Button>
-        ) : (
+        )}
+
+        {connecting && (
+          <Button size="sm" variant="outline" onClick={endCall}>
+            Cancel
+          </Button>
+        )}
+
+        {(connected || connecting) && (
           <>
             <Button
               size="icon"
@@ -286,6 +277,14 @@ export function VideoCall({ lessonId, userId, isCoach }: Props) {
           </>
         )}
       </div>
+
+      <p className="text-[11px] text-center text-muted-foreground">
+        {connected
+          ? "In call now"
+          : connecting
+            ? "Joining call..."
+            : "Not in call yet. Click Join Call to connect."}
+      </p>
     </div>
   );
 }

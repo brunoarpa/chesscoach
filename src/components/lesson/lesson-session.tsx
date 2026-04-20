@@ -47,6 +47,7 @@ export function LessonSession({
   const [activeTab, setActiveTab] = useState<string>("board");
   const isCall = communicationMethod === "CALL";
   const otherName = isCoach ? studentName : coachName;
+  const lessonModeLabel = communicationMethod === "CALL" ? "Call Lesson" : "Chat Lesson";
 
   return (
     <div className="flex flex-col h-full">
@@ -56,6 +57,12 @@ export function LessonSession({
           <h1 className="text-sm font-semibold">
             Lesson with {otherName}
           </h1>
+          <span className="text-[11px] px-2 py-0.5 rounded-full border text-muted-foreground">
+            {lessonModeLabel}
+          </span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full border ${otherJoined ? "text-green-600 border-green-500/40" : "text-amber-600 border-amber-500/40"}`}>
+            {otherJoined ? "Other participant joined" : "Waiting for other participant"}
+          </span>
           {scheduledStartAt && (
             <span className="text-xs text-muted-foreground">
               {new Date(scheduledStartAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
