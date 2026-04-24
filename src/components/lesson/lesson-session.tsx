@@ -7,7 +7,7 @@ import { ChatPanel } from "@/components/lesson/chat-panel";
 import { VideoCall, type CallActions } from "@/components/lesson/video-call";
 import { LessonControls } from "@/components/lesson/lesson-controls";
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff } from "lucide-react";
+import { Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 
 interface Message {
   id: string;
@@ -48,6 +48,7 @@ export function LessonSession({
 }: Props) {
   const [activeTab, setActiveTab] = useState<string>("board");
   const [inCall, setInCall] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
   const callActionsRef = useRef<CallActions | null>(null);
   const isCall = communicationMethod === "CALL";
   const otherName = isCoach ? studentName : coachName;
@@ -55,6 +56,11 @@ export function LessonSession({
 
   const handleCallStatusChange = useCallback((connected: boolean) => {
     setInCall(connected);
+    if (!connected) setAudioEnabled(true); // reset when call ends
+  }, []);
+
+  const handleAudioChange = useCallback((enabled: boolean) => {
+    setAudioEnabled(enabled);
   }, []);
 
   const handleJoinCall = useCallback(() => {
@@ -64,6 +70,10 @@ export function LessonSession({
 
   const handleLeaveCall = useCallback(() => {
     callActionsRef.current?.end();
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    callActionsRef.current?.toggleAudio();
   }, []);
 
   return (
@@ -96,12 +106,30 @@ export function LessonSession({
         <div className="flex items-center gap-2">
           {isCall && (
             inCall ? (
-              <Button size="sm" variant="destructive" onClick={handleLeaveCall}>
-                <PhoneOff className="h-3.5 w-3.5 mr-1" />
-                Leave Call
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant={audioEnabled ? "outline" : "destructive"}
+                  onClick={handleToggleMute}
+                  title={audioEnabled ? "Mute microphone" : "Unmute microphone"}
+                >
+                  {audioEnabled ? (
+                    <><Mic className="h-3.5 w-3.5 mr-1" />Mute</>
+                  ) : (
+                    <><MicOff className="h-3.5 w-3.5 mr-1" />Unmute</>
+                  )}
+                </Button>
+                <Button size="sm" variant="destructive" onClick={handleLeaveCall}>
+                  <PhoneOff className="h-3.5 w-3.5 mr-1" />
+                  Leave Call
+                </Button>
+              </>
             ) : (
-              <Button size="sm" onClick={handleJoinCall} className="animate-pulse">
+              <Button
+                size="sm"
+                onClick={handleJoinCall}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold animate-pulse"
+              >
                 <Phone className="h-3.5 w-3.5 mr-1" />
                 Join Call
               </Button>
@@ -133,6 +161,7 @@ export function LessonSession({
                 userId={userId}
                 isCoach={isCoach}
                 onCallStatusChange={handleCallStatusChange}
+                onAudioChange={handleAudioChange}
                 callActionsRef={callActionsRef}
               />
             </div>
@@ -174,6 +203,7 @@ export function LessonSession({
                 userId={userId}
                 isCoach={isCoach}
                 onCallStatusChange={handleCallStatusChange}
+                onAudioChange={handleAudioChange}
                 callActionsRef={callActionsRef}
               />
             </TabsContent>

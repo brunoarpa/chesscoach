@@ -184,116 +184,237 @@ export async function resolveDispute(
   });
 
   if (!lesson) throw new Error("Lesson not found");
-  if (lesson.status !== "DISPUTED") throw new Error("Lesson is not disputed");
-
-  if (resolution === "refund") {
-    // Refund: release reserved funds, set lesson to CANCELLED
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
-        where: { id: lessonId },
-        data: { status: "CANCELLED" },
-      }),
-      ...(lesson.isTrial
-        ? []
-        : [
-            prisma.user.update({
-              where: { id: lesson.studentId },
-              data: { reservedBalance: { decrement: lesson.estimatedCost } },
-            }),
-          ]),
-      prisma.user.update({
-        where: { id: lesson.studentId },
-        data: { hasActiveDispute: false },
-      }),
-      prisma.auditLog.create({
-        data: {
-          adminId,
-          action: "RESOLVE_DISPUTE",
-          targetId: lessonId,
-          details: `Dispute resolved: refund to student "${lesson.student.username}". Coach: "${lesson.coach.username}".`,
-        },
-      }),
-    ]);
-  } else {
-    // Pay coach: complete the payment as normal
-    const txOps = [
-      prisma.lessonRequest.update({
-        where: { id: lessonId },
-        data: {
-          status: "COMPLETED",
-          completedAt: new Date(),
-          studentConfirmed: true,
-          coachConfirmed: true,
-        },
-      }),
-      prisma.user.update({
-        where: { id: lesson.studentId },
-        data: {
-          hasActiveDispute: false,
-          ...(lesson.isTrial
-            ? { lessonsTaken: { increment: 1 } }
-            : {
-                walletBalance: { decrement: lesson.estimatedCost },
-                reservedBalance: { decrement: lesson.estimatedCost },
-                lessonsTaken: { increment: 1 },
-              }),
-        },
-      }),
-      prisma.user.update({
-        where: { id: lesson.coachId },
-        data: {
-          ...(lesson.isTrial
-            ? { lessonsGiven: { increment: 1 } }
-            : {
-                pendingEarnings: { increment: lesson.estimatedCost },
-                totalEarningsAllTime: { increment: lesson.estimatedCost },
-                lessonsGiven: { increment: 1 },
-              }),
-        },
-      }),
-      ...(lesson.isTrial
-        ? []
-        : [
-            prisma.transaction.create({
-              data: {
-                userId: lesson.studentId,
-                type: "LESSON_PAYMENT",
-                amount: -lesson.estimatedCost,
-                lessonRequestId: lessonId,
-              },
-            }),
-            prisma.transaction.create({
-              data: {
-                userId: lesson.coachId,
-                type: "LESSON_PAYMENT",
-                amount: lesson.estimatedCost,
-                lessonRequestId: lessonId,
-              },
-            }),
-            prisma.earningRecord.create({
-              data: {
-                userId: lesson.coachId,
-                amount: lesson.estimatedCost,
-              },
-            }),
-          ]),
-      prisma.auditLog.create({
-        data: {
-          adminId,
-          action: "RESOLVE_DISPUTE",
-          targetId: lessonId,
-          details: `Dispute resolved: paid coach "${lesson.coach.username}". Student: "${lesson.student.username}".`,
-        },
-      }),
-    ];
-    await prisma.$transaction(txOps);
+  if (!["DISPUTED", "COMPLETED", "NO_SHOW"].includes(lesson.status)) {
+    throw new Error("Lesson is not in a resolvable state");
   }
 
-  // Mark all LESSON_DISPUTE flags for this lesson as resolved
+  if (resolution === "refund") {
+    if (lesson.status === "NO_SHOW") {
+      // COACH_NO_SHOW: student was already auto-refunded. Just cancel and audit.
+      await prisma.$transaction([
+        prisma.lessonRequest.update({ where: { id: lessonId }, data: { status: "CANCELLED" } }),
+        prisma.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } }),
+        prisma.auditLog.create({
+          data: {
+            adminId,
+            action: "RESOLVE_DISPUTE",
+            targetId: lessonId,
+            details: `No-show acknowledged: refund confirmed for student "${lesson.student.username}". Coach: "${lesson.coach.username}".`,
+          },
+        }),
+      ]);
+    } else if (lesson.status === "COMPLETED") {
+      // STUDENT_NO_SHOW: lesson was auto-completed and coach was paid. Reverse the payment.
+      await prisma.$transaction([
+        prisma.lessonRequest.update({ where: { id: lessonId }, data: { status: "CANCELLED" } }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              // Restore student wallet
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { walletBalance: { increment: lesson.estimatedCost } },
+              }),
+              // Claw back coach earnings
+              prisma.user.update({
+                where: { id: lesson.coachId },
+                data: {
+                  pendingEarnings: { decrement: lesson.estimatedCost },
+                  totalEarningsAllTime: { decrement: lesson.estimatedCost },
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.studentId,
+                  type: "LESSON_REFUND",
+                  amount: lesson.estimatedCost,
+                  lessonRequestId: lessonId,
+                },
+              }),
+            ]),
+        prisma.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } }),
+        prisma.auditLog.create({
+          data: {
+            adminId,
+            action: "RESOLVE_DISPUTE",
+            targetId: lessonId,
+            details: `No-show overridden: refund issued to student "${lesson.student.username}". Coach: "${lesson.coach.username}".`,
+          },
+        }),
+      ]);
+    } else {
+      // DISPUTED: release reserved funds, set lesson to CANCELLED
+      await prisma.$transaction([
+        prisma.lessonRequest.update({ where: { id: lessonId }, data: { status: "CANCELLED" } }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { reservedBalance: { decrement: lesson.estimatedCost } },
+              }),
+            ]),
+        prisma.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } }),
+        prisma.auditLog.create({
+          data: {
+            adminId,
+            action: "RESOLVE_DISPUTE",
+            targetId: lessonId,
+            details: `Dispute resolved: refund to student "${lesson.student.username}". Coach: "${lesson.coach.username}".`,
+          },
+        }),
+      ]);
+    }
+  } else {
+    if (lesson.status === "COMPLETED") {
+      // STUDENT_NO_SHOW: lesson already auto-completed and coach already paid. Just audit.
+      await prisma.$transaction([
+        prisma.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } }),
+        prisma.auditLog.create({
+          data: {
+            adminId,
+            action: "RESOLVE_DISPUTE",
+            targetId: lessonId,
+            details: `No-show acknowledged: coach "${lesson.coach.username}" payment confirmed. Student: "${lesson.student.username}".`,
+          },
+        }),
+      ]);
+    } else if (lesson.status === "NO_SHOW") {
+      // COACH_NO_SHOW override: admin decides to pay coach despite no-show.
+      // Student's reservedBalance was already freed (no-show refund); take from walletBalance instead.
+      await prisma.$transaction([
+        prisma.lessonRequest.update({
+          where: { id: lessonId },
+          data: { status: "COMPLETED", completedAt: new Date(), studentConfirmed: true, coachConfirmed: true },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.user.update({
+                where: { id: lesson.studentId },
+                data: { walletBalance: { decrement: lesson.estimatedCost } },
+              }),
+              prisma.user.update({
+                where: { id: lesson.coachId },
+                data: {
+                  pendingEarnings: { increment: lesson.estimatedCost },
+                  totalEarningsAllTime: { increment: lesson.estimatedCost },
+                  lessonsGiven: { increment: 1 },
+                  // Reverse the ELO penalty applied during no-show detection
+                  coachRatingPenalty: { decrement: 50 },
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.studentId,
+                  type: "LESSON_PAYMENT",
+                  amount: -lesson.estimatedCost,
+                  lessonRequestId: lessonId,
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.coachId,
+                  type: "LESSON_PAYMENT",
+                  amount: lesson.estimatedCost,
+                  lessonRequestId: lessonId,
+                },
+              }),
+              prisma.earningRecord.create({
+                data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+              }),
+            ]),
+        prisma.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } }),
+        prisma.auditLog.create({
+          data: {
+            adminId,
+            action: "RESOLVE_DISPUTE",
+            targetId: lessonId,
+            details: `No-show overridden: paid coach "${lesson.coach.username}" despite no-show flag. Student: "${lesson.student.username}".`,
+          },
+        }),
+      ]);
+    } else {
+      // DISPUTED: pay coach — complete the payment as normal
+      const txOps = [
+        prisma.lessonRequest.update({
+          where: { id: lessonId },
+          data: {
+            status: "COMPLETED",
+            completedAt: new Date(),
+            studentConfirmed: true,
+            coachConfirmed: true,
+          },
+        }),
+        prisma.user.update({
+          where: { id: lesson.studentId },
+          data: {
+            hasActiveDispute: false,
+            ...(lesson.isTrial
+              ? { lessonsTaken: { increment: 1 } }
+              : {
+                  walletBalance: { decrement: lesson.estimatedCost },
+                  reservedBalance: { decrement: lesson.estimatedCost },
+                  lessonsTaken: { increment: 1 },
+                }),
+          },
+        }),
+        prisma.user.update({
+          where: { id: lesson.coachId },
+          data: {
+            ...(lesson.isTrial
+              ? { lessonsGiven: { increment: 1 } }
+              : {
+                  pendingEarnings: { increment: lesson.estimatedCost },
+                  totalEarningsAllTime: { increment: lesson.estimatedCost },
+                  lessonsGiven: { increment: 1 },
+                }),
+          },
+        }),
+        ...(lesson.isTrial
+          ? []
+          : [
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.studentId,
+                  type: "LESSON_PAYMENT",
+                  amount: -lesson.estimatedCost,
+                  lessonRequestId: lessonId,
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.coachId,
+                  type: "LESSON_PAYMENT",
+                  amount: lesson.estimatedCost,
+                  lessonRequestId: lessonId,
+                },
+              }),
+              prisma.earningRecord.create({
+                data: {
+                  userId: lesson.coachId,
+                  amount: lesson.estimatedCost,
+                },
+              }),
+            ]),
+        prisma.auditLog.create({
+          data: {
+            adminId,
+            action: "RESOLVE_DISPUTE",
+            targetId: lessonId,
+            details: `Dispute resolved: paid coach "${lesson.coach.username}". Student: "${lesson.student.username}".`,
+          },
+        }),
+      ];
+      await prisma.$transaction(txOps);
+    }
+  }
+
+  // Mark all relevant flags for this lesson as resolved
   await prisma.abuseFlag.updateMany({
     where: {
       relatedLessonId: lessonId,
-      type: "LESSON_DISPUTE",
+      type: { in: ["LESSON_DISPUTE", "STUDENT_NO_SHOW", "COACH_NO_SHOW"] },
       resolved: false,
     },
     data: {

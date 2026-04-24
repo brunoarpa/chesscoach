@@ -8,6 +8,8 @@ import { getPusherClient } from "@/lib/pusher-client";
 export interface CallActions {
   start: () => void;
   end: () => void;
+  toggleAudio: () => void;
+  toggleVideo: () => void;
 }
 
 interface Props {
@@ -15,6 +17,7 @@ interface Props {
   userId: string;
   isCoach: boolean;
   onCallStatusChange?: (inCall: boolean) => void;
+  onAudioChange?: (enabled: boolean) => void;
   callActionsRef?: React.MutableRefObject<CallActions | null>;
 }
 
@@ -32,7 +35,7 @@ function getIceServers(): RTCIceServer[] {
   return servers;
 }
 
-export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, callActionsRef }: Props) {
+export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAudioChange, callActionsRef }: Props) {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [remoteInCall, setRemoteInCall] = useState(false);
@@ -187,12 +190,12 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, callA
     cleanup();
   }, [cleanup]);
 
-  // Expose start/end actions to parent via ref.
+  // Expose actions to parent via ref.
   useEffect(() => {
     if (callActionsRef) {
-      callActionsRef.current = { start: startCall, end: endCall };
+      callActionsRef.current = { start: startCall, end: endCall, toggleAudio, toggleVideo };
     }
-  }, [callActionsRef, startCall, endCall]);
+  }, [callActionsRef, startCall, endCall, toggleAudio, toggleVideo]);
 
   // Notify parent when connected state changes; also broadcast via Pusher.
   useEffect(() => {
@@ -245,9 +248,10 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, callA
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setAudioEnabled(audioTrack.enabled);
+        onAudioChange?.(audioTrack.enabled);
       }
     }
-  }, []);
+  }, [onAudioChange]);
 
   return (
     <div className="p-2 space-y-2">
