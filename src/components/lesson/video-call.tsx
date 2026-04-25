@@ -190,13 +190,6 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
     cleanup();
   }, [cleanup]);
 
-  // Expose actions to parent via ref.
-  useEffect(() => {
-    if (callActionsRef) {
-      callActionsRef.current = { start: startCall, end: endCall, toggleAudio, toggleVideo };
-    }
-  }, [callActionsRef, startCall, endCall, toggleAudio, toggleVideo]);
-
   // Notify parent when connected state changes; also broadcast via Pusher.
   useEffect(() => {
     onCallStatusChange?.(connected);
@@ -252,6 +245,13 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
       }
     }
   }, [onAudioChange]);
+
+  // Expose actions to parent via ref.
+  useEffect(() => {
+    if (callActionsRef) {
+      callActionsRef.current = { start: startCall, end: endCall, toggleAudio, toggleVideo };
+    }
+  }, [callActionsRef, startCall, endCall, toggleAudio, toggleVideo]);
 
   return (
     <div className="p-2 space-y-2">
