@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { LANGUAGES } from "@/lib/languages";
 import { updateProfile } from "@/lib/actions/auth";
 import { toast } from "sonner";
 
@@ -27,7 +29,10 @@ interface Props {
   bio?: string;
   coachAvailability: string;
   timezone?: string;
+  languages: string[];
 }
+
+const languageOptions = LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
 export function ProfileEditForm(props: Props) {
   async function handleSubmit(formData: FormData) {
@@ -83,6 +88,19 @@ export function ProfileEditForm(props: Props) {
             />
             <p className="text-xs text-muted-foreground">
               Your timezone for scheduling. Detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Languages</Label>
+            <MultiSelect
+              name="languages"
+              options={languageOptions}
+              defaultValue={props.languages}
+              placeholder="Select languages you teach in…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Required to be available as a coach. Students can filter coaches by language.
             </p>
           </div>
 

@@ -18,6 +18,7 @@ export default async function ProfileEditPage() {
       bio: true,
       coachAvailability: true,
       timezone: true,
+      languages: true,
     },
   });
 
@@ -35,6 +36,7 @@ export default async function ProfileEditPage() {
         bio={user.bio ?? undefined}
         coachAvailability={user.coachAvailability}
         timezone={user.timezone ?? undefined}
+        languages={user.languages}
       />
     </div>
   );

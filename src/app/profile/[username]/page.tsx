@@ -11,6 +11,7 @@ import { ChessComVerificationForm } from "@/components/chess-com-verification-fo
 import { fetchChessComRating } from "@/lib/chess-com";
 import { getAvailableSlots } from "@/lib/actions/timeslots";
 import { FavouriteButton } from "@/components/favourite-button";
+import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -293,6 +294,18 @@ export default async function ProfilePage({
                   <strong>{Math.round(user.coachElo)}</strong>
                 </div>
               </div>
+              {user.languages.length > 0 && (
+                <div className="space-y-1.5 text-sm">
+                  <span className="text-muted-foreground">Languages:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.languages.map((code) => (
+                      <Badge key={code} variant="secondary" className="font-normal">
+                        {getLanguageLabel(code)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

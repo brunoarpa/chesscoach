@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation } from "@/lib/chess-com";
+import { filterValidLanguages } from "@/lib/languages";
 import crypto from "crypto";
 
 export async function setUsername(formData: FormData) {
@@ -54,6 +55,9 @@ export async function updateProfile(formData: FormData) {
     bio: (formData.get("bio") as string) || undefined,
     coachAvailability: (formData.get("coachAvailability") as string) || "AVAILABLE",
     timezone: (formData.get("timezone") as string) || undefined,
+    languages: filterValidLanguages(
+      formData.getAll("languages").map((v) => String(v)),
+    ),
   };
 
   // Validate and handle username change
@@ -78,10 +82,20 @@ export async function updateProfile(formData: FormData) {
 
   const chatPriceInCents = raw.coachChatPrice ? Math.round(raw.coachChatPrice * 100) : null;
   const callPriceInCents = raw.coachCallPrice ? Math.round(raw.coachCallPrice * 100) : null;
-  let availability = raw.coachAvailability as "AVAILABLE" | "UNAVAILABLE";
+  const availability = raw.coachAvailability as "AVAILABLE" | "UNAVAILABLE";
   const hasPrice = chatPriceInCents !== null || callPriceInCents !== null;
-  if (!hasPrice && availability === "AVAILABLE") {
-    availability = "UNAVAILABLE";
+  const hasLanguages = raw.languages.length > 0;
+
+  if (availability === "AVAILABLE") {
+    if (!hasPrice && !hasLanguages) {
+      return { error: "To be available as a coach, set a chat or call price and select at least one language you teach in." };
+    }
+    if (!hasPrice) {
+      return { error: "To be available as a coach, set a chat or call price." };
+    }
+    if (!hasLanguages) {
+      return { error: "To be available as a coach, select at least one language you teach in." };
+    }
   }
 
   await prisma.user.update({
@@ -95,6 +109,7 @@ export async function updateProfile(formData: FormData) {
       bio: raw.bio || null,
       coachAvailability: availability,
       timezone: raw.timezone || null,
+      languages: raw.languages,
       lastActiveAt: new Date(),
       activityStatus: "ACTIVE",
     },
@@ -113,10 +128,13 @@ export async function updateCoachAvailability(newStatus: "AVAILABLE" | "UNAVAILA
   if (newStatus === "AVAILABLE") {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { coachChatPrice: true, coachCallPrice: true },
+      select: { coachChatPrice: true, coachCallPrice: true, languages: true },
     });
     if (!user?.coachChatPrice && !user?.coachCallPrice) {
       return { error: "You must set a price before setting yourself as available. Go to Edit Profile to set your price." };
+    }
+    if (!user.languages || user.languages.length === 0) {
+      return { error: "You must select at least one language you teach in before becoming available. Go to Edit Profile." };
     }
   }
 

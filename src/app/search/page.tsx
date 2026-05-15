@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
 import { auth } from "@/lib/auth";
+import { filterValidLanguages } from "@/lib/languages";
 
 interface SearchParams {
   q?: string;
@@ -16,6 +17,7 @@ interface SearchParams {
   availability?: string;
   lastSeen?: string;
   favourites?: string;
+  languages?: string | string[];
 }
 
 export default async function SearchPage({
@@ -93,10 +95,20 @@ export default async function SearchPage({
     }
   }
 
-  // Build order by — always by total earnings
+  const rawLanguages = Array.isArray(params.languages)
+    ? params.languages
+    : params.languages
+      ? [params.languages]
+      : [];
+  const languages = filterValidLanguages(rawLanguages);
+  if (languages.length > 0) {
+    where.languages = { hasSome: languages };
+  }
+
+  // Sort by Coach ELO so stronger coaches surface first
   type OrderBy = Prisma.UserOrderByWithRelationInput;
   const orderBy: OrderBy[] = [
-    { totalEarningsAllTime: "desc" },
+    { coachElo: "desc" },
   ];
 
   const coaches = await prisma.user.findMany({
@@ -117,6 +129,7 @@ export default async function SearchPage({
       lastActiveAt: true,
       lessonsGiven: true,
       bio: true,
+      languages: true,
       reviewsReceived: { select: { rating: true } },
     },
   });
@@ -161,6 +174,7 @@ export default async function SearchPage({
                     reviewCount={coach.reviewsReceived.length}
                     lessonsGiven={coach.lessonsGiven}
                     bio={coach.bio}
+                    languages={coach.languages}
                     isFavourited={favouriteCoachIds.includes(coach.id)}
                     showFavourite={!!session?.user}
                   />

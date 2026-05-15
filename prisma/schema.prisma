@@ -125,6 +125,7 @@ model User {
   chessComAccountAge    DateTime? // when the chess.com account was created
   bio                   String?
   timezone              String?   // IANA timezone (e.g., "Europe/London")
+  languages             String[]  @default([]) // ISO 639-1 codes (e.g., ["en", "es"])
 
   // Stats
   lessonsGiven   Int @default(0)
@@ -191,6 +192,7 @@ model User {
   @@index([activityStatus])
   @@index([verificationStatus])
   @@index([continent])
+  @@index([languages], type: Gin)
 }
 
 model Account {

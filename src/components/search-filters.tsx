@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { LANGUAGES } from "@/lib/languages";
 
 const continents = [
   { value: "", label: "All" },
@@ -17,6 +19,8 @@ const continents = [
 ];
 
 const ratingOptions = Array.from({ length: 30 }, (_, i) => (i + 1) * 100); // 100 to 3000
+
+const languageOptions = LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
 interface Props {
   params: Record<string, string | undefined>;
@@ -31,7 +35,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
     const newParams = new URLSearchParams();
     for (const [key, value] of formData.entries()) {
       if (value && value !== "" && value !== "any") {
-        newParams.set(key, value as string);
+        newParams.append(key, value as string);
       }
     }
     router.push(`/search?${newParams.toString()}`);
@@ -115,6 +119,16 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
             defaultValue={params.maxPrice}
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Languages</Label>
+        <MultiSelect
+          name="languages"
+          options={languageOptions}
+          defaultValue={searchParams.getAll("languages")}
+          placeholder="Any"
+        />
       </div>
 
       <div className="space-y-2">

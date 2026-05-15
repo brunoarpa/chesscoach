@@ -15,6 +15,7 @@ export const profileEditSchema = z.object({
   communicationPreference: z.enum(["CHAT_ONLY", "CHAT_AND_CALL"]),
   bio: z.string().max(500).optional(),
   timezone: z.string().optional(),
+  languages: z.array(z.string()).optional(),
 });
 
 export const chessComUsernameSchema = z.object({

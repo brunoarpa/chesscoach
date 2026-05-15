@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, DollarSign, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
 import { FavouriteButton } from "@/components/favourite-button";
+import { getLanguageLabel } from "@/lib/languages";
 
 const continentLabels: Record<string, string> = {
   AFRICA: "Africa",
@@ -43,6 +44,7 @@ interface Props {
   reviewCount: number;
   lessonsGiven: number;
   bio: string | null;
+  languages: string[];
   isFavourited?: boolean;
   showFavourite?: boolean;
 }
@@ -112,6 +114,21 @@ export function CoachCard(props: Props) {
                 {formatRelativeTime(props.lastActiveAt)}
               </span>
             </div>
+
+            {props.languages.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {props.languages.slice(0, 4).map((code) => (
+                  <Badge key={code} variant="secondary" className="text-xs font-normal">
+                    {getLanguageLabel(code)}
+                  </Badge>
+                ))}
+                {props.languages.length > 4 && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    +{props.languages.length - 4}
+                  </Badge>
+                )}
+              </div>
+            )}
 
             {props.avgRating !== null && (
               <div className="mt-2 text-xs">
