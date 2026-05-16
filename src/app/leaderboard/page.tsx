@@ -44,7 +44,7 @@ export default async function LeaderboardPage() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold mb-2">Coach Leaderboard</h1>
       <p className="text-muted-foreground mb-8">
         Rankings based on coach rating.
@@ -118,7 +118,6 @@ export default async function LeaderboardPage() {
               <TableHead className="text-right">Lessons</TableHead>
               <TableHead className="text-right">Chat Lesson / slot</TableHead>
               <TableHead className="text-right">Call Lesson / slot</TableHead>
-              <TableHead className="text-right">Students</TableHead>
               <TableHead className="text-center">Last Active</TableHead>
               <TableHead className="text-center">Status</TableHead>
             </TableRow>
@@ -154,7 +153,6 @@ export default async function LeaderboardPage() {
                 <TableCell className="text-right">
                   {coach.coachCallPrice !== null ? `€${(coach.coachCallPrice / 100).toFixed(2)}` : "—"}
                 </TableCell>
-                <TableCell className="text-right">{coach.playersTaught}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${getActivityDotColor(coach.lastActiveAt)}`} />
