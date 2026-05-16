@@ -28,10 +28,13 @@ export default async function SearchPage({
   const params = await searchParams;
   const session = await auth();
 
-  // Build where clause
+  // Coaches are anyone with a chat or call price set. chess.com verification is optional.
   const where: Prisma.UserWhereInput = {
-    verificationStatus: "VERIFIED",
     isSuspended: false,
+    OR: [
+      { coachChatPrice: { not: null } },
+      { coachCallPrice: { not: null } },
+    ],
   };
 
   // Favourites filter

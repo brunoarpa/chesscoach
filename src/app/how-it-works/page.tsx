@@ -32,7 +32,7 @@ export default async function HowItWorksPage() {
             <div className="text-3xl font-bold mb-2">2.</div>
             <h3 className="font-semibold mb-1">Find or become a coach</h3>
             <p className="text-sm text-muted-foreground">
-              Browse verified coaches, or verify your chess.com to start coaching.
+              Browse coaches, or set a price and languages to start coaching. Verifying chess.com is optional.
             </p>
           </CardContent>
         </Card>
@@ -133,6 +133,7 @@ export default async function HowItWorksPage() {
               <li>Same flow as paid lessons. You can leave reviews after a trial.</li>
               <li>One pending free trial at a time, max one per hour.</li>
               <li>Coaches must successfully complete <strong>at least one free trial</strong> before they can receive paid bookings.</li>
+              <li>If a coach <strong>declines</strong> your trial request, the trial is consumed — pick coaches carefully. Trials are refunded only if the coach doesn&apos;t respond at all.</li>
             </ul>
           </CardContent>
         </Card>
@@ -173,13 +174,16 @@ export default async function HowItWorksPage() {
         <Card>
           <CardContent className="pt-6 space-y-3 text-sm">
             <p>
-              <strong>Anyone can coach.</strong> Verify your chess.com account, set a chat or call price per 15 minutes, and pick at least one teaching language in your{" "}
-              <Link href="/profile/edit" className="underline font-medium">profile</Link>.
+              <strong>Anyone can coach.</strong> Set a chat or call price per 15 minutes and pick at least one teaching language in your{" "}
+              <Link href="/profile/edit" className="underline font-medium">profile</Link>. Verifying your chess.com account is optional and adds a badge — it does not gate coaching or payouts.
             </p>
             <p className="text-muted-foreground">
               Your <strong>Coach ELO</strong> on the{" "}
               <Link href="/leaderboard" className="underline">leaderboard</Link>{" "}
               is based on your activity and earnings — stay active and teach well to climb.
+            </p>
+            <p className="text-xs text-muted-foreground border-t pt-2 mt-2">
+              <strong>Taxes:</strong> Coaching earnings paid via ChessCoach are yours to declare to your local tax authority. We don&apos;t withhold or remit taxes on your behalf.
             </p>
           </CardContent>
         </Card>
@@ -194,9 +198,9 @@ export default async function HowItWorksPage() {
         <div className="space-y-3">
           <Card>
             <CardContent className="pt-4 pb-4">
-              <h3 className="font-semibold mb-1">Do I need a chess.com account to book?</h3>
+              <h3 className="font-semibold mb-1">Do I need a chess.com account?</h3>
               <p className="text-sm text-muted-foreground">
-                No. Only coaches need a verified chess.com account. Students just need a username.
+                No. Neither students nor coaches need one to use ChessCoach. Coaches can optionally verify their chess.com account for a trust badge.
               </p>
             </CardContent>
           </Card>
@@ -232,7 +236,7 @@ export default async function HowItWorksPage() {
             <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Is my chess.com username shared?</h3>
               <p className="text-sm text-muted-foreground">
-                Coaches: yes — it&apos;s on your public profile. Students: only during active lessons, so you can connect and play.
+                Only if you linked one. For verified coaches it appears on your public profile. For everyone else, it&apos;s only shown to the other party during active lessons so you can connect and play.
               </p>
             </CardContent>
           </Card>

@@ -63,12 +63,16 @@ export async function calculateCoachElo(userId: string, db: PrismaLike = prisma)
 }
 
 /**
- * Recalculate ELO for all verified coaches (called by cron)
+ * Recalculate ELO for all coaches (called by cron).
+ * Coach = anyone with a chat or call price; chess.com verification is optional.
  */
 export async function recalculateAllElos() {
   const coaches = await prisma.user.findMany({
     where: {
-      verificationStatus: "VERIFIED",
+      OR: [
+        { coachChatPrice: { not: null } },
+        { coachCallPrice: { not: null } },
+      ],
     },
     select: { id: true },
   });

@@ -217,6 +217,13 @@ export async function verifyChessComLocation() {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
+  // Rate limit verification attempts — chess.com API check is external and can be abused.
+  const { rateLimit } = await import("@/lib/rate-limit");
+  const { success: rlSuccess } = await rateLimit(`verify-chess-com:${session.user.id}`, { maxAttempts: 10, windowMs: 60 * 60 * 1000 });
+  if (!rlSuccess) {
+    return { error: "Too many verification attempts. Try again in an hour." };
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { chessComUsername: true, verificationCode: true, verificationStatus: true },

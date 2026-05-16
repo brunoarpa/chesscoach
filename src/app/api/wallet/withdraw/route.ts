@@ -45,16 +45,11 @@ export async function POST(req: NextRequest) {
     select: {
       pendingEarnings: true,
       stripeConnectAccountId: true,
-      verificationStatus: true,
     },
   });
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  if (user.verificationStatus !== "VERIFIED") {
-    return NextResponse.json({ error: "Only verified coaches can withdraw" }, { status: 403 });
   }
 
   if (!user.stripeConnectAccountId) {
@@ -90,6 +85,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Amount too low to cover the withdrawal fee" }, { status: 400 });
   }
 
+  // Atomically reserve the withdrawal amount. If the guard fails, somebody else
+  // (or a concurrent click) already drained the balance.
+  const reserved = await prisma.user.updateMany({
+    where: { id: session.user.id, pendingEarnings: { gte: grossAmount } },
+    data: { pendingEarnings: { decrement: grossAmount } },
+  });
+  if (reserved.count === 0) {
+    return NextResponse.json({ error: "Balance changed while processing. Please retry." }, { status: 409 });
+  }
+
   try {
     const transfer = await stripeClient.transfers.create({
       amount: netAmount,
@@ -117,10 +122,6 @@ export async function POST(req: NextRequest) {
           amount: -grossAmount,
         },
       }),
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { pendingEarnings: { decrement: grossAmount } },
-      }),
     ]);
 
     return NextResponse.json({
@@ -130,6 +131,11 @@ export async function POST(req: NextRequest) {
       net: netAmount,
     });
   } catch (error) {
+    // Stripe transfer failed — credit the money back to the user.
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { pendingEarnings: { increment: grossAmount } },
+    }).catch(() => {});
     console.error("Withdrawal failed:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "Withdrawal failed. Please try again later." }, { status: 500 });
   }

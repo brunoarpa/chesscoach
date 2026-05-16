@@ -85,7 +85,7 @@ export default async function ProfilePage({
 
   if (!user) notFound();
 
-  // Refresh chess.com rapid rating on profile view for verified users
+  // Refresh chess.com rapid rating on profile view for verified users (still optional)
   if (user.verificationStatus === "VERIFIED" && user.chessComUsername) {
     const freshRating = await fetchChessComRating(user.chessComUsername);
     if (freshRating !== null && freshRating !== user.chessRating) {
@@ -171,7 +171,8 @@ export default async function ProfilePage({
   let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
   let hasCompletedTrial = true;      // default to true so non-coaches aren't gated
   const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachChatPrice, user.coachCallPrice);
-  if (user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
+  const isCoachProfile = !!(user.coachChatPrice || user.coachCallPrice);
+  if (isCoachProfile && effectiveAvailability === "AVAILABLE") {
     const [paidCompleted, trialCompleted] = await Promise.all([
       prisma.lessonRequest.findFirst({
         where: { coachId: user.id, status: "COMPLETED", isTrial: false },
@@ -192,7 +193,7 @@ export default async function ProfilePage({
 
   // Fetch available slots for the coach
   let availableSlots: Array<{ id: string; startTime: string; endTime: string }> = [];
-  if (!isOwnProfile && user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
+  if (!isOwnProfile && isCoachProfile && effectiveAvailability === "AVAILABLE") {
     const rawSlots = await getAvailableSlots(user.id);
     availableSlots = rawSlots.map((s) => ({
       id: s.id,
@@ -212,15 +213,15 @@ export default async function ProfilePage({
               title={getActivityLabel(user.lastActiveAt)}
             />
             {user.verificationStatus === "VERIFIED" && (
-              <Badge variant="default">Verified</Badge>
+              <Badge variant="default" title="chess.com account verified">✓ chess.com</Badge>
             )}
             {user.verificationStatus === "PENDING" && (
               <Badge variant="secondary">Pending Verification</Badge>
             )}
-            {user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE" && (
+            {isCoachProfile && effectiveAvailability === "AVAILABLE" && (
               <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
             )}
-            {user.verificationStatus === "VERIFIED" && effectiveAvailability === "UNAVAILABLE" && (
+            {isCoachProfile && effectiveAvailability === "UNAVAILABLE" && (
               <Badge variant="secondary">Unavailable</Badge>
             )}
           </div>
@@ -408,7 +409,7 @@ export default async function ProfilePage({
           {/* Lesson booking for other profiles */}
           {!isOwnProfile &&
             session?.user &&
-            user.verificationStatus === "VERIFIED" &&
+            isCoachProfile &&
             effectiveAvailability === "AVAILABLE" &&
             !isBlocked && (
               availableSlots.length > 0 ? (
@@ -443,7 +444,7 @@ export default async function ProfilePage({
             </Card>
           )}
           {!isOwnProfile &&
-            user.verificationStatus === "VERIFIED" &&
+            isCoachProfile &&
             effectiveAvailability === "UNAVAILABLE" && (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">

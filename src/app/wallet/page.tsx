@@ -76,13 +76,16 @@ export default async function WalletPage() {
 
       <DepositForm />
 
-      {user.verificationStatus === "VERIFIED" && (user.coachChatPrice || user.coachCallPrice) && (
+      {(user.coachChatPrice || user.coachCallPrice) && (
         <>
           <Separator className="my-8" />
           <StripeConnectSetup />
           <div className="mt-4">
             <WithdrawForm pendingEarnings={user.pendingEarnings} />
           </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Coaching earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — ChessCoach does not withhold or remit taxes on your behalf.
+          </p>
         </>
       )}
 

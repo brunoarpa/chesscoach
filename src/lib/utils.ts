@@ -23,6 +23,14 @@ export function getActivityDotColor(lastActiveAt: Date): string {
 }
 
 /**
+ * A user is considered a coach if they have set a price for chat or call lessons.
+ * chess.com verification is optional and shown as a separate badge.
+ */
+export function isCoach(user: { coachChatPrice: number | null; coachCallPrice: number | null }): boolean {
+  return !!(user.coachChatPrice || user.coachCallPrice);
+}
+
+/**
  * Returns the effective coach availability, overriding the stored value
  * to UNAVAILABLE if the coach hasn't been active in 24+ hours or has no price set.
  */

@@ -38,7 +38,7 @@ export default function SetupUsernamePage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              You can become a coach by verifying your chess.com account, setting a price, and picking the languages you teach in. You can always do this later.
+              Set a price and pick the languages you teach in. Verifying your chess.com account is optional but adds a trust badge to your profile. You can always do this later.
             </p>
             <div className="flex flex-col gap-2 pt-2">
               <Button

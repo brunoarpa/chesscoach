@@ -20,7 +20,11 @@ function formatRelativeTime(date: Date): string {
 export default async function LeaderboardPage() {
   const coaches = await prisma.user.findMany({
     where: {
-      verificationStatus: "VERIFIED",
+      isSuspended: false,
+      OR: [
+        { coachChatPrice: { not: null } },
+        { coachCallPrice: { not: null } },
+      ],
     },
     orderBy: { coachElo: "desc" },
     take: 100,
@@ -35,6 +39,7 @@ export default async function LeaderboardPage() {
       coachAvailability: true,
       coachChatPrice: true,
       coachCallPrice: true,
+      verificationStatus: true,
     },
   });
 
@@ -64,6 +69,9 @@ export default async function LeaderboardPage() {
                         <Link href={`/profile/${coach.username}`} className="font-medium hover:underline">
                           {coach.username}
                         </Link>
+                        {coach.verificationStatus === "VERIFIED" && (
+                          <Badge variant="outline" title="Verified on chess.com" className="text-xs">✓ chess.com</Badge>
+                        )}
                       </div>
                       {availability === "AVAILABLE" ? (
                         <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
@@ -126,6 +134,9 @@ export default async function LeaderboardPage() {
                   >
                     {coach.username}
                   </Link>
+                  {coach.verificationStatus === "VERIFIED" && (
+                    <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Verified on chess.com">✓</span>
+                  )}
                   <span className="text-xs text-muted-foreground ml-2">
                     ♟ {coach.chessRating ?? "—"}
                   </span>

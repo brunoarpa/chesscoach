@@ -27,7 +27,7 @@ export function CoachInviteBanner() {
       <div className="flex-1">
         <p className="font-medium">Want to teach chess?</p>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Verify your chess.com account, set a price, and pick your languages to start receiving lesson requests.
+          Set a price and pick your languages to start receiving lesson requests. Verifying your chess.com is optional but adds a trust badge.
         </p>
         <div className="mt-3">
           <Link href="/profile/edit?coach=1">

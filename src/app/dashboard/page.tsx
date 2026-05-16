@@ -41,11 +41,13 @@ export default async function DashboardPage() {
       activityStatus: "ACTIVE",
       ...(shouldForceUnavailable ? { coachAvailability: "UNAVAILABLE" } : {}),
     },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true },
   });
 
-  // Recalculate coach ELO on every dashboard visit for verified coaches
-  if (currentUser.verificationStatus === "VERIFIED") {
+  const isCoach = !!(currentUser.coachChatPrice || currentUser.coachCallPrice);
+
+  // Recalculate coach ELO on every dashboard visit for anyone set up as a coach.
+  if (isCoach) {
     const newElo = await calculateCoachElo(session.user.id);
     await prisma.user.update({
       where: { id: session.user.id },
@@ -122,7 +124,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {!currentUser.isSuspended && currentUser.verificationStatus !== "VERIFIED" && currentUser.verificationStatus !== "PENDING" && (
+      {!currentUser.isSuspended && !isCoach && (
         <CoachInviteBanner />
       )}
 
@@ -139,7 +141,7 @@ export default async function DashboardPage() {
           requests={JSON.parse(JSON.stringify(incomingRequests))}
           coachAvailability={currentUser.coachAvailability}
         />
-        {currentUser.verificationStatus === "VERIFIED" && (
+        {isCoach && (
           <div className="mt-6">
             <CoachScheduleEditor initialTemplates={weeklyTemplates} />
           </div>

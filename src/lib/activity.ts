@@ -70,12 +70,16 @@ export async function updateActivityStatuses() {
     data: { activityStatus: "ACTIVE" },
   });
 
-  // Auto-set coaches to UNAVAILABLE if inactive for 24+ hours
+  // Auto-set coaches to UNAVAILABLE if inactive for 24+ hours.
+  // "Coach" = anyone with a price set; chess.com verification is optional.
   await prisma.user.updateMany({
     where: {
       lastActiveAt: { lt: oneDayAgo },
-      verificationStatus: "VERIFIED",
       coachAvailability: { not: "UNAVAILABLE" },
+      OR: [
+        { coachChatPrice: { not: null } },
+        { coachCallPrice: { not: null } },
+      ],
     },
     data: { coachAvailability: "UNAVAILABLE" },
   });
@@ -100,33 +104,31 @@ export async function expirePendingRequests() {
   });
 
   for (const request of expiredRequests) {
-    const txOps = [
-      prisma.lessonRequest.update({
-        where: { id: request.id },
+    // Atomic PENDING -> EXPIRED transition; only refund if we actually flipped it.
+    await prisma.$transaction(async (tx) => {
+      const expired = await tx.lessonRequest.updateMany({
+        where: { id: request.id, status: "PENDING" },
         data: { status: "EXPIRED" },
-      }),
-      ...(request.isTrial
-        ? [
-            prisma.user.update({
-              where: { id: request.studentId },
-              data: { freeTrialsRemaining: { increment: 1 } },
-            }),
-          ]
-        : [
-            prisma.user.update({
-              where: { id: request.studentId },
-              data: { reservedBalance: { decrement: request.estimatedCost } },
-            }),
-          ]),
-      // Release the timeslot back to available
-      ...(request.timeSlotId
-        ? [prisma.timeSlot.update({
-            where: { id: request.timeSlotId },
-            data: { status: "AVAILABLE" },
-          })]
-        : []),
-    ];
-    await prisma.$transaction(txOps);
+      });
+      if (expired.count === 0) return;
+      if (request.isTrial) {
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: { freeTrialsRemaining: { increment: 1 } },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: { reservedBalance: { decrement: request.estimatedCost } },
+        });
+      }
+      if (request.timeSlotId) {
+        await tx.timeSlot.update({
+          where: { id: request.timeSlotId },
+          data: { status: "AVAILABLE" },
+        });
+      }
+    });
   }
 
   // Check for coach non-responsive pattern: 3+ expired in 7 days

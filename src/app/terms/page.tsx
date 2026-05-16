@@ -32,7 +32,7 @@ export default function TermsOfServicePage() {
             <li>You are responsible for keeping your account credentials secure.</li>
             <li>One account per person. Creating multiple accounts to exploit free trials, evade restrictions, or otherwise abuse the Platform is prohibited.</li>
             <li>You must be at least 13 years old. Users under 18 must have parental consent.</li>
-            <li>Booking lessons does not require a chess.com account. Offering lessons as a coach requires a verified chess.com account.</li>
+            <li>Neither booking lessons nor offering them requires a chess.com account. Verifying your chess.com account is optional and adds a trust badge to your profile and leaderboard entry.</li>
           </ul>
         </section>
 
@@ -51,15 +51,23 @@ export default function TermsOfServicePage() {
           <ul className="list-disc pl-6 space-y-2">
             <li>Every new student account gets up to 3 free trial lessons. Coaches choose whether to accept them.</li>
             <li>Free trials cost nothing. Coaches must successfully complete at least one free trial lesson before they are eligible to receive paid bookings.</li>
+            <li>If a coach <strong>declines</strong> a free trial request, the trial is consumed (not refunded to the student) to deter spam. Trials are restored if the coach simply fails to respond and the request expires.</li>
             <li>If a free trial is reported as unsatisfactory and an admin agrees, the trial does not count as a successfully delivered lesson for the coach.</li>
             <li>Abusing the free trial system (e.g. multiple accounts) results in suspension.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-3">6. Coach Verification</h2>
+          <h2 className="text-xl font-semibold mt-8 mb-3">6. Coach Verification (optional)</h2>
           <p className="leading-relaxed">
-            Coaches must verify their identity by linking a chess.com account. Verification is reviewed by our admin team. ChessCoach does not guarantee the quality, qualifications, or conduct of any individual coach.
+            Coaches may optionally verify their identity by linking a chess.com account. Verification is reviewed by our admin team and adds a badge to your profile and leaderboard entry. ChessCoach does not guarantee the quality, qualifications, or conduct of any individual coach, verified or otherwise.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mt-8 mb-3">6a. Coach Taxes</h2>
+          <p className="leading-relaxed">
+            Coaching earnings paid out through ChessCoach are your responsibility to declare to your local tax authority. ChessCoach does not withhold, remit, or report taxes on your behalf. We may issue payout summaries on request.
           </p>
         </section>
 

@@ -38,11 +38,7 @@ export async function POST() {
     return NextResponse.json({ error: "Your account is under review" }, { status: 403 });
   }
 
-  // Only verified coaches with pricing can set up payouts
-  if (user.verificationStatus !== "VERIFIED") {
-    return NextResponse.json({ error: "You must be a verified coach to set up payouts" }, { status: 403 });
-  }
-
+  // Anyone with a coaching price can set up payouts. chess.com verification is optional.
   if (!user.coachChatPrice && !user.coachCallPrice) {
     return NextResponse.json({ error: "Set your coaching prices before setting up payouts" }, { status: 400 });
   }
