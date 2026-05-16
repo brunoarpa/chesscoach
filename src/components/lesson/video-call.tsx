@@ -39,8 +39,9 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [remoteInCall, setRemoteInCall] = useState(false);
-  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [remoteHasVideo, setRemoteHasVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -79,12 +80,9 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
     retryCountRef.current = 0;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Audio-only by default — user can opt into camera mid-call via the video toggle.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
 
       const { default: Peer } = await import("peerjs");
 
@@ -101,6 +99,18 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
       });
       peerRef.current = peer;
 
+      function wireRemoteStream(remoteStream: MediaStream) {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
+        }
+        const sync = () => {
+          if (mountedRef.current) setRemoteHasVideo(remoteStream.getVideoTracks().length > 0);
+        };
+        sync();
+        remoteStream.addEventListener("addtrack", sync);
+        remoteStream.addEventListener("removetrack", sync);
+      }
+
       function attemptCall() {
         if (!peerRef.current || !localStreamRef.current || !mountedRef.current) return;
 
@@ -108,9 +118,7 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
         if (call) {
           callRef.current = call;
           call.on("stream", (remoteStream) => {
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = remoteStream;
-            }
+            wireRemoteStream(remoteStream);
             if (mountedRef.current) {
               setConnected(true);
               setConnecting(false);
@@ -118,7 +126,10 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
             retryCountRef.current = 0;
           });
           call.on("close", () => {
-            if (mountedRef.current) setConnected(false);
+            if (mountedRef.current) {
+              setConnected(false);
+              setRemoteHasVideo(false);
+            }
           });
         }
       }
@@ -133,9 +144,7 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
         incomingCall.answer(localStreamRef.current);
         callRef.current = incomingCall;
         incomingCall.on("stream", (remoteStream) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-          }
+          wireRemoteStream(remoteStream);
           if (mountedRef.current) {
             setConnected(true);
             setConnecting(false);
@@ -143,7 +152,10 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
           retryCountRef.current = 0;
         });
         incomingCall.on("close", () => {
-          if (mountedRef.current) setConnected(false);
+          if (mountedRef.current) {
+            setConnected(false);
+            setRemoteHasVideo(false);
+          }
         });
       });
 
@@ -225,12 +237,34 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
     };
   }, [cleanup]);
 
-  const toggleVideo = useCallback(() => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setVideoEnabled(videoTrack.enabled);
+  const toggleVideo = useCallback(async () => {
+    if (!localStreamRef.current) return;
+    const existing = localStreamRef.current.getVideoTracks()[0];
+
+    if (existing) {
+      // Turn camera off: stop track and remove sender so the other side stops receiving video.
+      existing.stop();
+      localStreamRef.current.removeTrack(existing);
+      const pc = callRef.current?.peerConnection;
+      if (pc) {
+        const sender = pc.getSenders().find((s) => s.track === existing);
+        if (sender) pc.removeTrack(sender);
+      }
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      setVideoEnabled(false);
+    } else {
+      // Turn camera on: request permission now, add track to the live peer connection.
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoTrack = videoStream.getVideoTracks()[0];
+        if (!videoTrack) return;
+        localStreamRef.current.addTrack(videoTrack);
+        const pc = callRef.current?.peerConnection;
+        if (pc) pc.addTrack(videoTrack, localStreamRef.current);
+        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+        setVideoEnabled(true);
+      } catch {
+        setError("Could not access camera. Please check permissions.");
       }
     }
   }, []);
@@ -263,7 +297,7 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
           playsInline
           className="w-full h-full object-cover"
         />
-        {!connected && (
+        {!connected ? (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/80">
             <p className="text-sm text-muted-foreground">
               {connecting
@@ -273,15 +307,21 @@ export function VideoCall({ lessonId, userId, isCoach, onCallStatusChange, onAud
                   : "Waiting for other participant to join"}
             </p>
           </div>
+        ) : !remoteHasVideo ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/40 pointer-events-none">
+            <p className="text-xs text-muted-foreground">Audio call — other camera off</p>
+          </div>
+        ) : null}
+        {/* Local video pip — only shown when our camera is on */}
+        {videoEnabled && (
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute bottom-2 right-2 w-24 h-18 rounded border-2 border-background object-cover"
+          />
         )}
-        {/* Local video pip */}
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="absolute bottom-2 right-2 w-24 h-18 rounded border-2 border-background object-cover"
-        />
       </div>
 
       {error && (
