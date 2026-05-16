@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { resolveAbuseFlag, suspendUser, banUser, resolveDispute } from "@/lib/actions/admin";
+import { resolveAbuseFlag, suspendUser, resolveDispute } from "@/lib/actions/admin";
 import { toast } from "sonner";
 
 interface AbuseFlag {
@@ -65,22 +65,12 @@ export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
   }
 
   async function handleSuspend(userId: string) {
-    if (!confirm("Suspend this user? They will not be able to make deposits or lesson requests.")) return;
+    if (!confirm("Suspend this user? They won't be able to book, accept, or deposit. They can still withdraw remaining coach earnings.")) return;
     try {
       await suspendUser(userId);
       toast.success("User suspended");
     } catch {
       toast.error("Failed to suspend user");
-    }
-  }
-
-  async function handleBan(userId: string) {
-    if (!confirm("Ban this user? They will not be able to log in.")) return;
-    try {
-      await banUser(userId);
-      toast.success("User banned");
-    } catch {
-      toast.error("Failed to ban user");
     }
   }
 
@@ -145,11 +135,8 @@ export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
                     Resolve
                   </Button>
                 )}
-                <Button size="sm" variant="secondary" onClick={() => handleSuspend(flag.user.id)}>
+                <Button size="sm" variant="destructive" onClick={() => handleSuspend(flag.user.id)}>
                   Suspend
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleBan(flag.user.id)}>
-                  Ban
                 </Button>
               </div>
             </div>

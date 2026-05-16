@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -11,10 +11,24 @@ function calculateFee(amountCents: number): number {
   return FEE_FLAT_CENTS + Math.ceil(amountCents * FEE_PERCENT);
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // Parse requested amount (in cents). Defaults to full pending balance when omitted.
+  let requestedCents: number | null = null;
+  try {
+    const body = await req.json().catch(() => null);
+    if (body && typeof body.amountCents === "number") {
+      if (!Number.isFinite(body.amountCents) || body.amountCents <= 0) {
+        return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+      }
+      requestedCents = Math.floor(body.amountCents);
+    }
+  } catch {
+    // ignore parse errors — fall back to full balance
   }
 
   const { success: rlSuccess } = await rateLimit(`withdraw:${session.user.id}`, { maxAttempts: 3, windowMs: 15 * 60 * 1000 });
@@ -31,17 +45,12 @@ export async function POST() {
     select: {
       pendingEarnings: true,
       stripeConnectAccountId: true,
-      isSuspended: true,
       verificationStatus: true,
     },
   });
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  if (user.isSuspended) {
-    return NextResponse.json({ error: "Your account is under review" }, { status: 403 });
   }
 
   if (user.verificationStatus !== "VERIFIED") {
@@ -56,6 +65,15 @@ export async function POST() {
     return NextResponse.json({ error: `Minimum withdrawal is €${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
   }
 
+  const grossAmount = requestedCents ?? user.pendingEarnings;
+
+  if (grossAmount > user.pendingEarnings) {
+    return NextResponse.json({ error: "Amount exceeds your pending earnings" }, { status: 400 });
+  }
+  if (grossAmount < MIN_PAYOUT_CENTS) {
+    return NextResponse.json({ error: `Minimum withdrawal is €${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
+  }
+
   // Verify Stripe Connect account is fully onboarded
   const stripe = (await import("stripe")).default;
   const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
@@ -65,12 +83,11 @@ export async function POST() {
     return NextResponse.json({ error: "Your payout account is not fully set up" }, { status: 400 });
   }
 
-  const grossAmount = user.pendingEarnings;
   const fee = calculateFee(grossAmount);
   const netAmount = grossAmount - fee;
 
   if (netAmount <= 0) {
-    return NextResponse.json({ error: "Earnings too low to cover the withdrawal fee" }, { status: 400 });
+    return NextResponse.json({ error: "Amount too low to cover the withdrawal fee" }, { status: 400 });
   }
 
   try {
@@ -102,7 +119,7 @@ export async function POST() {
       }),
       prisma.user.update({
         where: { id: session.user.id },
-        data: { pendingEarnings: 0 },
+        data: { pendingEarnings: { decrement: grossAmount } },
       }),
     ]);
 

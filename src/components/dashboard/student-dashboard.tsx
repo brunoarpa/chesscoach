@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cancelLessonRequest, confirmLesson, confirmLessonStart, declineAcceptedLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
+import { cancelLessonRequest, confirmLessonStart, declineAcceptedLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ interface Request {
   communicationMethod: string | null;
   message: string | null;
   scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
   studentStartConfirmed: boolean;
   coachStartConfirmed: boolean;
   studentConfirmed: boolean;
@@ -65,7 +66,7 @@ const availabilityColors: Record<string, string> = {
 function RequestMeta({ request }: { request: Request }) {
   return (
     <>
-      <span className="text-sm text-muted-foreground ml-2">
+      <span className="text-sm text-muted-foreground sm:ml-2 block sm:inline mt-0.5 sm:mt-0">
         Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
         {request.scheduledStartAt && ` · ${new Date(request.scheduledStartAt).toLocaleString()}`}
@@ -195,9 +196,16 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
 
       {completed.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-4">Completed</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Completed</h2>
+            {completed.length > 3 && (
+              <Link href="/dashboard/history?role=student" className="text-sm text-muted-foreground underline">
+                View all ({completed.length}) &rarr;
+              </Link>
+            )}
+          </div>
           <div className="space-y-3">
-            {completed.map((r) => (
+            {completed.slice(0, 3).map((r) => (
               <StudentCompletedCard key={r.id} request={r} />
             ))}
           </div>
@@ -206,22 +214,15 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
 
       {other.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-4">History</h2>
-          <div className="space-y-3">
-            {other.map((r) => (
-              <Card key={r.id}>
-                <CardContent className="pt-4 flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{r.coach.username}</span>
-                    <RequestMeta request={r} />
-                  </div>
-                  <Badge variant={statusColors[r.status] as "default" | "secondary" | "destructive" | "outline"}>
-                    {r.status}
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">History</h2>
+            <Link href="/dashboard/history?role=student" className="text-sm text-muted-foreground underline">
+              View all ({other.length}) &rarr;
+            </Link>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Declined, cancelled, expired and no-show requests are kept in your history page.
+          </p>
         </section>
       )}
 
@@ -331,14 +332,9 @@ function StudentActiveCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
-
-  async function handleConfirm() {
-    setLoading(true);
-    const result = await confirmLesson(request.id);
-    setLoading(false);
-    if (result.error) toast.error(result.error);
-    else toast.success("Confirmed!");
-  }
+  const autoCompleteAt = request.scheduledEndAt
+    ? new Date(new Date(request.scheduledEndAt).getTime() + 24 * 60 * 60 * 1000)
+    : null;
 
   async function handleDispute() {
     if (disputeReason.trim().length < 10) {
@@ -349,7 +345,7 @@ function StudentActiveCard({ request }: { request: Request }) {
     const result = await disputeLesson(request.id, disputeReason.trim());
     setLoading(false);
     if (result.error) toast.error(result.error);
-    else toast.success("Dispute submitted. An admin will review.");
+    else toast.success("Issue reported. An admin will review.");
   }
 
   return (
@@ -360,29 +356,24 @@ function StudentActiveCard({ request }: { request: Request }) {
             <span className="font-medium">{request.coach.username}</span>
             <RequestMeta request={request} />
             <div className="text-xs text-muted-foreground mt-1">
-              {request.studentConfirmed ? "✓ You confirmed completion" : "⏳ Awaiting your confirmation"}
-              {" · "}
-              {request.coachConfirmed ? "✓ Coach confirmed completion" : "⏳ Awaiting coach confirmation"}
+              {autoCompleteAt
+                ? `Auto-completes ${autoCompleteAt.toLocaleString()} unless you report an issue.`
+                : "Will auto-complete after the dispute window."}
             </div>
           </div>
-          {!request.studentConfirmed && (
-            <div className="flex items-center gap-2">
-              <Link href={`/lesson/${request.id}`}>
-                <Button size="sm" variant="default">Join Lesson</Button>
-              </Link>
-              <Button size="sm" variant="outline" onClick={handleConfirm} disabled={loading}>
-                Confirm & Pay
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => setShowDispute(!showDispute)} disabled={loading}>
-                Dispute
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Link href={`/lesson/${request.id}`}>
+              <Button size="sm" variant="default">Join Lesson</Button>
+            </Link>
+            <Button size="sm" variant="destructive" onClick={() => setShowDispute(!showDispute)} disabled={loading}>
+              Report Issue
+            </Button>
+          </div>
         </div>
         {showDispute && (
           <div className="mt-4 space-y-3 border-t pt-4">
             <p className="text-sm text-muted-foreground">
-              If the lesson was unsatisfactory, describe what went wrong. An admin will review your dispute and contact both parties via email or Chess.com.
+              If the lesson was unsatisfactory (coach barely showed up, no teaching happened, etc.), describe what went wrong. An admin will review and contact both parties via email or Chess.com.
             </p>
             <Textarea
               value={disputeReason}
@@ -391,7 +382,7 @@ function StudentActiveCard({ request }: { request: Request }) {
               maxLength={1000}
             />
             <Button size="sm" variant="destructive" onClick={handleDispute} disabled={loading || disputeReason.trim().length < 10}>
-              Submit Dispute
+              Submit Report
             </Button>
           </div>
         )}

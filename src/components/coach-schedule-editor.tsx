@@ -124,18 +124,19 @@ export function CoachScheduleEditor({ initialTemplates }: Props) {
   return (
     <Card onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle className="text-lg">Weekly Availability</CardTitle>
-          <Button onClick={handleSave} disabled={saving} size="sm">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="sm:w-auto w-full">
             {saving ? "Saving..." : "Save Schedule"}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Click or drag to set your recurring 15-min availability slots. Times are in your local timezone.
+          Tap or drag to set your recurring 15-min availability slots. Times are in your local timezone.
+          <span className="sm:hidden block mt-1 text-xs">Scroll the grid horizontally on small screens.</span>
         </p>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <div className="min-w-[600px]">
             {/* Day headers */}
             <div className="grid grid-cols-[60px_repeat(7,1fr)] gap-0.5 mb-1">

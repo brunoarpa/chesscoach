@@ -337,8 +337,135 @@ export async function detectConfirmationDisputes() {
   }
 }
 
-const NO_SHOW_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+const NO_SHOW_BUFFER_MS = 0; // No grace — coach must be ready by scheduled start
 const NO_SHOW_ELO_PENALTY = 50;
+
+// Window after the lesson's scheduled end during which a student can report
+// the lesson as unsatisfactory. Once this elapses, the lesson auto-completes
+// and the coach is paid.
+export const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Compute the moment at which an IN_PROGRESS lesson will auto-complete.
+ * Falls back to respondedAt + duration when scheduledEndAt is missing.
+ */
+export function getAutoCompleteAt(lesson: {
+  scheduledEndAt: Date | null;
+  respondedAt: Date | null;
+  durationMinutes: number;
+}): Date | null {
+  if (lesson.scheduledEndAt) {
+    return new Date(lesson.scheduledEndAt.getTime() + DISPUTE_WINDOW_MS);
+  }
+  if (lesson.respondedAt) {
+    return new Date(
+      lesson.respondedAt.getTime() +
+        lesson.durationMinutes * 60 * 1000 +
+        DISPUTE_WINDOW_MS,
+    );
+  }
+  return null;
+}
+
+/**
+ * Auto-complete IN_PROGRESS lessons whose dispute window has elapsed.
+ * Student silence = satisfaction: payment transfers to the coach.
+ */
+export async function autoCompleteLessons() {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - DISPUTE_WINDOW_MS);
+
+  const lessons = await prisma.lessonRequest.findMany({
+    where: {
+      status: "IN_PROGRESS",
+      scheduledEndAt: { not: null, lte: cutoff },
+    },
+  });
+
+  for (const lesson of lessons) {
+    await prisma.$transaction(async (tx) => {
+      // Re-check status under the implicit row state to avoid double-processing.
+      const fresh = await tx.lessonRequest.findUnique({
+        where: { id: lesson.id },
+        select: { status: true },
+      });
+      if (!fresh || fresh.status !== "IN_PROGRESS") return;
+
+      await tx.lessonRequest.update({
+        where: { id: lesson.id },
+        data: {
+          status: "COMPLETED",
+          completedAt: now,
+          studentConfirmed: true,
+          coachConfirmed: true,
+        },
+      });
+
+      if (lesson.isTrial) {
+        await tx.user.update({
+          where: { id: lesson.studentId },
+          data: { lessonsTaken: { increment: 1 } },
+        });
+        await tx.user.update({
+          where: { id: lesson.coachId },
+          data: { lessonsGiven: { increment: 1 } },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: lesson.studentId },
+          data: {
+            walletBalance: { decrement: lesson.estimatedCost },
+            reservedBalance: { decrement: lesson.estimatedCost },
+            lessonsTaken: { increment: 1 },
+          },
+        });
+        await tx.user.update({
+          where: { id: lesson.coachId },
+          data: {
+            pendingEarnings: { increment: lesson.estimatedCost },
+            totalEarningsAllTime: { increment: lesson.estimatedCost },
+            lessonsGiven: { increment: 1 },
+          },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: lesson.studentId,
+            type: "LESSON_PAYMENT",
+            amount: -lesson.estimatedCost,
+            lessonRequestId: lesson.id,
+          },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: lesson.coachId,
+            type: "LESSON_PAYMENT",
+            amount: lesson.estimatedCost,
+            lessonRequestId: lesson.id,
+          },
+        });
+        await tx.earningRecord.create({
+          data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+        });
+      }
+
+      const distinctStudents = await tx.lessonRequest.findMany({
+        where: { coachId: lesson.coachId, status: "COMPLETED" },
+        select: { studentId: true },
+        distinct: ["studentId"],
+      });
+      await tx.user.update({
+        where: { id: lesson.coachId },
+        data: { playersTaught: distinctStudents.length },
+      });
+
+      const newElo = await calculateCoachElo(lesson.coachId, tx);
+      await tx.user.update({
+        where: { id: lesson.coachId },
+        data: { coachElo: newElo },
+      });
+    });
+  }
+}
 
 /**
  * Auto-detect no-shows for ACCEPTED/IN_PROGRESS lessons

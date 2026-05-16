@@ -1,23 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { setUsername } from "@/lib/actions/auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 
 export default function SetupUsernamePage() {
   const router = useRouter();
+  const [step, setStep] = useState<"username" | "coach">("username");
+
   const [state, formAction, isPending] = useActionState(
     async (_prev: unknown, formData: FormData) => {
       const result = await setUsername(formData);
-      if (result?.success) {
-        router.push("/dashboard");
-        return result;
-      }
       return result;
     },
     null,
@@ -25,9 +22,44 @@ export default function SetupUsernamePage() {
 
   useEffect(() => {
     if (state?.success) {
-      router.push("/dashboard");
+      setStep("coach");
     }
-  }, [state, router]);
+  }, [state]);
+
+  if (step === "coach") {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh] px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Welcome!</CardTitle>
+            <CardDescription>
+              Do you want to teach chess on ChessCoach as well?
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              You can become a coach by verifying your chess.com account, setting a price, and picking the languages you teach in. You can always do this later.
+            </p>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                className="w-full"
+                onClick={() => router.push("/profile/edit?coach=1")}
+              >
+                Yes, set me up as a coach
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push("/dashboard")}
+              >
+                Not right now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] px-4">

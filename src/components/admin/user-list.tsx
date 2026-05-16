@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { banUser, setUserRole, suspendUser, unsuspendUser } from "@/lib/actions/admin";
+import { setUserRole, suspendUser, unsuspendUser } from "@/lib/actions/admin";
 import { toast } from "sonner";
 
 interface User {
@@ -21,16 +21,6 @@ interface User {
 }
 
 export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAccountsMap: Record<string, number> }) {
-  async function handleBan(userId: string) {
-    if (!confirm("Are you sure you want to ban this user? This action cannot be easily undone.")) return;
-    try {
-      await banUser(userId);
-      toast.success("User banned");
-    } catch {
-      toast.error("Failed");
-    }
-  }
-
   async function handleToggleAdmin(userId: string, currentRole: string) {
     const action = currentRole === "ADMIN" ? "demote" : "promote";
     if (!confirm(`Are you sure you want to ${action} this user?`)) return;
@@ -142,17 +132,10 @@ export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAc
                 </Button>
                 <Button
                   size="sm"
-                  variant={user.isSuspended ? "default" : "secondary"}
+                  variant={user.isSuspended ? "default" : "destructive"}
                   onClick={() => handleToggleSuspend(user.id, user.isSuspended)}
                 >
                   {user.isSuspended ? "Unsuspend" : "Suspend"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleBan(user.id)}
-                >
-                  Ban
                 </Button>
               </div>
             </TableCell>

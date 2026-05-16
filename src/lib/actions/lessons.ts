@@ -119,6 +119,18 @@ export async function createLessonRequest(formData: FormData) {
 
     estimatedCost = 0;
   } else {
+    // Coaches must successfully complete at least one free trial before receiving paid bookings
+    const completedTrials = await prisma.lessonRequest.count({
+      where: {
+        coachId,
+        isTrial: true,
+        status: "COMPLETED",
+      },
+    });
+    if (completedTrials === 0) {
+      return { error: "This coach hasn't completed a free trial yet. Book a free trial first to try them out." };
+    }
+
     // Determine price based on communication method
     let slotPrice: number;
     if (communicationMethod === "CALL") {
@@ -149,16 +161,21 @@ export async function createLessonRequest(formData: FormData) {
     if (slot.coachId !== coachId) return { error: "Slot does not belong to this coach" };
     if (slot.status !== "AVAILABLE") return { error: "This slot is no longer available" };
 
-    // Must be at least 2h from now
     const now = new Date();
-    if (slot.startTime.getTime() < now.getTime() + 2 * 60 * 60 * 1000) {
-      return { error: "Cannot book a slot less than 2 hours away" };
+    // Slot must be in the future
+    if (slot.startTime.getTime() <= now.getTime()) {
+      return { error: "This slot has already started" };
+    }
+    // Max 1 week ahead
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    if (slot.startTime.getTime() > now.getTime() + oneWeekMs) {
+      return { error: "You can only book slots up to 1 week in advance" };
     }
 
-    // Compute acceptance deadline: min(now + 24h, slotStart - 2h)
+    // Coach must accept before the lesson starts (and within 24h max)
     const deadline = new Date(Math.min(
       now.getTime() + 24 * 60 * 60 * 1000,
-      slot.startTime.getTime() - 2 * 60 * 60 * 1000
+      slot.startTime.getTime()
     ));
 
     slotData = {
@@ -225,6 +242,14 @@ export async function respondToLessonRequest(
   if (request.coachId !== session.user.id) return { error: "Not authorized" };
   if (request.status !== "PENDING") return { error: "Request is no longer pending" };
 
+  const coachAccount = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { isSuspended: true },
+  });
+  if (coachAccount?.isSuspended) {
+    return { error: "Your account is suspended. You cannot accept lessons. Contact support to appeal." };
+  }
+
   if (action === "accept") {
     await prisma.$transaction([
       prisma.lessonRequest.update({
@@ -279,168 +304,6 @@ export async function respondToLessonRequest(
 
   revalidatePath("/dashboard");
   return { success: true };
-}
-
-export async function confirmLesson(requestId: string) {
-  const session = await auth();
-  if (!session?.user?.id) return { error: "Not authenticated" };
-
-  if (!requestId || typeof requestId !== "string") return { error: "Invalid request ID" };
-
-  // Use interactive transaction with row-level locking to prevent race conditions
-  const result = await prisma.$transaction(async (tx) => {
-    // Lock the lesson request row to prevent concurrent modifications
-    const rows = await tx.$queryRaw<Array<{
-      id: string;
-      studentId: string;
-      coachId: string;
-      status: string;
-      studentConfirmed: boolean;
-      coachConfirmed: boolean;
-      estimatedCost: number;
-      respondedAt: Date | null;
-      durationMinutes: number;
-      isTrial: boolean;
-    }>>`SELECT * FROM "LessonRequest" WHERE id = ${requestId} FOR UPDATE`;
-
-    const request = rows[0];
-    if (!request) return { error: "Request not found" };
-    if (request.status !== "IN_PROGRESS") return { error: "Lesson must be in progress first" };
-
-    const isStudent = request.studentId === session.user.id;
-    const isCoach = request.coachId === session.user.id;
-    if (!isStudent && !isCoach) return { error: "Not authorized" };
-
-    // Cooldown: lesson must have been accepted for at least its duration (min 5 minutes)
-    if (request.respondedAt) {
-      const minCooldownMs = Math.max(request.durationMinutes * 60 * 1000, 5 * 60 * 1000);
-      const elapsed = Date.now() - new Date(request.respondedAt).getTime();
-      if (elapsed < minCooldownMs) {
-        const remaining = Math.ceil((minCooldownMs - elapsed) / 60000);
-        return { error: `Lesson cannot be confirmed yet. Please wait ${remaining} more minute(s).` };
-      }
-    }
-
-    const updateData: Record<string, boolean> = {};
-    if (isStudent) updateData.studentConfirmed = true;
-    if (isCoach) updateData.coachConfirmed = true;
-
-    const newStudentConfirmed = isStudent ? true : request.studentConfirmed;
-    const newCoachConfirmed = isCoach ? true : request.coachConfirmed;
-    const bothConfirmed = newStudentConfirmed && newCoachConfirmed;
-
-    if (bothConfirmed) {
-      // Complete the lesson
-      await tx.lessonRequest.update({
-        where: { id: requestId },
-        data: {
-          ...updateData,
-          status: "COMPLETED",
-          completedAt: new Date(),
-        },
-      });
-
-      if (request.isTrial) {
-        // Free trial: no money transfer, just update stats
-        await tx.user.update({
-          where: { id: request.studentId },
-          data: {
-            lessonsTaken: { increment: 1 },
-            lastActiveAt: new Date(),
-            activityStatus: "ACTIVE",
-          },
-        });
-        await tx.user.update({
-          where: { id: request.coachId },
-          data: {
-            lessonsGiven: { increment: 1 },
-            lastActiveAt: new Date(),
-            activityStatus: "ACTIVE",
-          },
-        });
-      } else {
-        // Paid lesson: transfer money
-        // Debit student
-        await tx.user.update({
-          where: { id: request.studentId },
-          data: {
-            walletBalance: { decrement: request.estimatedCost },
-            reservedBalance: { decrement: request.estimatedCost },
-            lessonsTaken: { increment: 1 },
-            lastActiveAt: new Date(),
-            activityStatus: "ACTIVE",
-          },
-        });
-        // Credit coach
-        await tx.user.update({
-          where: { id: request.coachId },
-          data: {
-            pendingEarnings: { increment: request.estimatedCost },
-            totalEarningsAllTime: { increment: request.estimatedCost },
-            lessonsGiven: { increment: 1 },
-            lastActiveAt: new Date(),
-            activityStatus: "ACTIVE",
-          },
-        });
-        // Record transactions
-        await tx.transaction.create({
-          data: {
-            userId: request.studentId,
-            type: "LESSON_PAYMENT",
-            amount: -request.estimatedCost,
-            lessonRequestId: requestId,
-          },
-        });
-        await tx.transaction.create({
-          data: {
-            userId: request.coachId,
-            type: "LESSON_PAYMENT",
-            amount: request.estimatedCost,
-            lessonRequestId: requestId,
-          },
-        });
-        // Record earning for ELO
-        await tx.earningRecord.create({
-          data: {
-            userId: request.coachId,
-            amount: request.estimatedCost,
-          },
-        });
-      }
-
-      // Update players taught count (distinct students) inside transaction
-      const distinctStudents = await tx.lessonRequest.findMany({
-        where: { coachId: request.coachId, status: "COMPLETED" },
-        select: { studentId: true },
-        distinct: ["studentId"],
-      });
-      await tx.user.update({
-        where: { id: request.coachId },
-        data: { playersTaught: distinctStudents.length },
-      });
-
-      // Recalculate coach ELO immediately (pass tx so it sees uncommitted data)
-      const newElo = await calculateCoachElo(request.coachId, tx);
-      await tx.user.update({
-        where: { id: request.coachId },
-        data: { coachElo: newElo },
-      });
-    } else {
-      await tx.lessonRequest.update({
-        where: { id: requestId },
-        data: updateData,
-      });
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-      });
-    }
-
-    return { success: true };
-  });
-
-  revalidatePath("/dashboard");
-  return result;
 }
 
 export async function cancelLessonRequest(requestId: string) {
@@ -538,7 +401,7 @@ export async function disputeLesson(requestId: string, reason: string) {
   return { success: true };
 }
 
-const NO_SHOW_BUFFER_MS = 5 * 60 * 1000; // 5 minutes after scheduled start
+const NO_SHOW_BUFFER_MS = 0; // No grace period — coach must be ready by scheduled start
 const NO_SHOW_ELO_PENALTY = 50;
 
 export async function reportNoShow(requestId: string) {
@@ -570,9 +433,8 @@ export async function reportNoShow(requestId: string) {
   const now = Date.now();
   const startTime = new Date(request.scheduledStartAt).getTime();
 
-  // Must be past the buffer window
   if (now < startTime + NO_SHOW_BUFFER_MS) {
-    return { error: "Please wait at least 5 minutes after the scheduled start time" };
+    return { error: "You can only report a no-show after the scheduled start time." };
   }
 
   if (isStudent) {
@@ -708,6 +570,9 @@ export async function submitReview(formData: FormData) {
 
   if (!lessonId || !rating || rating < 1 || rating > 5) {
     return { error: "Invalid review data" };
+  }
+  if (comment !== null && comment.length > 500) {
+    return { error: "Comment must be 500 characters or fewer" };
   }
 
   const lesson = await prisma.lessonRequest.findUnique({

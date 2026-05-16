@@ -136,16 +136,14 @@ export default async function ProfilePage({
   // Fetch student wallet balance and free trials for lesson request form
   let studentAvailableBalance: number | null = null;
   let freeTrialsRemaining: number = 0;
-  let studentVerified = false;
   if (session?.user?.id && !isOwnProfile) {
     const studentData = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { walletBalance: true, reservedBalance: true, freeTrialsRemaining: true, verificationStatus: true },
+      select: { walletBalance: true, reservedBalance: true, freeTrialsRemaining: true },
     });
     if (studentData) {
       studentAvailableBalance = studentData.walletBalance - studentData.reservedBalance;
       freeTrialsRemaining = studentData.freeTrialsRemaining;
-      studentVerified = studentData.verificationStatus === "VERIFIED";
     }
   }
 
@@ -169,19 +167,23 @@ export default async function ProfilePage({
     isBlocked = !!block;
   }
 
-  // Check if coach has completed any paid lessons (for new coach warning)
+  // Check coach lesson history: new-coach warning + paid-booking eligibility
   let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
+  let hasCompletedTrial = true;      // default to true so non-coaches aren't gated
   const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachChatPrice, user.coachCallPrice);
   if (user.verificationStatus === "VERIFIED" && effectiveAvailability === "AVAILABLE") {
-    const paidCompleted = await prisma.lessonRequest.findFirst({
-      where: {
-        coachId: user.id,
-        status: "COMPLETED",
-        isTrial: false,
-      },
-      select: { id: true },
-    });
+    const [paidCompleted, trialCompleted] = await Promise.all([
+      prisma.lessonRequest.findFirst({
+        where: { coachId: user.id, status: "COMPLETED", isTrial: false },
+        select: { id: true },
+      }),
+      prisma.lessonRequest.findFirst({
+        where: { coachId: user.id, status: "COMPLETED", isTrial: true },
+        select: { id: true },
+      }),
+    ]);
     hasCompletedPaidLesson = !!paidCompleted;
+    hasCompletedTrial = !!trialCompleted;
   }
 
   const chessComAgeStr = user.chessComAccountAge
@@ -418,6 +420,7 @@ export default async function ProfilePage({
                   availableBalance={studentAvailableBalance ?? 0}
                   freeTrialsRemaining={freeTrialsRemaining}
                   slots={availableSlots}
+                  hasCompletedTrial={hasCompletedTrial}
                 />
               ) : (
                 <LessonRequestForm
@@ -428,6 +431,7 @@ export default async function ProfilePage({
                   availableBalance={studentAvailableBalance ?? 0}
                   freeTrialsRemaining={freeTrialsRemaining}
                   hasCompletedPaidLesson={hasCompletedPaidLesson}
+                  hasCompletedTrial={hasCompletedTrial}
                 />
               )
             )}

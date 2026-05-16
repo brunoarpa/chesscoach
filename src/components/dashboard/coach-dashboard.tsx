@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { respondToLessonRequest, confirmLesson, confirmLessonStart, declineAcceptedLesson, submitReview, blockStudent } from "@/lib/actions/lessons";
+import { respondToLessonRequest, confirmLessonStart, declineAcceptedLesson, submitReview, blockStudent } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ interface Request {
   communicationMethod: string | null;
   message: string | null;
   scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
   studentStartConfirmed: boolean;
   coachStartConfirmed: boolean;
   studentConfirmed: boolean;
@@ -56,7 +57,7 @@ const availabilityConfig: Record<string, { color: string; label: string }> = {
 function RequestMeta({ request }: { request: Request }) {
   return (
     <>
-      <span className="text-sm text-muted-foreground ml-2">
+      <span className="text-sm text-muted-foreground sm:ml-2 block sm:inline mt-0.5 sm:mt-0">
         Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
         {request.scheduledStartAt && ` · ${new Date(request.scheduledStartAt).toLocaleString()}`}
@@ -161,9 +162,16 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
 
       {completed.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-4">Completed</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Completed</h2>
+            {completed.length > 3 && (
+              <Link href="/dashboard/history?role=coach" className="text-sm text-muted-foreground underline">
+                View all ({completed.length}) &rarr;
+              </Link>
+            )}
+          </div>
           <div className="space-y-3">
-            {completed.map((r) => (
+            {completed.slice(0, 3).map((r) => (
               <CompletedCard key={r.id} request={r} otherUser={r.student} />
             ))}
           </div>
@@ -172,22 +180,15 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
 
       {other.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-4">History</h2>
-          <div className="space-y-3">
-            {other.map((r) => (
-              <Card key={r.id}>
-                <CardContent className="pt-4 flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{r.student.username}</span>
-                    <RequestMeta request={r} />
-                  </div>
-                  <Badge variant={statusColors[r.status] as "default" | "secondary" | "destructive" | "outline"}>
-                    {r.status}
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">History</h2>
+            <Link href="/dashboard/history?role=coach" className="text-sm text-muted-foreground underline">
+              View all ({other.length}) &rarr;
+            </Link>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Declined, cancelled, expired and no-show requests are kept in your history page.
+          </p>
         </section>
       )}
 
@@ -317,18 +318,10 @@ function AcceptedLessonCard({ request, role }: { request: Request; role: "coach"
 }
 
 function ActiveLessonCard({ request, role }: { request: Request; role: "coach" | "student" }) {
-  const [loading, setLoading] = useState(false);
   const otherUser = role === "coach" ? request.student : (request as unknown as { coach: Request["student"] }).coach;
-  const myConfirmed = role === "coach" ? request.coachConfirmed : request.studentConfirmed;
-  const otherConfirmed = role === "coach" ? request.studentConfirmed : request.coachConfirmed;
-
-  async function handleConfirm() {
-    setLoading(true);
-    const result = await confirmLesson(request.id);
-    setLoading(false);
-    if (result.error) toast.error(result.error);
-    else toast.success("Confirmed!");
-  }
+  const autoCompleteAt = request.scheduledEndAt
+    ? new Date(new Date(request.scheduledEndAt).getTime() + 24 * 60 * 60 * 1000)
+    : null;
 
   return (
     <Card>
@@ -338,21 +331,16 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
             <span className="font-medium">{otherUser.username}</span>
             <RequestMeta request={request} />
             <div className="text-xs text-muted-foreground mt-1">
-              {myConfirmed ? "✓ You confirmed completion" : "⏳ Awaiting your confirmation"}
-              {" · "}
-              {otherConfirmed ? "✓ They confirmed completion" : "⏳ Awaiting their confirmation"}
+              {autoCompleteAt
+                ? `Auto-completes ${autoCompleteAt.toLocaleString()} if the student doesn't report an issue.`
+                : "Will auto-complete after the dispute window."}
             </div>
           </div>
-          {!myConfirmed && (
-            <div className="flex gap-2">
-              <Link href={`/lesson/${request.id}`}>
-                <Button size="sm" variant="default">Join Lesson</Button>
-              </Link>
-              <Button size="sm" variant="outline" onClick={handleConfirm} disabled={loading}>
-                Mark Complete
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <Link href={`/lesson/${request.id}`}>
+              <Button size="sm" variant="default">Join Lesson</Button>
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>

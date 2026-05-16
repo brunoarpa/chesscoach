@@ -6,7 +6,8 @@ import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
-import { expirePendingRequests } from "@/lib/activity";
+import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
+import { expirePendingRequests, autoCompleteLessons } from "@/lib/activity";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -15,8 +16,9 @@ export default async function DashboardPage() {
   // Redirect Google users (and anyone without a username) to set up their profile first.
   if (session.user.needsUsername) redirect("/setup-username");
 
-  // Expire any overdue pending requests (runs inline so deadlines are accurate, not just at 6am cron).
+  // Run inline so deadlines & auto-completions are accurate, not just at 6am cron.
   expirePendingRequests().catch(() => {});
+  autoCompleteLessons().catch(() => {});
 
   // Check if coach needs to be forced UNAVAILABLE (inactive 24h+ or no price)
   const userCheck = await prisma.user.findUnique({
@@ -108,15 +110,20 @@ export default async function DashboardPage() {
 
       {currentUser.isSuspended && (
         <div className="mb-6 p-4 rounded-lg border border-destructive bg-destructive/10 text-destructive">
-          <p className="font-medium">Your account is under review.</p>
+          <p className="font-medium">Your account is suspended.</p>
           <p className="text-sm mt-1">
-            You cannot create new lesson requests or make deposits while your account is being reviewed.
+            You cannot book lessons, accept lessons, or deposit funds. You can still withdraw any remaining coach earnings.
             Contact support at{" "}
             <a href="mailto:chesscoach.training@gmail.com" className="underline font-medium">
               chesscoach.training@gmail.com
-            </a>
+            </a>{" "}
+            to appeal.
           </p>
         </div>
+      )}
+
+      {!currentUser.isSuspended && currentUser.verificationStatus !== "VERIFIED" && currentUser.verificationStatus !== "PENDING" && (
+        <CoachInviteBanner />
       )}
 
       <section>

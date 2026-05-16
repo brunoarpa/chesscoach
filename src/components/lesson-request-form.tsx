@@ -17,9 +17,10 @@ interface Props {
   availableBalance: number;
   freeTrialsRemaining: number;
   hasCompletedPaidLesson: boolean;
+  hasCompletedTrial?: boolean;
 }
 
-export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coachCommunicationPreference, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson }: Props) {
+export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coachCommunicationPreference, availableBalance, freeTrialsRemaining, hasCompletedPaidLesson, hasCompletedTrial = true }: Props) {
   const [loading, setLoading] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
   const [warningDismissed, setWarningDismissed] = useState(false);
@@ -150,7 +151,16 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
             </p>
           ) : null}
 
-          {!isTrial && !hasCompletedPaidLesson && !warningDismissed && (
+          {!isTrial && !hasCompletedTrial && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30">
+              <span className="text-amber-600 dark:text-amber-400 mt-0.5">&#9888;&#65039;</span>
+              <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+                This coach hasn&apos;t completed a free trial yet. Book a free trial first to try them out — paid bookings unlock once they&apos;ve given one successful trial.
+              </p>
+            </div>
+          )}
+
+          {!isTrial && hasCompletedTrial && !hasCompletedPaidLesson && !warningDismissed && (
             <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30">
               <span className="text-amber-600 dark:text-amber-400 mt-0.5">&#9888;&#65039;</span>
               <div className="flex-1">
@@ -171,7 +181,7 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || !commMethod || (!isTrial && slotPrice > 0 && slotPrice > availableBalance / 100)}
+            disabled={loading || !commMethod || (!isTrial && (!hasCompletedTrial || (slotPrice > 0 && slotPrice > availableBalance / 100)))}
           >
             {loading ? "Sending..." : isTrial ? "Send Free Trial Request" : "Send Request"}
           </Button>

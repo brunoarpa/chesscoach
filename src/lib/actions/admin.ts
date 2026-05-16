@@ -70,25 +70,6 @@ export async function rejectUser(userId: string) {
   revalidatePath("/admin");
 }
 
-export async function banUser(userId: string) {
-  const adminId = await requireAdmin();
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: {
-        verificationStatus: "REJECTED",
-        activityStatus: "INACTIVE",
-      },
-    }),
-    prisma.auditLog.create({
-      data: { adminId, action: "BAN_USER", targetId: userId },
-    }),
-  ]);
-
-  revalidatePath("/admin");
-}
-
 export async function setUserRole(userId: string, role: "USER" | "ADMIN") {
   const adminId = await requireAdmin();
 

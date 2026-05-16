@@ -3,18 +3,21 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-const FEE_FLAT = 0.40;
+const FEE_FLAT_CENTS = 40;
 const FEE_PERCENT = 0.02;
-const MIN_PAYOUT = 5;
+const MIN_PAYOUT_CENTS = 500;
 
-function calculateFee(amount: number): number {
-  return FEE_FLAT + Math.ceil(amount * FEE_PERCENT * 100) / 100;
+function calculateFeeCents(amountCents: number): number {
+  return FEE_FLAT_CENTS + Math.ceil(amountCents * FEE_PERCENT);
 }
 
 export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
   const [loading, setLoading] = useState(false);
+  const [amountStr, setAmountStr] = useState("");
   const [connectStatus, setConnectStatus] = useState<{
     connected: boolean;
     chargesEnabled?: boolean;
@@ -28,18 +31,30 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
       .catch(() => setConnectStatus({ connected: false }));
   }, []);
 
-  const earningsEuros = pendingEarnings / 100;
-  const fee = calculateFee(earningsEuros);
-  const netAmount = earningsEuros - fee;
-  const canWithdraw = earningsEuros >= MIN_PAYOUT && netAmount > 0;
+  const pendingEuros = pendingEarnings / 100;
   const isConnected = connectStatus?.connected && connectStatus?.chargesEnabled && connectStatus?.payoutsEnabled;
+  const meetsMinimum = pendingEarnings >= MIN_PAYOUT_CENTS;
+
+  const parsedAmount = Number(amountStr);
+  const amountCents = Number.isFinite(parsedAmount) ? Math.round(parsedAmount * 100) : 0;
+  const validAmount = amountCents >= MIN_PAYOUT_CENTS && amountCents <= pendingEarnings;
+  const feeCents = validAmount ? calculateFeeCents(amountCents) : 0;
+  const netCents = validAmount ? amountCents - feeCents : 0;
+
+  function handleMax() {
+    setAmountStr((pendingEarnings / 100).toFixed(2));
+  }
 
   async function handleWithdraw() {
-    if (!canWithdraw) return;
+    if (!validAmount) return;
 
     setLoading(true);
     try {
-      const res = await fetch("/api/wallet/withdraw", { method: "POST" });
+      const res = await fetch("/api/wallet/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amountCents }),
+      });
       const data = await res.json();
 
       if (data.success) {
@@ -67,33 +82,69 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
           <p className="text-sm text-muted-foreground">
             No pending earnings to withdraw. Complete lessons to earn money.
           </p>
-        ) : !canWithdraw ? (
+        ) : !meetsMinimum ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              You have €{earningsEuros.toFixed(2)} in pending earnings. Minimum withdrawal is €{MIN_PAYOUT.toFixed(2)}.
+              You have €{pendingEuros.toFixed(2)} in pending earnings. Minimum withdrawal is €{(MIN_PAYOUT_CENTS / 100).toFixed(2)}.
             </p>
             <p className="text-xs text-muted-foreground">
-              Keep coaching to reach the minimum. Your earnings will stay safe until you&apos;re ready to withdraw.
+              Keep coaching to reach the minimum.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Pending earnings</span>
-                <span>€{earningsEuros.toFixed(2)}</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="withdraw-amount">Amount (€)</Label>
+                <span className="text-xs text-muted-foreground">
+                  Available: €{pendingEuros.toFixed(2)}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Withdrawal fee (€0.40 + 2%)</span>
-                <span>-€{fee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-medium border-t pt-1">
-                <span>You receive</span>
-                <span className="text-green-600">€{netAmount.toFixed(2)}</span>
+              <div className="flex gap-2">
+                <Input
+                  id="withdraw-amount"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min={(MIN_PAYOUT_CENTS / 100).toFixed(2)}
+                  max={pendingEuros.toFixed(2)}
+                  value={amountStr}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  placeholder={`min €${(MIN_PAYOUT_CENTS / 100).toFixed(2)}`}
+                />
+                <Button type="button" variant="outline" onClick={handleMax}>
+                  Max
+                </Button>
               </div>
             </div>
-            <Button onClick={handleWithdraw} disabled={loading} className="w-full">
-              {loading ? "Processing..." : `Withdraw €${netAmount.toFixed(2)}`}
+
+            {validAmount && (
+              <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Withdraw</span>
+                  <span>€{(amountCents / 100).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Fee (€0.40 + 2%)</span>
+                  <span>-€{(feeCents / 100).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-medium border-t pt-1">
+                  <span>You receive</span>
+                  <span className="text-green-600">€{(netCents / 100).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            <Button
+              onClick={handleWithdraw}
+              disabled={loading || !validAmount || netCents <= 0}
+              className="w-full"
+            >
+              {loading
+                ? "Processing..."
+                : validAmount
+                ? `Withdraw €${(amountCents / 100).toFixed(2)}`
+                : "Enter an amount"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
               Funds are transferred to your connected Stripe account.

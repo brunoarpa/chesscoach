@@ -41,6 +41,16 @@ export async function updateProfile(formData: FormData) {
     return { error: "Not authenticated" };
   }
 
+  const rawBio = (formData.get("bio") as string)?.trim() || undefined;
+  if (rawBio && rawBio.length > 500) {
+    return { error: "Bio must be 500 characters or fewer." };
+  }
+
+  const rawTimezone = (formData.get("timezone") as string) || undefined;
+  if (rawTimezone && rawTimezone.length > 64) {
+    return { error: "Invalid timezone." };
+  }
+
   const raw = {
     username: (formData.get("username") as string)?.trim() || undefined,
     continent: (formData.get("continent") as string) || undefined,
@@ -52,13 +62,22 @@ export async function updateProfile(formData: FormData) {
       : undefined,
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
-    bio: (formData.get("bio") as string) || undefined,
+    bio: rawBio,
     coachAvailability: (formData.get("coachAvailability") as string) || "AVAILABLE",
-    timezone: (formData.get("timezone") as string) || undefined,
+    timezone: rawTimezone,
     languages: filterValidLanguages(
       formData.getAll("languages").map((v) => String(v)),
     ),
   };
+
+  // Validate price ranges (in euros, before *100)
+  const MAX_PRICE_EUROS = 200; // €200 per 15 minutes is plenty
+  if (raw.coachChatPrice !== undefined && (raw.coachChatPrice < 0 || raw.coachChatPrice > MAX_PRICE_EUROS || !Number.isFinite(raw.coachChatPrice))) {
+    return { error: `Chat price must be between €0 and €${MAX_PRICE_EUROS}.` };
+  }
+  if (raw.coachCallPrice !== undefined && (raw.coachCallPrice < 0 || raw.coachCallPrice > MAX_PRICE_EUROS || !Number.isFinite(raw.coachCallPrice))) {
+    return { error: `Call price must be between €0 and €${MAX_PRICE_EUROS}.` };
+  }
 
   // Validate and handle username change
   const currentUser = await prisma.user.findUnique({

@@ -31,6 +31,7 @@ export default async function SearchPage({
   // Build where clause
   const where: Prisma.UserWhereInput = {
     verificationStatus: "VERIFIED",
+    isSuspended: false,
   };
 
   // Favourites filter

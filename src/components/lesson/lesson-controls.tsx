@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { confirmLesson, confirmLessonStart, reportNoShow } from "@/lib/actions/lessons";
+import { confirmLessonStart, reportNoShow } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -18,9 +18,9 @@ export function LessonControls({ lessonId, lessonStatus, isCoach, scheduledStart
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Show no-show button if 5+ minutes past start and other party hasn't joined
-  const canReportNoShow = !otherJoined && scheduledStartAt && 
-    Date.now() > new Date(scheduledStartAt).getTime() + 5 * 60 * 1000;
+  // Show no-show button once the scheduled start has passed and the other party hasn't joined
+  const canReportNoShow = !otherJoined && scheduledStartAt &&
+    Date.now() >= new Date(scheduledStartAt).getTime();
 
   async function handleConfirmStart() {
     setLoading(true);
@@ -31,18 +31,6 @@ export function LessonControls({ lessonId, lessonStatus, isCoach, scheduledStart
     } else {
       toast.success("Lesson start confirmed!");
       router.refresh();
-    }
-  }
-
-  async function handleConfirmComplete() {
-    setLoading(true);
-    const result = await confirmLesson(lessonId);
-    setLoading(false);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("Lesson completed!");
-      router.push("/dashboard");
     }
   }
 
@@ -69,11 +57,6 @@ export function LessonControls({ lessonId, lessonStatus, isCoach, scheduledStart
       {lessonStatus === "ACCEPTED" && (
         <Button size="sm" onClick={handleConfirmStart} disabled={loading}>
           {loading ? "..." : "Confirm Start"}
-        </Button>
-      )}
-      {lessonStatus === "IN_PROGRESS" && (
-        <Button size="sm" onClick={handleConfirmComplete} disabled={loading}>
-          {loading ? "..." : "Complete Lesson"}
         </Button>
       )}
     </div>

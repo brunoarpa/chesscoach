@@ -28,8 +28,8 @@ const steps = [
   },
   {
     number: 5,
-    title: "Both Confirm Completion",
-    description: "Both student and coach confirm completion. Payment is then transferred.",
+    title: "Lesson Auto-Completes",
+    description: "24 hours after the scheduled end, payment transfers to the coach automatically. If the lesson was unsatisfactory, the student can Report Issue during that window for admin review.",
   },
   {
     number: 6,

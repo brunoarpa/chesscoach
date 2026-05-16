@@ -25,6 +25,7 @@ interface Props {
   availableBalance: number;
   freeTrialsRemaining: number;
   slots: Slot[];
+  hasCompletedTrial?: boolean;
 }
 
 type GroupedSlots = Record<string, Slot[]>;
@@ -59,6 +60,7 @@ export function SlotPicker({
   availableBalance,
   freeTrialsRemaining,
   slots,
+  hasCompletedTrial = true,
 }: Props) {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [commMethod, setCommMethod] = useState<string>("");
@@ -82,7 +84,7 @@ export function SlotPicker({
     return 0;
   })();
 
-  const canBook = selectedSlotId && (commMethod || isTrial) && (isTrial || availableBalance >= slotPrice);
+  const canBook = selectedSlotId && (commMethod || isTrial) && (isTrial || (hasCompletedTrial && availableBalance >= slotPrice));
 
   async function handleBook() {
     if (!selectedSlotId) return;
@@ -233,6 +235,12 @@ export function SlotPicker({
                 ) : null}
               </div>
             </div>
+
+            {!isTrial && !hasCompletedTrial && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                This coach hasn&apos;t completed a free trial yet — book a free trial first to unlock paid lessons with them.
+              </p>
+            )}
 
             {!isTrial && commMethod && availableBalance < slotPrice && (
               <p className="text-xs text-destructive">

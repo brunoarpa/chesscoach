@@ -9,39 +9,39 @@ export default async function HowItWorksPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-4">How ChessCoach Works</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Find a coach, book a lesson, improve your game. It&apos;s that simple.
+      <div className="text-center mb-10 sm:mb-12">
+        <h1 className="text-3xl sm:text-4xl font-bold mb-4">How ChessCoach Works</h1>
+        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
+          Find a coach, book a lesson, improve your game. That&apos;s it.
         </p>
       </div>
 
       {/* Quick Start */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-10">
         <Card className="text-center">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold mb-2">1.</div>
-            <h3 className="font-semibold mb-1">Sign Up &amp; Verify</h3>
+            <h3 className="font-semibold mb-1">Sign up</h3>
             <p className="text-sm text-muted-foreground">
-              Create an account and verify your chess.com username
+              Pick a username. No chess.com account needed to take lessons.
             </p>
           </CardContent>
         </Card>
         <Card className="text-center">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold mb-2">2.</div>
-            <h3 className="font-semibold mb-1">Find or Become a Coach</h3>
+            <h3 className="font-semibold mb-1">Find or become a coach</h3>
             <p className="text-sm text-muted-foreground">
-              Browse coaches or set your prices to start teaching
+              Browse verified coaches, or verify your chess.com to start coaching.
             </p>
           </CardContent>
         </Card>
         <Card className="text-center">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold mb-2">3.</div>
-            <h3 className="font-semibold mb-1">Learn &amp; Grow</h3>
+            <h3 className="font-semibold mb-1">Learn &amp; grow</h3>
             <p className="text-sm text-muted-foreground">
-              Take lessons, leave reviews, and climb the ratings
+              Take lessons, leave reviews, climb the rankings.
             </p>
           </CardContent>
         </Card>
@@ -51,50 +51,49 @@ export default async function HowItWorksPage() {
 
       {/* Lesson Flow */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-6">How a Lesson Works</h2>
+        <h2 className="text-2xl font-bold mb-6">How a lesson works</h2>
 
         <ol className="relative border-l border-muted-foreground/20 ml-4 space-y-6">
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
-            <p className="font-semibold">Student Requests a Lesson</p>
+            <p className="font-semibold">Student books a slot</p>
             <p className="text-sm text-muted-foreground">
-              Visit a coach&apos;s profile, choose a duration, and send a request.
-              The estimated cost is reserved from your wallet.
+              Pick a time from the coach&apos;s calendar (anywhere from a few minutes ahead up to 1 week out). The cost is reserved from your wallet.
             </p>
           </li>
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
-            <p className="font-semibold">Coach Accepts or Declines</p>
+            <p className="font-semibold">Coach accepts</p>
             <p className="text-sm text-muted-foreground">
-              The coach reviews your request. If they decline, your funds are released immediately.
+              The coach has up to the lesson start (and at most 24h) to accept. If they decline or don&apos;t respond, your funds are released automatically.
             </p>
           </li>
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
-            <p className="font-semibold">Both Confirm Start</p>
+            <p className="font-semibold">Both confirm start</p>
             <p className="text-sm text-muted-foreground">
-              Contact each other via Chess.com. Once you&apos;re both ready, confirm the lesson has started.
+              Connect via chess.com when the time comes. Both click &quot;I&apos;m ready&quot; to start the lesson.
             </p>
           </li>
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
-            <p className="font-semibold">Have the Lesson</p>
+            <p className="font-semibold">Have the lesson</p>
             <p className="text-sm text-muted-foreground">
               Play, analyze, learn — whatever you agreed on.
             </p>
           </li>
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">5</span>
-            <p className="font-semibold">Both Confirm Completion</p>
+            <p className="font-semibold">Auto-completion</p>
             <p className="text-sm text-muted-foreground">
-              When the lesson is done, both sides confirm it&apos;s complete. Payment is then transferred to the coach.
+              24 hours after the scheduled end, payment moves to the coach automatically. If something went wrong, the student can Report Issue in that window and an admin reviews it before money moves.
             </p>
           </li>
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">6</span>
-            <p className="font-semibold">Leave Reviews</p>
+            <p className="font-semibold">Reviews</p>
             <p className="text-sm text-muted-foreground">
-              Rate each other 1–5 stars with an optional comment. Reviews help others find great coaches.
+              Rate each other 1–5 stars with an optional comment.
             </p>
           </li>
         </ol>
@@ -102,18 +101,38 @@ export default async function HowItWorksPage() {
 
       <Separator className="my-8" />
 
-      {/* Free Trials */}
+      {/* No-shows */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-4">Free Trials</h2>
+        <h2 className="text-2xl font-bold mb-4">No-shows and refunds</h2>
         <Card>
           <CardContent className="pt-6 space-y-2 text-sm">
             <p>
-              Every new account gets <strong>3 free trial lessons</strong>. Try different coaches before committing to paid lessons.
+              <strong>If the coach doesn&apos;t show up:</strong> the lesson is cancelled and the student is fully refunded. The coach receives an ELO penalty.
+            </p>
+            <p>
+              <strong>If the student doesn&apos;t show up</strong> (or shows up late) but the coach is ready: the coach is paid in full. Your time matters.
+            </p>
+            <p className="text-muted-foreground">
+              Either party can cancel an accepted lesson before it starts and the student is fully refunded.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Separator className="my-8" />
+
+      {/* Free Trials */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold mb-4">Free trials</h2>
+        <Card>
+          <CardContent className="pt-6 space-y-2 text-sm">
+            <p>
+              Every new account gets up to <strong>3 free trial lessons</strong>. Try different coaches before paying.
             </p>
             <ul className="list-disc list-inside space-y-1 ml-2 text-muted-foreground">
-              <li>Free trials follow the same flow — both parties confirm completion</li>
-              <li>You can leave reviews after free trials</li>
-              <li>One free trial request at a time, max one per hour</li>
+              <li>Same flow as paid lessons. You can leave reviews after a trial.</li>
+              <li>One pending free trial at a time, max one per hour.</li>
+              <li>Coaches must successfully complete <strong>at least one free trial</strong> before they can receive paid bookings.</li>
             </ul>
           </CardContent>
         </Card>
@@ -128,21 +147,19 @@ export default async function HowItWorksPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Student Wallet</CardTitle>
+              <CardTitle className="text-base">Student wallet</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Deposit funds via Stripe. A small processing fee (€0.40 + 2%) applies. Your balance is used across all coaches — no per-lesson payment friction.
-              When you request a lesson, funds are reserved until the lesson completes or is cancelled.
+              Deposit via Stripe (€0.40 + 2% fee). Your balance is used across all coaches — no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Coach Payouts</CardTitle>
+              <CardTitle className="text-base">Coach payouts</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              When a lesson completes, earnings move to your pending balance.
-              Withdraw anytime from your wallet (minimum €5.00). A small fee of €0.40 + 2% applies per withdrawal.
+              When a lesson completes, earnings move to your pending balance. Withdraw any amount you like (minimum €5.00) — €0.40 + 2% fee per withdrawal.
             </CardContent>
           </Card>
         </div>
@@ -152,17 +169,17 @@ export default async function HowItWorksPage() {
 
       {/* For Coaches */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-4">For Coaches</h2>
+        <h2 className="text-2xl font-bold mb-4">For coaches</h2>
         <Card>
           <CardContent className="pt-6 space-y-3 text-sm">
             <p>
-              <strong>Anyone can coach.</strong> Once verified, set your price per 5 minutes in your{" "}
-              <Link href="/profile/edit" className="underline font-medium">profile settings</Link>.
+              <strong>Anyone can coach.</strong> Verify your chess.com account, set a chat or call price per 15 minutes, and pick at least one teaching language in your{" "}
+              <Link href="/profile/edit" className="underline font-medium">profile</Link>.
             </p>
             <p className="text-muted-foreground">
               Your <strong>Coach ELO</strong> on the{" "}
-              <Link href="/leaderboard" className="underline">Leaderboard</Link>{" "}
-              is based on your activity and earnings — stay active and give lessons to climb the rankings.
+              <Link href="/leaderboard" className="underline">leaderboard</Link>{" "}
+              is based on your activity and earnings — stay active and teach well to climb.
             </p>
           </CardContent>
         </Card>
@@ -177,9 +194,18 @@ export default async function HowItWorksPage() {
         <div className="space-y-3">
           <Card>
             <CardContent className="pt-4 pb-4">
+              <h3 className="font-semibold mb-1">Do I need a chess.com account to book?</h3>
+              <p className="text-sm text-muted-foreground">
+                No. Only coaches need a verified chess.com account. Students just need a username.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Can I be both a student and a coach?</h3>
               <p className="text-sm text-muted-foreground">
-                Yes! Your dashboard has separate sections for coaching and learning.
+                Yes. Your dashboard has separate sections for coaching and learning.
               </p>
             </CardContent>
           </Card>
@@ -188,25 +214,34 @@ export default async function HowItWorksPage() {
             <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">What if a coach doesn&apos;t respond?</h3>
               <p className="text-sm text-muted-foreground">
-                Pending requests can expire, and your funds are released. You can also cancel anytime.
+                Pending requests expire automatically and your funds are released. You can also cancel anytime.
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-4 pb-4">
-              <h3 className="font-semibold mb-1">Why do both parties confirm completion?</h3>
+              <h3 className="font-semibold mb-1">What if the lesson was bad?</h3>
               <p className="text-sm text-muted-foreground">
-                Dual confirmation ensures both sides agree the lesson happened, preventing payment disputes.
+                Within 24 hours of the scheduled end, hit Report Issue on the lesson card. An admin reviews before any money moves.
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="pt-4 pb-4">
-              <h3 className="font-semibold mb-1">Is my Chess.com username shared?</h3>
+              <h3 className="font-semibold mb-1">Is my chess.com username shared?</h3>
               <p className="text-sm text-muted-foreground">
-                Yes — during active lessons your username is visible so you can connect and play.
+                Coaches: yes — it&apos;s on your public profile. Students: only during active lessons, so you can connect and play.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <h3 className="font-semibold mb-1">What happens if my account is suspended?</h3>
+              <p className="text-sm text-muted-foreground">
+                You can&apos;t book, accept, or deposit, and you won&apos;t appear in search. You can still withdraw any coach earnings. Email support to appeal.
               </p>
             </CardContent>
           </Card>
@@ -216,17 +251,17 @@ export default async function HowItWorksPage() {
       {/* CTA */}
       <div className="text-center py-8">
         <h2 className="text-2xl font-bold mb-4">Ready to get started?</h2>
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
           <Link href="/search">
-            <Button size="lg">Find a Coach</Button>
+            <Button size="lg" className="w-full sm:w-auto">Find a Coach</Button>
           </Link>
           {session?.user ? (
             <Link href="/dashboard">
-              <Button size="lg" variant="outline">Go to Dashboard</Button>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto">Go to Dashboard</Button>
             </Link>
           ) : (
             <Link href="/login">
-              <Button size="lg" variant="outline">Get Started</Button>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto">Get Started</Button>
             </Link>
           )}
         </div>

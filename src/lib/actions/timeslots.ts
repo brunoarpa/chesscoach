@@ -232,7 +232,7 @@ export async function getAvailableSlots(coachId: string) {
       coachId,
       status: "AVAILABLE",
       startTime: {
-        gte: new Date(now.getTime() + 2 * 60 * 60 * 1000), // at least 2h from now
+        gt: now, // any future slot — coach has to confirm anyway
         lte: weekFromNow,
       },
     },
