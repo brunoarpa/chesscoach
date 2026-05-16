@@ -137,7 +137,7 @@ export default async function LeaderboardPage() {
                     <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Verified on chess.com">✓</span>
                   )}
                   <span className="text-xs text-muted-foreground ml-2">
-                    ♟ {coach.chessRating ?? "—"}
+                    ♝ {coach.chessRating ?? "—"}
                   </span>
                 </TableCell>
                 <TableCell className="text-right font-mono font-medium">
