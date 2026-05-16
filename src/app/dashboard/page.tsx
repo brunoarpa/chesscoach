@@ -140,6 +140,7 @@ export default async function DashboardPage() {
         <CoachDashboard
           requests={JSON.parse(JSON.stringify(incomingRequests))}
           coachAvailability={currentUser.coachAvailability}
+          isCoach={isCoach}
         />
         {isCoach && (
           <div className="mt-6">

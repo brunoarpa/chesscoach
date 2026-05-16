@@ -288,7 +288,7 @@ export default async function ProfilePage({
                   <span className="text-muted-foreground">Communication:</span>{" "}
                   <strong>
                     {user.communicationPreference === "CHAT_AND_CALL"
-                      ? "Chat & Call"
+                      ? "Chat or Call"
                       : "Chat Only"}
                   </strong>
                 </div>

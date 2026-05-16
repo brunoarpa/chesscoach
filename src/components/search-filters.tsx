@@ -140,7 +140,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
           <SelectContent>
             <SelectItem value="any">Any</SelectItem>
             <SelectItem value="CHAT_ONLY">Chat Only</SelectItem>
-            <SelectItem value="CHAT_AND_CALL">Chat & Call</SelectItem>
+            <SelectItem value="CHAT_AND_CALL">Chat or Call</SelectItem>
           </SelectContent>
         </Select>
       </div>

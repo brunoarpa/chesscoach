@@ -105,7 +105,7 @@ export function CoachCard(props: Props) {
                 ) : (
                   <MessageSquare className="h-3 w-3" />
                 )}{" "}
-                {props.communicationPreference === "CHAT_AND_CALL" ? "Chat & Call" : "Chat"}
+                {props.communicationPreference === "CHAT_AND_CALL" ? "Chat or Call" : "Chat"}
               </span>
               <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {props.lessonsGiven} lessons</span>
               <span className="flex items-center gap-1">

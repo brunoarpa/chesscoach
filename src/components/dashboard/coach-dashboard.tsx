@@ -67,7 +67,7 @@ function RequestMeta({ request }: { request: Request }) {
   );
 }
 
-export function CoachDashboard({ requests, coachAvailability }: { requests: Request[]; coachAvailability: string }) {
+export function CoachDashboard({ requests, coachAvailability, isCoach }: { requests: Request[]; coachAvailability: string; isCoach: boolean }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
   const inProgress = requests.filter((r) => r.status === "IN_PROGRESS");
@@ -76,6 +76,8 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
   const other = requests.filter(
     (r) => !["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "DISPUTED"].includes(r.status)
   );
+  const hasCompletedTrial = requests.some((r) => r.isTrial && r.status === "COMPLETED");
+  const showTrialNotice = isCoach && !hasCompletedTrial;
 
   return (
     <div className="space-y-8">
@@ -95,6 +97,17 @@ export function CoachDashboard({ requests, coachAvailability }: { requests: Requ
             : "— Students cannot send you new requests"}
         </span>
       </div>
+
+      {showTrialNotice && (
+        <div className="p-4 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            You need to complete 1 successful free trial lesson before you can receive paid bookings.
+          </p>
+          <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+            Until then, students can only book free trials with you. Accept a trial request and complete the lesson to unlock paid bookings.
+          </p>
+        </div>
+      )}
 
       {pending.length > 0 && (
         <section>

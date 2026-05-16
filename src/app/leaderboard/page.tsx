@@ -88,10 +88,10 @@ export default async function LeaderboardPage() {
                       <span className="text-right">{coach.lessonsGiven}</span>
                       <span className="text-muted-foreground">Students</span>
                       <span className="text-right">{coach.playersTaught}</span>
-                      <span className="text-muted-foreground">Chat price</span>
+                      <span className="text-muted-foreground">Chat lesson / slot</span>
                       <span className="text-right">{coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}</span>
                       {coach.coachCallPrice !== null && (
-                        <><span className="text-muted-foreground">Call price</span>
+                        <><span className="text-muted-foreground">Call lesson / slot</span>
                         <span className="text-right">€{(coach.coachCallPrice / 100).toFixed(2)}</span></>
                       )}
                       <span className="text-muted-foreground">Last Active</span>
@@ -116,8 +116,8 @@ export default async function LeaderboardPage() {
               <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>
               <TableHead className="text-right">Lessons</TableHead>
-              <TableHead className="text-right">Chat Price</TableHead>
-              <TableHead className="text-right">Call Price</TableHead>
+              <TableHead className="text-right">Chat Lesson / slot</TableHead>
+              <TableHead className="text-right">Call Lesson / slot</TableHead>
               <TableHead className="text-right">Students</TableHead>
               <TableHead className="text-center">Last Active</TableHead>
               <TableHead className="text-center">Status</TableHead>

@@ -156,7 +156,7 @@ export function ProfileEditForm(props: Props) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="CHAT_ONLY">Chat Only</SelectItem>
-                <SelectItem value="CHAT_AND_CALL">Chat &amp; Call</SelectItem>
+                <SelectItem value="CHAT_AND_CALL">Chat or Call</SelectItem>
               </SelectContent>
             </Select>
           </div>
