@@ -17,31 +17,41 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    await Promise.all([
-      recalculateAllElos(),
-      updateActivityStatuses(),
-      expirePendingRequests(),
-      refreshAllChessComRatings(),
-      detectConfirmationDisputes(),
-      detectNoShows(),
-      autoCompleteLessons(),
-      // Purge expired rate-limit rows
-      prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
-    ]);
+  // Use allSettled so one failing task doesn't block the others.
+  const tasks = await Promise.allSettled([
+    recalculateAllElos(),
+    updateActivityStatuses(),
+    expirePendingRequests(),
+    refreshAllChessComRatings(),
+    detectConfirmationDisputes(),
+    detectNoShows(),
+    autoCompleteLessons(),
+    prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
+  ]);
 
-    // Generate upcoming time slots for all coaches with templates
+  let slotTasks: PromiseSettledResult<unknown>[] = [];
+  try {
     const coachesWithTemplates = await prisma.timeSlotTemplate.findMany({
       select: { coachId: true },
       distinct: ["coachId"],
     });
-    await Promise.all(
+    slotTasks = await Promise.allSettled(
       coachesWithTemplates.map((c) => generateUpcomingSlots(c.coachId))
     );
-
-    return NextResponse.json({ success: true, timestamp: new Date().toISOString() });
   } catch (error) {
-    console.error("Cron job failed:", error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ error: "Cron job failed" }, { status: 500 });
+    console.error("Cron slot generation failed:", error instanceof Error ? error.message : "Unknown error");
   }
+
+  const failures = [...tasks, ...slotTasks].filter((t) => t.status === "rejected");
+  for (const f of failures) {
+    if (f.status === "rejected") {
+      console.error("Cron task failed:", f.reason instanceof Error ? f.reason.message : f.reason);
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    failures: failures.length,
+  });
 }

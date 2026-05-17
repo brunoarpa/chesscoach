@@ -95,12 +95,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Balance changed while processing. Please retry." }, { status: 409 });
   }
 
+  // Idempotency key tied to user + amount + a fresh nonce, so a retried request
+  // with the same payload doesn't double-pay if Stripe got our first call.
+  const idempotencyKey = `wd_${session.user.id}_${grossAmount}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
   try {
-    const transfer = await stripeClient.transfers.create({
-      amount: netAmount,
-      currency: "eur",
-      destination: user.stripeConnectAccountId,
-    });
+    const transfer = await stripeClient.transfers.create(
+      {
+        amount: netAmount,
+        currency: "eur",
+        destination: user.stripeConnectAccountId,
+      },
+      { idempotencyKey },
+    );
 
     const now = new Date();
 
