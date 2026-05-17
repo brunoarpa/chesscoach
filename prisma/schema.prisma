@@ -102,6 +102,11 @@ enum AbuseFlagSeverity {
   HIGH
 }
 
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
 model User {
   id            String   @id @default(cuid())
   username      String?  @unique
@@ -187,6 +192,7 @@ model User {
   timeSlotTemplates TimeSlotTemplate[]
   timeSlots         TimeSlot[]
   chatMessagesSent  ChatMessage[]
+  verificationTokens VerificationToken[]
 
   @@index([coachElo(sort: Desc)])
   @@index([activityStatus])
@@ -386,6 +392,20 @@ model AbuseFlag {
   @@index([resolved])
   @@index([type])
   @@index([createdAt])
+}
+
+model VerificationToken {
+  id        String                @id @default(cuid())
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String                @unique
+  type      VerificationTokenType
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime              @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model RateLimitEntry {
