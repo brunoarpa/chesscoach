@@ -337,8 +337,8 @@ function StudentActiveCard({ request }: { request: Request }) {
     : null;
 
   async function handleDispute() {
-    if (disputeReason.trim().length < 10) {
-      toast.error("Please provide a reason (at least 10 characters)");
+    if (disputeReason.trim().length < 30) {
+      toast.error("Please describe the issue in a sentence (at least 30 characters)");
       return;
     }
     setLoading(true);
@@ -378,10 +378,10 @@ function StudentActiveCard({ request }: { request: Request }) {
             <Textarea
               value={disputeReason}
               onChange={(e) => setDisputeReason(e.target.value)}
-              placeholder="Describe the issue (at least 10 characters)..."
+              placeholder="Describe what went wrong in a sentence (at least 30 characters)..."
               maxLength={1000}
             />
-            <Button size="sm" variant="destructive" onClick={handleDispute} disabled={loading || disputeReason.trim().length < 10}>
+            <Button size="sm" variant="destructive" onClick={handleDispute} disabled={loading || disputeReason.trim().length < 30}>
               Submit Report
             </Button>
           </div>
