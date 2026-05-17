@@ -6,7 +6,7 @@ import { SignupForm } from "./signup-form";
 
 export default async function SignupPage() {
   const session = await auth();
-  if (session?.user) {
+  if (session?.user?.id) {
     redirect("/dashboard");
   }
   return (

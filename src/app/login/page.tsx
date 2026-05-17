@@ -14,7 +14,7 @@ function errorMessage(code: string | undefined): string | null {
 
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth();
-  if (session?.user) {
+  if (session?.user?.id) {
     redirect("/dashboard");
   }
   const params = await searchParams;
