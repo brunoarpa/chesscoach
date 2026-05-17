@@ -16,39 +16,6 @@ export default async function HowItWorksPage() {
         </p>
       </div>
 
-      {/* Quick Start */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-10">
-        <Card className="text-center">
-          <CardContent className="pt-6">
-            <div className="text-3xl font-bold mb-2">1.</div>
-            <h3 className="font-semibold mb-1">Sign up</h3>
-            <p className="text-sm text-muted-foreground">
-              Pick a username. No chess.com account needed to take lessons.
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="text-center">
-          <CardContent className="pt-6">
-            <div className="text-3xl font-bold mb-2">2.</div>
-            <h3 className="font-semibold mb-1">Find or become a coach</h3>
-            <p className="text-sm text-muted-foreground">
-              Browse coaches, or set a price and languages to start coaching. Verifying chess.com is optional.
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="text-center">
-          <CardContent className="pt-6">
-            <div className="text-3xl font-bold mb-2">3.</div>
-            <h3 className="font-semibold mb-1">Learn &amp; grow</h3>
-            <p className="text-sm text-muted-foreground">
-              Take lessons, leave reviews, climb the rankings.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Separator className="my-8" />
-
       {/* Lesson Flow */}
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-6">How a lesson works</h2>
@@ -79,14 +46,14 @@ export default async function HowItWorksPage() {
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
             <p className="font-semibold">Have the lesson</p>
             <p className="text-sm text-muted-foreground">
-              Play, analyze, learn — whatever you agreed on.
+              Play, analyze positions, or review games together.
             </p>
           </li>
           <li className="pl-8">
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">5</span>
             <p className="font-semibold">Auto-completion</p>
             <p className="text-sm text-muted-foreground">
-              24 hours after the scheduled end, payment moves to the coach automatically. If something went wrong, the student can Report Issue in that window and an admin reviews it before money moves.
+              24 hours after the scheduled end, payment moves to the coach automatically. If the student hits Report Issue in that window, the payment is frozen until an admin reviews it, no matter how much time passes.
             </p>
           </li>
           <li className="pl-8">
@@ -133,7 +100,7 @@ export default async function HowItWorksPage() {
               <li>Same flow as paid lessons. You can leave reviews after a trial.</li>
               <li>One pending free trial at a time, max one per hour.</li>
               <li>Coaches must successfully complete <strong>at least one free trial</strong> before they can receive paid bookings.</li>
-              <li>If a coach <strong>declines</strong> your trial request, the trial is consumed — pick coaches carefully. Trials are refunded only if the coach doesn&apos;t respond at all.</li>
+              <li>To prevent spamming or misuse, if a coach <strong>declines</strong> your trial request, the trial is consumed, so pick coaches carefully.</li>
             </ul>
           </CardContent>
         </Card>
@@ -175,12 +142,12 @@ export default async function HowItWorksPage() {
           <CardContent className="pt-6 space-y-3 text-sm">
             <p>
               <strong>Anyone can coach.</strong> Set a chat or call price per 15 minutes and pick at least one teaching language in your{" "}
-              <Link href="/profile/edit" className="underline font-medium">profile</Link>. Verifying your chess.com account is optional and adds a badge — it does not gate coaching or payouts.
+              <Link href="/profile/edit" className="underline font-medium">profile</Link>. Verifying your chess.com account is optional and adds a badge. It does not gate coaching or payouts.
             </p>
             <p className="text-muted-foreground">
               Your <strong>Coach ELO</strong> on the{" "}
               <Link href="/leaderboard" className="underline">leaderboard</Link>{" "}
-              is based on recent activity and earnings — both decay over time if you go quiet (roughly a 7-day half-life for activity, 30 days for earnings). No-shows cost 50 ELO each.
+              is based on recent activity and earnings. Both decay over time if you go quiet (roughly a 7-day half-life for activity, 30 days for earnings). No-shows cost 50 ELO each.
             </p>
             <p className="text-xs text-muted-foreground border-t pt-2 mt-2">
               <strong>Taxes:</strong> Coaching earnings paid via ChessCoach are yours to declare to your local tax authority. We don&apos;t withhold or remit taxes on your behalf.
