@@ -1,8 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignupForm } from "./signup-form";
+
+export const metadata: Metadata = {
+  title: "Sign up — ChessCoach",
+  robots: { index: false, follow: false },
+};
 
 export default async function SignupPage() {
   const session = await auth();

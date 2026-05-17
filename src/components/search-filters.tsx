@@ -101,7 +101,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label>Price per 5 min ($)</Label>
+        <Label>Price per 15 min (€)</Label>
         <div className="flex gap-2">
           <Input
             name="minPrice"

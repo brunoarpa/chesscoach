@@ -1,6 +1,12 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResetForm } from "./reset-form";
+
+export const metadata: Metadata = {
+  title: "Reset password — ChessCoach",
+  robots: { index: false, follow: false },
+};
 
 type SearchParams = Promise<{ token?: string }>;
 
