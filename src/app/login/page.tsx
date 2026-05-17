@@ -1,23 +1,92 @@
+import Link from "next/link";
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default async function LoginPage() {
+type SearchParams = Promise<{ error?: string; code?: string }>;
+
+function errorMessage(code: string | undefined): string | null {
+  if (!code) return null;
+  if (code === "email_not_verified") return "Please verify your email before signing in. Check your inbox.";
+  if (code === "invalid_credentials") return "Incorrect email or password.";
+  return "Could not sign in. Please try again.";
+}
+
+export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth();
   if (session?.user) {
     redirect("/dashboard");
   }
+  const params = await searchParams;
+  const error = errorMessage(params.code);
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome to ChessCoach</CardTitle>
-          <CardDescription>
-            Sign in or create an account to get started
-          </CardDescription>
+          <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {error && (
+            <p className="text-sm text-destructive border border-destructive/30 bg-destructive/10 rounded-md px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await signIn("credentials", {
+                email: formData.get("email"),
+                password: formData.get("password"),
+                redirectTo: "/dashboard",
+              });
+            }}
+            className="space-y-3"
+          >
+            <div className="space-y-1">
+              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-sm font-medium">Password</label>
+                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:underline">
+                  Forgot?
+                </Link>
+              </div>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+            >
+              Sign in
+            </button>
+          </form>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
           <form
             action={async () => {
               "use server";
@@ -37,6 +106,13 @@ export default async function LoginPage() {
               Continue with Google
             </button>
           </form>
+
+          <p className="text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="text-foreground hover:underline">
+              Sign up
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>
