@@ -1,22 +1,46 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { signUpWithPassword } from "@/lib/actions/password-auth";
 
 export function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [linkedExisting, setLinkedExisting] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  return sentTo ? (
-    <div className="text-sm space-y-2">
-      <p>Check your inbox.</p>
-      <p className="text-muted-foreground">
-        If an account is available for <strong>{sentTo}</strong>, we just sent a verification link.
-        It expires in 1 hour.
-      </p>
-    </div>
-  ) : (
+  if (linkedExisting) {
+    return (
+      <div className="text-sm space-y-3">
+        <p>Your password is set.</p>
+        <p className="text-muted-foreground">
+          We didn&apos;t send a verification email because this address is already verified through Google.
+          You can sign in with either method now.
+        </p>
+        <Link
+          href="/login"
+          className="block w-full text-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+        >
+          Go to sign in
+        </Link>
+      </div>
+    );
+  }
+
+  if (sentTo) {
+    return (
+      <div className="text-sm space-y-2">
+        <p>Check your inbox.</p>
+        <p className="text-muted-foreground">
+          If an account is available for <strong>{sentTo}</strong>, we just sent a verification link.
+          It expires in 1 hour. (Don&apos;t see it? Check your spam folder.)
+        </p>
+      </div>
+    );
+  }
+
+  return (
     <form
       action={(formData) => {
         setError(null);
@@ -25,6 +49,10 @@ export function SignupForm() {
           const result = await signUpWithPassword(formData);
           if (result?.error) {
             setError(result.error);
+            return;
+          }
+          if ("alreadyVerified" in result && result.alreadyVerified) {
+            setLinkedExisting(true);
             return;
           }
           setSentTo(emailValue);
