@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,11 +94,16 @@ function MobileLink({
   children: React.ReactNode;
   className?: string;
 }) {
+  const pathname = usePathname();
+  const isActive = pathname === href || pathname.startsWith(href + "/");
   return (
     <Link
       href={href}
       onClick={onClose}
-      className={`text-sm px-3 py-2 rounded-md hover:bg-muted transition-colors ${className ?? ""}`}
+      aria-current={isActive ? "page" : undefined}
+      className={`text-sm px-3 py-2 rounded-md hover:bg-muted transition-colors ${
+        isActive ? "bg-muted font-medium" : ""
+      } ${className ?? ""}`}
     >
       {children}
     </Link>

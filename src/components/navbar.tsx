@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AvailabilityToggle } from "@/components/availability-toggle";
 import { MobileNav } from "@/components/mobile-nav";
+import { NavLink } from "@/components/nav-link";
 
 export async function Navbar() {
   const session = await auth();
@@ -31,36 +32,61 @@ export async function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          <Link href="/search" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
+          <NavLink
+            href="/search"
+            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+            activeClassName="bg-muted font-medium"
+          >
             Find a Coach
-          </Link>
-          <Link href="/how-it-works" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
+          </NavLink>
+          <NavLink
+            href="/how-it-works"
+            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+            activeClassName="bg-muted font-medium"
+          >
             How It Works
-          </Link>
-          <Link href="/leaderboard" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
+          </NavLink>
+          <NavLink
+            href="/leaderboard"
+            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+            activeClassName="bg-muted font-medium"
+          >
             Leaderboard
-          </Link>
+          </NavLink>
 
           {session?.user ? (
             <>
-              <Link href="/dashboard" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
+              <NavLink
+                href="/dashboard"
+                className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+                activeClassName="bg-muted font-medium"
+              >
                 Dashboard
-              </Link>
-              <Link href="/wallet" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors">
+              </NavLink>
+              <NavLink
+                href="/wallet"
+                className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+                activeClassName="bg-muted font-medium"
+              >
                 Wallet
-              </Link>
+              </NavLink>
               {username && (
-                <Link
+                <NavLink
                   href={`/profile/${username}`}
                   className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+                  activeClassName="bg-muted font-medium"
                 >
                   Profile
-                </Link>
+                </NavLink>
               )}
               {isAdmin && (
-                <Link href="/admin" className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors text-red-500">
+                <NavLink
+                  href="/admin"
+                  className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors text-red-500"
+                  activeClassName="bg-muted font-medium"
+                >
                   Admin
-                </Link>
+                </NavLink>
               )}
               <SignOutButton />
             </>
