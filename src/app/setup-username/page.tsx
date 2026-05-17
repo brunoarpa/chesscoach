@@ -88,6 +88,10 @@ export default function SetupUsernamePage() {
                 maxLength={20}
                 pattern="^[a-zA-Z0-9_]+$"
                 placeholder="e.g. magnus_fan"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
                 3-20 characters. Letters, numbers, and underscores only.
