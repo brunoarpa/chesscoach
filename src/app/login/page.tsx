@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,11 +38,21 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           <form
             action={async (formData: FormData) => {
               "use server";
-              await signIn("credentials", {
-                email: formData.get("email"),
-                password: formData.get("password"),
-                redirectTo: "/dashboard",
-              });
+              try {
+                await signIn("credentials", {
+                  email: formData.get("email"),
+                  password: formData.get("password"),
+                  redirectTo: "/dashboard",
+                });
+              } catch (err) {
+                if (err instanceof CredentialsSignin) {
+                  redirect(`/login?code=${err.code ?? "invalid_credentials"}`);
+                }
+                if (err instanceof AuthError) {
+                  redirect(`/login?code=auth_error`);
+                }
+                throw err; // re-throw NEXT_REDIRECT and unknown errors
+              }
             }}
             className="space-y-3"
           >
