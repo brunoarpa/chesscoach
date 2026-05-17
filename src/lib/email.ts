@@ -4,8 +4,18 @@ if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
-const FROM = process.env.EMAIL_FROM ?? "noreply@example.com";
 const APP_NAME = "ChessCoach";
+
+function fromAddress(): string {
+  const from = process.env.EMAIL_FROM;
+  if (!from) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("EMAIL_FROM is not set");
+    }
+    return "noreply@example.com";
+  }
+  return from;
+}
 
 function baseUrl(): string {
   const raw =
@@ -16,14 +26,30 @@ function baseUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
+function buttonLink(url: string, label: string): string {
+  return `<a href="${url}" style="display:inline-block;padding:10px 18px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">${label}</a>`;
+}
+
+function wrap(title: string, body: string): string {
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111;">
+    <h1 style="font-size:20px;margin:0 0 16px;">${title}</h1>
+    ${body}
+    <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
+    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} — chesscoach.training@gmail.com</p>
+  </div>`;
+}
+
 async function send(to: string, subject: string, html: string) {
   if (!process.env.SENDGRID_API_KEY) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SENDGRID_API_KEY is not set");
+    }
     // Dev fallback: log instead of throwing so flows are testable without SendGrid set up.
     console.warn(`[email] SENDGRID_API_KEY missing — would send to ${to}: ${subject}`);
     console.warn(html);
     return;
   }
-  await sgMail.send({ to, from: FROM, subject, html });
+  await sgMail.send({ to, from: fromAddress(), subject, html });
 }
 
 export async function sendVerificationEmail(email: string, token: string) {
@@ -31,9 +57,13 @@ export async function sendVerificationEmail(email: string, token: string) {
   await send(
     email,
     `Verify your ${APP_NAME} email`,
-    `<p>Welcome to ${APP_NAME}.</p>
-     <p>Click the link below to verify your email. It expires in 1 hour.</p>
-     <p><a href="${url}">${url}</a></p>`,
+    wrap(
+      `Welcome to ${APP_NAME}`,
+      `<p>Click the button below to verify your email address. This link expires in 1 hour.</p>
+       <p style="margin:24px 0;">${buttonLink(url, "Verify email")}</p>
+       <p style="font-size:13px;color:#666;">Or copy and paste this URL into your browser:<br /><span style="word-break:break-all;">${url}</span></p>
+       <p style="font-size:13px;color:#666;">If you didn't create an account, you can safely ignore this email.</p>`,
+    ),
   );
 }
 
@@ -42,8 +72,12 @@ export async function sendPasswordResetEmail(email: string, token: string) {
   await send(
     email,
     `Reset your ${APP_NAME} password`,
-    `<p>We received a request to reset your password.</p>
-     <p>Click the link below to set a new password. It expires in 1 hour. If you didn't request this, ignore this email.</p>
-     <p><a href="${url}">${url}</a></p>`,
+    wrap(
+      `Reset your password`,
+      `<p>We received a request to reset your password. Click the button below to set a new one. This link expires in 1 hour.</p>
+       <p style="margin:24px 0;">${buttonLink(url, "Reset password")}</p>
+       <p style="font-size:13px;color:#666;">Or copy and paste this URL into your browser:<br /><span style="word-break:break-all;">${url}</span></p>
+       <p style="font-size:13px;color:#666;">If you didn't request a reset, you can safely ignore this email — your password will stay the same.</p>`,
+    ),
   );
 }

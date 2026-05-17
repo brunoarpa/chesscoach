@@ -92,7 +92,7 @@ export default async function AdminPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-3xl font-bold mb-8 text-red-600">Admin Panel</h1>
+      <h1 className="text-3xl font-bold mb-8 text-destructive">Admin Panel</h1>
 
       <Tabs defaultValue="flags">
         <TabsList className="mb-6">

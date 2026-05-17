@@ -84,7 +84,6 @@ export function ProfileEditForm(props: Props) {
               name="timezone"
               defaultValue={props.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
               placeholder="e.g. Europe/London"
-              list="timezones"
             />
             <p className="text-xs text-muted-foreground">
               Your timezone for scheduling. Detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}

@@ -48,16 +48,16 @@ export function EvalBar({ fen, boardOrientation }: Props) {
         const mateMatch = line.match(/score mate (-?\d+)/);
         const perspective = activeTurnRef.current === "w" ? 1 : -1;
 
-        if (depthMatch) setDepth(parseInt(depthMatch[1]));
+        if (depthMatch) setDepth(parseInt(depthMatch[1], 10));
 
         if (mateMatch) {
-          const sideToMoveMate = parseInt(mateMatch[1]);
+          const sideToMoveMate = parseInt(mateMatch[1], 10);
           const whitePerspectiveMate = sideToMoveMate * perspective;
           setMate(whitePerspectiveMate);
           setEvaluation(whitePerspectiveMate > 0 ? 10000 : -10000);
         } else if (cpMatch) {
           setMate(null);
-          const sideToMoveCp = parseInt(cpMatch[1]);
+          const sideToMoveCp = parseInt(cpMatch[1], 10);
           setEvaluation(sideToMoveCp * perspective);
         }
       }

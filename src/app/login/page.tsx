@@ -1,9 +1,15 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResendVerification } from "./resend-verification";
+
+export const metadata: Metadata = {
+  title: "Sign in — ChessCoach",
+  robots: { index: false, follow: false },
+};
 
 type SearchParams = Promise<{ error?: string; code?: string }>;
 

@@ -9,16 +9,18 @@ export default authMiddleware((req) => {
   if (pathname.startsWith("/api/") && !pathname.startsWith("/api/stripe/webhook") && req.method !== "GET" && req.method !== "HEAD") {
     const origin = req.headers.get("origin");
     const host = req.headers.get("host");
-    if (origin && host) {
-      let originHost: string;
-      try {
-        originHost = new URL(origin).host;
-      } catch {
-        return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-      }
-      if (originHost !== host) {
-        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
-      }
+    // Require Origin on mutating requests — browsers always send it on POST/PUT/PATCH/DELETE.
+    if (!origin || !host) {
+      return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+    }
+    let originHost: string;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
+    if (originHost !== host) {
+      return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
     }
   }
 
