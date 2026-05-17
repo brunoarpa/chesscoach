@@ -155,8 +155,8 @@ export async function generateUpcomingSlots(coachId: string) {
 
       const endTime = new Date(startTime.getTime() + 15 * 60 * 1000);
 
-      // Skip if slot is in the past (with 2h buffer)
-      if (startTime.getTime() < now.getTime() + 2 * 60 * 60 * 1000) continue;
+      // Skip only past slots — coaches must accept anyway, so near-term bookings are fine.
+      if (startTime.getTime() <= now.getTime()) continue;
 
       slotsToCreate.push({
         coachId,

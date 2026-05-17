@@ -254,63 +254,65 @@ export default async function ProfilePage({
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Coach Info</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {user.chessRating && (
+          {isCoachProfile && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Coach Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {user.chessRating && (
+                    <div>
+                      <span className="text-muted-foreground">Chess Rating:</span>{" "}
+                      <strong>{user.chessRating}</strong>
+                    </div>
+                  )}
+                  {user.continent && (
+                    <div>
+                      <span className="text-muted-foreground">Continent:</span>{" "}
+                      <strong>{continentLabels[user.continent]}</strong>
+                    </div>
+                  )}
+                  {user.coachChatPrice !== null && (
+                    <div>
+                      <span className="text-muted-foreground">Chat Price/slot:</span>{" "}
+                      <strong>€{(user.coachChatPrice / 100).toFixed(2)}</strong>
+                    </div>
+                  )}
+                  {user.coachCallPrice !== null && (
+                    <div>
+                      <span className="text-muted-foreground">Call Price/slot:</span>{" "}
+                      <strong>€{(user.coachCallPrice / 100).toFixed(2)}</strong>
+                    </div>
+                  )}
                   <div>
-                    <span className="text-muted-foreground">Chess Rating:</span>{" "}
-                    <strong>{user.chessRating}</strong>
+                    <span className="text-muted-foreground">Communication:</span>{" "}
+                    <strong>
+                      {user.communicationPreference === "CHAT_AND_CALL"
+                        ? "Chat or Call"
+                        : "Chat Only"}
+                    </strong>
                   </div>
-                )}
-                {user.continent && (
                   <div>
-                    <span className="text-muted-foreground">Continent:</span>{" "}
-                    <strong>{continentLabels[user.continent]}</strong>
-                  </div>
-                )}
-                {user.coachChatPrice !== null && (
-                  <div>
-                    <span className="text-muted-foreground">Chat Price/slot:</span>{" "}
-                    <strong>€{(user.coachChatPrice / 100).toFixed(2)}</strong>
-                  </div>
-                )}
-                {user.coachCallPrice !== null && (
-                  <div>
-                    <span className="text-muted-foreground">Call Price/slot:</span>{" "}
-                    <strong>€{(user.coachCallPrice / 100).toFixed(2)}</strong>
-                  </div>
-                )}
-                <div>
-                  <span className="text-muted-foreground">Communication:</span>{" "}
-                  <strong>
-                    {user.communicationPreference === "CHAT_AND_CALL"
-                      ? "Chat or Call"
-                      : "Chat Only"}
-                  </strong>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Coach ELO:</span>{" "}
-                  <strong>{Math.round(user.coachElo)}</strong>
-                </div>
-              </div>
-              {user.languages.length > 0 && (
-                <div className="space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">Languages:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {user.languages.map((code) => (
-                      <Badge key={code} variant="secondary" className="font-normal">
-                        {getLanguageLabel(code)}
-                      </Badge>
-                    ))}
+                    <span className="text-muted-foreground">Coach ELO:</span>{" "}
+                    <strong>{Math.round(user.coachElo)}</strong>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {user.languages.length > 0 && (
+                  <div className="space-y-1.5 text-sm">
+                    <span className="text-muted-foreground">Languages:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.languages.map((code) => (
+                        <Badge key={code} variant="secondary" className="font-normal">
+                          {getLanguageLabel(code)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

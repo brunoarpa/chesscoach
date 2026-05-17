@@ -65,11 +65,20 @@ export default async function SearchPage({
   }
 
   if (params.minPrice || params.maxPrice) {
-    where.coachChatPrice = {};
-    if (params.minPrice)
-      where.coachChatPrice.gte = Math.round(Number(params.minPrice) * 100);
-    if (params.maxPrice)
-      where.coachChatPrice.lte = Math.round(Number(params.maxPrice) * 100);
+    const priceRange: { gte?: number; lte?: number } = {};
+    if (params.minPrice) priceRange.gte = Math.round(Number(params.minPrice) * 100);
+    if (params.maxPrice) priceRange.lte = Math.round(Number(params.maxPrice) * 100);
+    // Match if either chat OR call price falls in the range — coaches setting
+    // only one of the two prices should still surface.
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      {
+        OR: [
+          { coachChatPrice: priceRange },
+          { coachCallPrice: priceRange },
+        ],
+      },
+    ];
   }
 
   if (params.communication && params.communication !== "any") {

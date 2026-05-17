@@ -477,15 +477,16 @@ export async function reportNoShow(requestId: string) {
         where: { id: requestId },
         data: { status: "NO_SHOW" },
       }),
-      // Refund student
-      ...(request.isTrial
-        ? []
-        : [
-            prisma.user.update({
-              where: { id: request.studentId },
-              data: { reservedBalance: { decrement: request.estimatedCost } },
-            }),
-          ]),
+      // Make the student whole: refund paid cost, or restore the free trial if it was a trial.
+      request.isTrial
+        ? prisma.user.update({
+            where: { id: request.studentId },
+            data: { freeTrialsRemaining: { increment: 1 } },
+          })
+        : prisma.user.update({
+            where: { id: request.studentId },
+            data: { reservedBalance: { decrement: request.estimatedCost } },
+          }),
       // Apply ELO penalty to coach
       prisma.user.update({
         where: { id: request.coachId },
