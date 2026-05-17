@@ -383,7 +383,7 @@ export async function disputeLesson(requestId: string, reason: string) {
   if (!session?.user?.id) return { error: "Not authenticated" };
 
   if (!requestId || typeof requestId !== "string") return { error: "Invalid request ID" };
-  if (!reason || reason.trim().length < 10) return { error: "Please provide a reason (at least 10 characters)" };
+  if (!reason || reason.trim().length < 30) return { error: "Please describe the issue in a sentence (at least 30 characters)" };
   if (reason.length > 1000) return { error: "Reason must be under 1000 characters" };
 
   const request = await prisma.lessonRequest.findUnique({
