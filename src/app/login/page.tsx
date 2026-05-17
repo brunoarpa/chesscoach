@@ -3,6 +3,7 @@ import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn, auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ResendVerification } from "./resend-verification";
 
 type SearchParams = Promise<{ error?: string; code?: string }>;
 
@@ -33,6 +34,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
             <p className="text-sm text-destructive border border-destructive/30 bg-destructive/10 rounded-md px-3 py-2">
               {error}
             </p>
+          )}
+          {params.code === "email_not_verified" && (
+            <div className="border border-input rounded-md px-3 py-3">
+              <ResendVerification />
+            </div>
           )}
 
           <form

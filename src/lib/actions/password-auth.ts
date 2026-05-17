@@ -40,12 +40,14 @@ export async function signUpWithPassword(formData: FormData) {
   let userId: string;
   let alreadyVerified = false;
   if (existing) {
-    if (existing.passwordHash) {
-      // Don't reveal whether the email exists with a password; pretend success
-      // and DON'T send a verification email. Login form will fail authentication.
+    if (existing.passwordHash && existing.emailVerified) {
+      // Verified account already exists with a password. Don't leak that
+      // and don't allow overwriting the password from an anonymous form.
       return { success: true };
     }
-    // Linking a password to an existing Google-only account.
+    // Either no password yet (Google-only link) OR password but never verified.
+    // In both cases it's safe to set the password and (re)send verification —
+    // the real owner is the only one who can act on the email.
     userId = existing.id;
     alreadyVerified = !!existing.emailVerified;
     await prisma.user.update({
@@ -64,7 +66,12 @@ export async function signUpWithPassword(formData: FormData) {
   }
 
   const token = await createToken(userId, "EMAIL_VERIFICATION");
-  await sendVerificationEmail(email, token);
+  try {
+    await sendVerificationEmail(email, token);
+  } catch (err) {
+    console.error("[signUpWithPassword] sendVerificationEmail failed", err);
+    return { error: "We couldn't send the verification email. Please try again in a moment." };
+  }
   return { success: true };
 }
 
@@ -91,7 +98,12 @@ export async function resendVerificationEmail(formData: FormData) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (user && !user.emailVerified) {
     const token = await createToken(user.id, "EMAIL_VERIFICATION");
-    await sendVerificationEmail(email, token);
+    try {
+      await sendVerificationEmail(email, token);
+    } catch (err) {
+      console.error("[resendVerificationEmail] failed", err);
+      return { error: "We couldn't send the email. Please try again in a moment." };
+    }
   }
   return { success: true };
 }
@@ -109,7 +121,12 @@ export async function requestPasswordReset(formData: FormData) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (user) {
     const token = await createToken(user.id, "PASSWORD_RESET");
-    await sendPasswordResetEmail(email, token);
+    try {
+      await sendPasswordResetEmail(email, token);
+    } catch (err) {
+      console.error("[requestPasswordReset] failed", err);
+      // Still succeed below to avoid leaking which emails exist.
+    }
   }
   // Always succeed so we don't leak which emails are registered.
   return { success: true };
