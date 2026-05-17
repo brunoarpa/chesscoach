@@ -28,7 +28,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Service:</strong> Match students with coaches, process payments, manage bookings and reviews.</li>
             <li><strong>Abuse prevention:</strong> Detect duplicate accounts, card sharing, spam, and no-shows.</li>
             <li><strong>Rate limiting:</strong> Protect signup, login, password reset, deposits, and booking endpoints.</li>
-            <li><strong>Communication:</strong> Send password reset emails when an email is on file.</li>
+            <li><strong>Communication:</strong> Send email verification, password reset, and dispute-related emails to the address on your account.</li>
             <li><strong>Improvement:</strong> Aggregate, anonymized analytics only.</li>
           </ul>
         </section>
@@ -39,6 +39,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Other users:</strong> Your username, profile, coaching status, activity, and reviews are public. Your email and IP are not.</li>
             <li><strong>Stripe:</strong> Payment data is shared with Stripe. See <a href="https://stripe.com/privacy" className="underline" target="_blank" rel="noopener noreferrer">Stripe&apos;s Privacy Policy</a>.</li>
             <li><strong>Chess.com:</strong> We query the public chess.com API to verify coach accounts and fetch ratings. We do not share your data with chess.com.</li>
+            <li><strong>Google (optional):</strong> If you sign in with Google, your browser is redirected to Google&apos;s sign-in page (which sets its own cookies on google.com) and Google returns your name and email address to us. See <a href="https://policies.google.com/privacy" className="underline" target="_blank" rel="noopener noreferrer">Google&apos;s Privacy Policy</a>.</li>
             <li><strong>Law enforcement:</strong> We may disclose information if required by law.</li>
             <li>We do not sell personal data.</li>
           </ul>

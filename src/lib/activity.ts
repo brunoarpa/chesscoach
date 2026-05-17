@@ -494,20 +494,21 @@ export async function detectNoShows() {
 
   for (const lesson of lessons) {
     if (!lesson.coachJoinedAt && !lesson.studentJoinedAt) {
-      // Neither joined — expire, refund student
+      // Neither joined — expire, make student whole
       const txOps = [
         prisma.lessonRequest.update({
           where: { id: lesson.id },
           data: { status: "EXPIRED" },
         }),
-        ...(lesson.isTrial
-          ? []
-          : [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: { reservedBalance: { decrement: lesson.estimatedCost } },
-              }),
-            ]),
+        lesson.isTrial
+          ? prisma.user.update({
+              where: { id: lesson.studentId },
+              data: { freeTrialsRemaining: { increment: 1 } },
+            })
+          : prisma.user.update({
+              where: { id: lesson.studentId },
+              data: { reservedBalance: { decrement: lesson.estimatedCost } },
+            }),
         ...(lesson.timeSlotId
           ? [prisma.timeSlot.update({ where: { id: lesson.timeSlotId }, data: { status: "AVAILABLE" } })]
           : []),
@@ -520,14 +521,15 @@ export async function detectNoShows() {
           where: { id: lesson.id },
           data: { status: "NO_SHOW" },
         }),
-        ...(lesson.isTrial
-          ? []
-          : [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: { reservedBalance: { decrement: lesson.estimatedCost } },
-              }),
-            ]),
+        lesson.isTrial
+          ? prisma.user.update({
+              where: { id: lesson.studentId },
+              data: { freeTrialsRemaining: { increment: 1 } },
+            })
+          : prisma.user.update({
+              where: { id: lesson.studentId },
+              data: { reservedBalance: { decrement: lesson.estimatedCost } },
+            }),
         prisma.user.update({
           where: { id: lesson.coachId },
           data: { coachRatingPenalty: { increment: NO_SHOW_ELO_PENALTY } },

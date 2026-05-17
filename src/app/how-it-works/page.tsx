@@ -72,7 +72,7 @@ export default async function HowItWorksPage() {
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
             <p className="font-semibold">Both confirm start</p>
             <p className="text-sm text-muted-foreground">
-              Connect via chess.com when the time comes. Both click &quot;I&apos;m ready&quot; to start the lesson.
+              When it&apos;s time, both open the lesson page in the dashboard. The lesson runs in-app — chess board, chat, and (for call lessons) video. Both click &quot;Confirm Start&quot; to begin.
             </p>
           </li>
           <li className="pl-8">
@@ -151,7 +151,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Student wallet</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Deposit via Stripe (€0.40 + 2% fee). Your balance is used across all coaches — no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
+              Deposit via Stripe (€0.40 + 2% fee, up to €20 per deposit). Your balance is used across all coaches — no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
             </CardContent>
           </Card>
 
@@ -180,7 +180,7 @@ export default async function HowItWorksPage() {
             <p className="text-muted-foreground">
               Your <strong>Coach ELO</strong> on the{" "}
               <Link href="/leaderboard" className="underline">leaderboard</Link>{" "}
-              is based on your activity and earnings — stay active and teach well to climb.
+              is based on recent activity and earnings — both decay over time if you go quiet (roughly a 7-day half-life for activity, 30 days for earnings). No-shows cost 50 ELO each.
             </p>
             <p className="text-xs text-muted-foreground border-t pt-2 mt-2">
               <strong>Taxes:</strong> Coaching earnings paid via ChessCoach are yours to declare to your local tax authority. We don&apos;t withhold or remit taxes on your behalf.
@@ -236,7 +236,7 @@ export default async function HowItWorksPage() {
             <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Is my chess.com username shared?</h3>
               <p className="text-sm text-muted-foreground">
-                Only if you linked one. For verified coaches it appears on your public profile. For everyone else, it&apos;s only shown to the other party during active lessons so you can connect and play.
+                No. Even if you verify, only a ✓ chess.com badge is shown publicly — never the username itself. We use it server-side to refresh your chess.com rating.
               </p>
             </CardContent>
           </Card>

@@ -46,21 +46,21 @@ export default async function Home() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 max-w-4xl w-full">
         <div className="text-center space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Verified Coaches</h3>
+          <h3 className="font-semibold text-lg">Real Reviews</h3>
           <p className="text-sm text-muted-foreground">
-            Every coach is verified through their chess.com account
+            Coaches build a track record from completed lessons. Optional chess.com badge for extra trust.
           </p>
         </div>
         <div className="text-center space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Flexible Lessons</h3>
+          <h3 className="font-semibold text-lg">15-Minute Lessons</h3>
           <p className="text-sm text-muted-foreground">
-            Quick 5-minute sessions or full lessons up to any length
+            Every lesson is one 15-minute slot. Book back-to-back slots for longer sessions.
           </p>
         </div>
         <div className="text-center space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Simple Payments</h3>
           <p className="text-sm text-muted-foreground">
-            Deposit once, spend across multiple coaches. No micro-transactions
+            Top up your wallet (up to €20 per deposit) and spend across any coach. No per-lesson checkout.
           </p>
         </div>
       </div>

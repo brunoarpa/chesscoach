@@ -92,7 +92,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
         <div className="p-3 rounded-lg border border-destructive bg-destructive/10 text-sm">
           <p className="font-medium text-destructive">You have an active lesson dispute.</p>
           <p className="text-muted-foreground mt-1">
-            You cannot request new lessons until the dispute is resolved. An admin will review and contact you via email or Chess.com.
+            You cannot request new lessons until the dispute is resolved. An admin will review and contact you via email.
           </p>
         </div>
       )}
@@ -185,7 +185,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                     <Badge variant="destructive">Disputed — Awaiting Admin Review</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    An admin will review this dispute and contact you via email or Chess.com.
+                    An admin will review this dispute and contact you via email.
                   </p>
                 </CardContent>
               </Card>
@@ -373,7 +373,7 @@ function StudentActiveCard({ request }: { request: Request }) {
         {showDispute && (
           <div className="mt-4 space-y-3 border-t pt-4">
             <p className="text-sm text-muted-foreground">
-              If the lesson was unsatisfactory (coach barely showed up, no teaching happened, etc.), describe what went wrong. An admin will review and contact both parties via email or Chess.com.
+              If the lesson was unsatisfactory (coach barely showed up, no teaching happened, etc.), describe what went wrong. An admin will review and contact both parties via email.
             </p>
             <Textarea
               value={disputeReason}
