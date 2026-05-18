@@ -31,7 +31,7 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
       .catch(() => setConnectStatus({ connected: false }));
   }, []);
 
-  const pendingEuros = pendingEarnings / 100;
+  const pendingDollars = pendingEarnings / 100;
   const isConnected = connectStatus?.connected && connectStatus?.chargesEnabled && connectStatus?.payoutsEnabled;
   const meetsMinimum = pendingEarnings >= MIN_PAYOUT_CENTS;
 
@@ -58,7 +58,7 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(`€${(data.net / 100).toFixed(2)} withdrawn to your bank account!`);
+        toast.success(`$${(data.net / 100).toFixed(2)} withdrawn to your bank account!`);
         window.location.reload();
       } else {
         toast.error(data.error || "Withdrawal failed");
@@ -85,7 +85,7 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
         ) : !meetsMinimum ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              You have €{pendingEuros.toFixed(2)} in pending earnings. Minimum withdrawal is €{(MIN_PAYOUT_CENTS / 100).toFixed(2)}.
+              You have ${pendingDollars.toFixed(2)} in pending earnings. Minimum withdrawal is ${(MIN_PAYOUT_CENTS / 100).toFixed(2)}.
             </p>
             <p className="text-xs text-muted-foreground">
               Keep coaching to reach the minimum.
@@ -95,9 +95,9 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
           <div className="space-y-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="withdraw-amount">Amount (€)</Label>
+                <Label htmlFor="withdraw-amount">Amount ($)</Label>
                 <span className="text-xs text-muted-foreground">
-                  Available: €{pendingEuros.toFixed(2)}
+                  Available: ${pendingDollars.toFixed(2)}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -107,10 +107,10 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
                   inputMode="decimal"
                   step="0.01"
                   min={(MIN_PAYOUT_CENTS / 100).toFixed(2)}
-                  max={pendingEuros.toFixed(2)}
+                  max={pendingDollars.toFixed(2)}
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
-                  placeholder={`min €${(MIN_PAYOUT_CENTS / 100).toFixed(2)}`}
+                  placeholder={`min $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}`}
                 />
                 <Button type="button" variant="outline" onClick={handleMax}>
                   Max
@@ -122,15 +122,15 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
               <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Withdraw</span>
-                  <span>€{(amountCents / 100).toFixed(2)}</span>
+                  <span>${(amountCents / 100).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fee (€0.40 + 2%)</span>
-                  <span>-€{(feeCents / 100).toFixed(2)}</span>
+                  <span className="text-muted-foreground">Fee ($0.40 + 2%)</span>
+                  <span>-${(feeCents / 100).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-medium border-t pt-1">
                   <span>You receive</span>
-                  <span className="text-green-600">€{(netCents / 100).toFixed(2)}</span>
+                  <span className="text-green-600">${(netCents / 100).toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -143,7 +143,7 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
               {loading
                 ? "Processing..."
                 : validAmount
-                ? `Withdraw €${(amountCents / 100).toFixed(2)}`
+                ? `Withdraw $${(amountCents / 100).toFixed(2)}`
                 : "Enter an amount"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">

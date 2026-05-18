@@ -101,12 +101,12 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
                     For paid lessons, only show options where the coach has set a price. */}
                 {(isTrial || coachChatPrice !== null) && (
                   <SelectItem value="CHAT">
-                    {isTrial ? "Chat (free trial)" : `Chat (\u20ac${(coachChatPrice! / 100).toFixed(2)}/slot)`}
+                    {isTrial ? "Chat (free trial)" : `Chat ($${(coachChatPrice! / 100).toFixed(2)}/slot)`}
                   </SelectItem>
                 )}
                 {coachCommunicationPreference === "CHAT_AND_CALL" && (isTrial || coachCallPrice !== null) && (
                   <SelectItem value="CALL">
-                    {isTrial ? "Call (free trial)" : `Call (\u20ac${(coachCallPrice! / 100).toFixed(2)}/slot)`}
+                    {isTrial ? "Call (free trial)" : `Call ($${(coachCallPrice! / 100).toFixed(2)}/slot)`}
                   </SelectItem>
                 )}
               </SelectContent>
@@ -131,13 +131,13 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
             <div className="p-3 rounded-lg bg-muted/50 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Price per 15-min slot</span>
-                <span className="font-medium">&euro;{slotPrice.toFixed(2)}</span>
+                <span className="font-medium">${slotPrice.toFixed(2)}</span>
               </div>
             </div>
           )}
 
           <p className="text-sm text-muted-foreground">
-            Your available balance: <span className="font-medium">&euro;{(availableBalance / 100).toFixed(2)}</span>
+            Your available balance: <span className="font-medium">${(availableBalance / 100).toFixed(2)}</span>
           </p>
 
           {isTrial ? (
@@ -146,7 +146,7 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
             </p>
           ) : slotPrice > 0 ? (
             <p className={`text-sm font-medium ${slotPrice > availableBalance / 100 ? "text-destructive" : ""}`}>
-              Cost per slot: &euro;{slotPrice.toFixed(2)}
+              Cost per slot: ${slotPrice.toFixed(2)}
               {slotPrice > availableBalance / 100 && " — Insufficient balance"}
             </p>
           ) : null}

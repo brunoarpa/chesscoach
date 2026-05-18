@@ -116,7 +116,7 @@ export function ProfileEditForm(props: Props) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="coachChatPrice">Chat lesson price per slot (€)</Label>
+              <Label htmlFor="coachChatPrice">Chat lesson price per slot ($)</Label>
               <Input
                 id="coachChatPrice"
                 name="coachChatPrice"
@@ -128,7 +128,7 @@ export function ProfileEditForm(props: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="coachCallPrice">Call lesson price per slot (€)</Label>
+              <Label htmlFor="coachCallPrice">Call lesson price per slot ($)</Label>
               <Input
                 id="coachCallPrice"
                 name="coachCallPrice"

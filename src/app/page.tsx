@@ -60,7 +60,7 @@ export default async function Home() {
         <div className="text-center space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Simple Payments</h3>
           <p className="text-sm text-muted-foreground">
-            Top up your wallet (up to €20 per deposit) and spend across any coach. No per-lesson checkout.
+            Top up your wallet (up to $20 per deposit) and spend across any coach. No per-lesson checkout.
           </p>
         </div>
       </div>

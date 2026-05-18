@@ -67,7 +67,7 @@ function RequestMeta({ request }: { request: Request }) {
   return (
     <>
       <span className="text-sm text-muted-foreground sm:ml-2 block sm:inline mt-0.5 sm:mt-0">
-        Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `€${(request.estimatedCost / 100).toFixed(2)}`}
+        Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
         {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
         {request.scheduledStartAt && ` · ${new Date(request.scheduledStartAt).toLocaleString()}`}
       </span>
@@ -122,7 +122,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
                     </div>
                     {coach.coachChatPrice != null && (
                       <span className="text-sm text-muted-foreground">
-                        €{(coach.coachChatPrice / 100).toFixed(2)}/slot
+                        ${(coach.coachChatPrice / 100).toFixed(2)}/slot
                       </span>
                     )}
                   </CardContent>

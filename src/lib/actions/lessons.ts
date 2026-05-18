@@ -145,7 +145,7 @@ export async function createLessonRequest(formData: FormData) {
   if (!isTrial) {
     const available = currentUser.walletBalance - currentUser.reservedBalance;
     if (available < estimatedCost) {
-      return { error: `Insufficient balance. You need €${(estimatedCost / 100).toFixed(2)} but only have €${(available / 100).toFixed(2)} available.` };
+      return { error: `Insufficient balance. You need $${(estimatedCost / 100).toFixed(2)} but only have $${(available / 100).toFixed(2)} available.` };
     }
   }
 

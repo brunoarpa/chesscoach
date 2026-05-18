@@ -12,7 +12,7 @@ type PrismaLike = Pick<typeof prisma, "user" | "earningRecord">;
 /**
  * Calculate coach ELO rating.
  *
- * Formula: 100 + 500·e^(-0.1·daysSinceActive) + 400·e^(-0.023·daysSinceLastEarning) + 100·ln(1 + totalEarnings€)
+ * Formula: 100 + 500·e^(-0.1·daysSinceActive) + 400·e^(-0.023·daysSinceLastEarning) + 100·ln(1 + totalEarnings$)
  *
  * Accepts an optional prisma client (e.g. a transaction client) so it can
  * read data that hasn't been committed yet.

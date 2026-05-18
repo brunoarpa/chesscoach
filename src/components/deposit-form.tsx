@@ -27,11 +27,11 @@ export function DepositForm() {
   async function handleDeposit() {
     const cents = Math.round(depositValue * 100);
     if (cents < MIN_DEPOSIT * 100) {
-      toast.error(`Minimum deposit is €${MIN_DEPOSIT.toFixed(2)}`);
+      toast.error(`Minimum deposit is $${MIN_DEPOSIT.toFixed(2)}`);
       return;
     }
     if (cents > MAX_DEPOSIT * 100) {
-      toast.error(`Maximum deposit is €${MAX_DEPOSIT.toFixed(2)}`);
+      toast.error(`Maximum deposit is $${MAX_DEPOSIT.toFixed(2)}`);
       return;
     }
 
@@ -47,7 +47,7 @@ export function DepositForm() {
       if (data.url) {
         window.location.href = data.url;
       } else if (data.success) {
-        toast.success(`€${(cents / 100).toFixed(2)} deposited!`);
+        toast.success(`$${(cents / 100).toFixed(2)} deposited!`);
         window.location.reload();
       } else {
         toast.error(data.error || "Failed to create deposit");
@@ -66,7 +66,7 @@ export function DepositForm() {
       <CardContent>
         <div className="flex items-end gap-4">
           <div className="flex-1 space-y-2">
-            <Label>Amount (€)</Label>
+            <Label>Amount ($)</Label>
             <Input
               type="number"
               step="0.01"
@@ -76,7 +76,7 @@ export function DepositForm() {
               onChange={(e) => setAmount(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Min €{MIN_DEPOSIT.toFixed(2)} · Max €{MAX_DEPOSIT.toFixed(2)}
+              Min ${MIN_DEPOSIT.toFixed(2)} · Max ${MAX_DEPOSIT.toFixed(2)}
             </p>
           </div>
           <Button onClick={handleDeposit} disabled={loading || depositValue < MIN_DEPOSIT || depositValue > MAX_DEPOSIT}>
@@ -87,15 +87,15 @@ export function DepositForm() {
           <div className="mt-3 p-3 rounded-lg bg-muted/50 text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Deposit</span>
-              <span>€{depositValue.toFixed(2)}</span>
+              <span>${depositValue.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Processing fee (€0.40 + 2%)</span>
-              <span>€{fee.toFixed(2)}</span>
+              <span className="text-muted-foreground">Processing fee ($0.40 + 2%)</span>
+              <span>${fee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-medium border-t pt-1">
               <span>Total charge</span>
-              <span>€{totalCharge.toFixed(2)}</span>
+              <span>${totalCharge.toFixed(2)}</span>
             </div>
           </div>
         )}

@@ -3,9 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
-const FEE_FLAT_CENTS = 40;      // €0.40
+const FEE_FLAT_CENTS = 40;      // $0.40
 const FEE_PERCENT = 0.02;       // 2%
-const MIN_PAYOUT_CENTS = 500;    // €5.00
+const MIN_PAYOUT_CENTS = 500;    // $5.00
 
 function calculateFee(amountCents: number): number {
   return FEE_FLAT_CENTS + Math.ceil(amountCents * FEE_PERCENT);
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (user.pendingEarnings < MIN_PAYOUT_CENTS) {
-    return NextResponse.json({ error: `Minimum withdrawal is €${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
+    return NextResponse.json({ error: `Minimum withdrawal is $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
   }
 
   const grossAmount = requestedCents ?? user.pendingEarnings;
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Amount exceeds your pending earnings" }, { status: 400 });
   }
   if (grossAmount < MIN_PAYOUT_CENTS) {
-    return NextResponse.json({ error: `Minimum withdrawal is €${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
+    return NextResponse.json({ error: `Minimum withdrawal is $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
   }
 
   // Verify Stripe Connect account is fully onboarded
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     const transfer = await stripeClient.transfers.create(
       {
         amount: netAmount,
-        currency: "eur",
+        currency: "usd",
         destination: user.stripeConnectAccountId,
       },
       { idempotencyKey },

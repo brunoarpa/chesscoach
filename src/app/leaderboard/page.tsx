@@ -89,10 +89,10 @@ export default async function LeaderboardPage() {
                       <span className="text-muted-foreground">Students</span>
                       <span className="text-right">{coach.playersTaught}</span>
                       <span className="text-muted-foreground">Chat lesson / slot</span>
-                      <span className="text-right">{coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}</span>
+                      <span className="text-right">{coach.coachChatPrice !== null ? `$${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}</span>
                       {coach.coachCallPrice !== null && (
                         <><span className="text-muted-foreground">Call lesson / slot</span>
-                        <span className="text-right">€{(coach.coachCallPrice / 100).toFixed(2)}</span></>
+                        <span className="text-right">${(coach.coachCallPrice / 100).toFixed(2)}</span></>
                       )}
                       <span className="text-muted-foreground">Last Active</span>
                       <span className="text-right flex items-center justify-end gap-1.5">
@@ -148,10 +148,10 @@ export default async function LeaderboardPage() {
                 </TableCell>
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">
-                  {coach.coachChatPrice !== null ? `€${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}
+                  {coach.coachChatPrice !== null ? `$${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}
                 </TableCell>
                 <TableCell className="text-right">
-                  {coach.coachCallPrice !== null ? `€${(coach.coachCallPrice / 100).toFixed(2)}` : "—"}
+                  {coach.coachCallPrice !== null ? `$${(coach.coachCallPrice / 100).toFixed(2)}` : "—"}
                 </TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1.5">

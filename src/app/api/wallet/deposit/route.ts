@@ -3,10 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 
-const FEE_FLAT_CENTS = 40;      // €0.40
+const FEE_FLAT_CENTS = 40;      // $0.40
 const FEE_PERCENT = 0.02;       // 2%
-const MIN_DEPOSIT_CENTS = 500;   // €5.00
-const MAX_DEPOSIT_CENTS = 2000;  // €20.00
+const MIN_DEPOSIT_CENTS = 500;   // $5.00
+const MAX_DEPOSIT_CENTS = 2000;  // $20.00
 
 function calculateFee(amountCents: number): number {
   return FEE_FLAT_CENTS + Math.ceil(amountCents * FEE_PERCENT);
@@ -39,11 +39,11 @@ export async function POST(request: Request) {
   const { amount } = await request.json();
 
   if (!amount || amount < MIN_DEPOSIT_CENTS) {
-    return NextResponse.json({ error: "Minimum deposit is €5.00" }, { status: 400 });
+    return NextResponse.json({ error: "Minimum deposit is $5.00" }, { status: 400 });
   }
 
   if (amount > MAX_DEPOSIT_CENTS) {
-    return NextResponse.json({ error: "Maximum deposit is €20.00" }, { status: 400 });
+    return NextResponse.json({ error: "Maximum deposit is $20.00" }, { status: 400 });
   }
 
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     line_items: [
       {
         price_data: {
-          currency: "eur",
+          currency: "usd",
           product_data: { name: "ChessCoach Wallet Deposit" },
           unit_amount: amount,
         },
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       },
       {
         price_data: {
-          currency: "eur",
+          currency: "usd",
           product_data: { name: "Processing Fee" },
           unit_amount: feeCents,
         },

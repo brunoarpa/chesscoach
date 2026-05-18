@@ -197,12 +197,12 @@ export function SlotPicker({
                   <SelectContent>
                     {coachChatPrice !== null && (
                       <SelectItem value="CHAT">
-                        Chat — €{(coachChatPrice / 100).toFixed(2)}/slot
+                        Chat — ${(coachChatPrice / 100).toFixed(2)}/slot
                       </SelectItem>
                     )}
                     {canCall && (
                       <SelectItem value="CALL">
-                        Call — €{(coachCallPrice! / 100).toFixed(2)}/slot
+                        Call — ${(coachCallPrice! / 100).toFixed(2)}/slot
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -231,7 +231,7 @@ export function SlotPicker({
                 {isTrial ? (
                   <Badge variant="secondary">FREE</Badge>
                 ) : commMethod ? (
-                  <span className="font-semibold">€{(slotPrice / 100).toFixed(2)}</span>
+                  <span className="font-semibold">${(slotPrice / 100).toFixed(2)}</span>
                 ) : null}
               </div>
             </div>
@@ -244,7 +244,7 @@ export function SlotPicker({
 
             {!isTrial && commMethod && availableBalance < slotPrice && (
               <p className="text-xs text-destructive">
-                Insufficient balance. You have €{(availableBalance / 100).toFixed(2)} available.
+                Insufficient balance. You have ${(availableBalance / 100).toFixed(2)} available.
               </p>
             )}
 
