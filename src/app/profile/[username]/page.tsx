@@ -276,13 +276,13 @@ export default async function ProfilePage({
                   {user.coachChatPrice !== null && (
                     <div>
                       <span className="text-muted-foreground">Chat Price/slot:</span>{" "}
-                      <strong>€{(user.coachChatPrice / 100).toFixed(2)}</strong>
+                      <strong>${(user.coachChatPrice / 100).toFixed(2)}</strong>
                     </div>
                   )}
                   {user.coachCallPrice !== null && (
                     <div>
                       <span className="text-muted-foreground">Call Price/slot:</span>{" "}
-                      <strong>€{(user.coachCallPrice / 100).toFixed(2)}</strong>
+                      <strong>${(user.coachCallPrice / 100).toFixed(2)}</strong>
                     </div>
                   )}
                   <div>

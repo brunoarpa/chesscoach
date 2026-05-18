@@ -81,7 +81,7 @@ export default async function DashboardHistoryPage({ searchParams }: PageProps) 
                   <div className="min-w-0">
                     <div className="font-medium truncate">{otherUser.username}</div>
                     <div className="text-sm text-muted-foreground">
-                      Lesson · {r.durationMinutes}min · {r.isTrial ? "Free" : `€${(r.estimatedCost / 100).toFixed(2)}`}
+                      Lesson · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
                       {r.scheduledStartAt && ` · ${new Date(r.scheduledStartAt).toLocaleString()}`}
                     </div>
                     {!r.scheduledStartAt && (

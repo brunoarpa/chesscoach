@@ -94,10 +94,10 @@ export function CoachCard(props: Props) {
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {continentLabels[props.continent]}</span>
               )}
               {props.coachChatPrice !== null && (
-                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> €{(props.coachChatPrice / 100).toFixed(2)}/slot (chat)</span>
+                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> ${(props.coachChatPrice / 100).toFixed(2)}/slot (chat)</span>
               )}
               {props.coachCallPrice !== null && (
-                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> €{(props.coachCallPrice / 100).toFixed(2)}/slot (call)</span>
+                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> ${(props.coachCallPrice / 100).toFixed(2)}/slot (call)</span>
               )}
               <span className="flex items-center gap-1">
                 {props.communicationPreference === "CHAT_AND_CALL" ? (

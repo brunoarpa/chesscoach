@@ -70,13 +70,13 @@ export async function updateProfile(formData: FormData) {
     ),
   };
 
-  // Validate price ranges (in euros, before *100)
-  const MAX_PRICE_EUROS = 200; // €200 per 15 minutes is plenty
-  if (raw.coachChatPrice !== undefined && (raw.coachChatPrice < 0 || raw.coachChatPrice > MAX_PRICE_EUROS || !Number.isFinite(raw.coachChatPrice))) {
-    return { error: `Chat price must be between €0 and €${MAX_PRICE_EUROS}.` };
+  // Validate price ranges (in dollars, before *100)
+  const MAX_PRICE_USD = 200; // $200 per 15 minutes is plenty
+  if (raw.coachChatPrice !== undefined && (raw.coachChatPrice < 0 || raw.coachChatPrice > MAX_PRICE_USD || !Number.isFinite(raw.coachChatPrice))) {
+    return { error: `Chat price must be between $0 and $${MAX_PRICE_USD}.` };
   }
-  if (raw.coachCallPrice !== undefined && (raw.coachCallPrice < 0 || raw.coachCallPrice > MAX_PRICE_EUROS || !Number.isFinite(raw.coachCallPrice))) {
-    return { error: `Call price must be between €0 and €${MAX_PRICE_EUROS}.` };
+  if (raw.coachCallPrice !== undefined && (raw.coachCallPrice < 0 || raw.coachCallPrice > MAX_PRICE_USD || !Number.isFinite(raw.coachCallPrice))) {
+    return { error: `Call price must be between $0 and $${MAX_PRICE_USD}.` };
   }
 
   // Validate and handle username change

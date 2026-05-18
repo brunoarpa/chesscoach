@@ -42,7 +42,7 @@ export default function TermsOfServicePage() {
             <li>Payments are processed by Stripe. ChessCoach does not store full card details.</li>
             <li>When you book a lesson, the cost is reserved from your wallet. If the coach declines or the request expires, the reserved amount is released back automatically.</li>
             <li>Wallet deposits are non-refundable except where required by applicable law. Email <a href="mailto:chesscoach.training@gmail.com" className="underline">chesscoach.training@gmail.com</a> for refund requests.</li>
-            <li>Coaches can withdraw any amount of their pending earnings (minimum €5.00) at any time. A fee of €0.40 + 2% applies per withdrawal.</li>
+            <li>Coaches can withdraw any amount of their pending earnings (minimum $5.00) at any time. A fee of $0.40 + 2% applies per withdrawal.</li>
           </ul>
         </section>
 

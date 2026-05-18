@@ -118,7 +118,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Student wallet</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Deposit via Stripe (€0.40 + 2% fee, up to €20 per deposit). Your balance is used across all coaches — no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
+              Deposit via Stripe ($0.40 + 2% fee, up to $20 per deposit). Your balance is used across all coaches — no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
             </CardContent>
           </Card>
 
@@ -127,7 +127,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Coach payouts</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              When a lesson completes, earnings move to your pending balance. Withdraw any amount you like (minimum €5.00) — €0.40 + 2% fee per withdrawal.
+              When a lesson completes, earnings move to your pending balance. Withdraw any amount you like (minimum $5.00) — $0.40 + 2% fee per withdrawal.
             </CardContent>
           </Card>
         </div>

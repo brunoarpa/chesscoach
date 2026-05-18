@@ -108,7 +108,7 @@ export function AbuseFlagList({ flags }: { flags: AbuseFlag[] }) {
                 <p className="text-sm text-muted-foreground mt-1">{flag.details}</p>
                 {flag.relatedLesson && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Lesson: {flag.relatedLesson.durationMinutes}min · €{(flag.relatedLesson.estimatedCost / 100).toFixed(2)}
+                    Lesson: {flag.relatedLesson.durationMinutes}min · ${(flag.relatedLesson.estimatedCost / 100).toFixed(2)}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">

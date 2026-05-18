@@ -37,7 +37,7 @@ export const reviewSchema = z.object({
 });
 
 export const depositSchema = z.object({
-  amount: z.coerce.number().min(500, "Minimum deposit is €5.00"), // cents
+  amount: z.coerce.number().min(500, "Minimum deposit is $5.00"), // cents
 });
 
 export type UsernameInput = z.infer<typeof usernameSchema>;

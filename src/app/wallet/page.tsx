@@ -50,25 +50,25 @@ export default async function WalletPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">€{(available / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">${(available / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Available</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">€{(user.reservedBalance / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">${(user.reservedBalance / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Reserved</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">€{(user.pendingEarnings / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">${(user.pendingEarnings / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Pending Earnings</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <div className="text-2xl font-bold">€{(user.totalEarningsAllTime / 100).toFixed(2)}</div>
+            <div className="text-2xl font-bold">${(user.totalEarningsAllTime / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Total Earned</div>
           </CardContent>
         </Card>
@@ -124,7 +124,7 @@ export default async function WalletPage() {
                     tx.amount > 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  {tx.amount > 0 ? "+" : ""}€{(tx.amount / 100).toFixed(2)}
+                  {tx.amount > 0 ? "+" : ""}${(tx.amount / 100).toFixed(2)}
                 </span>
               </CardContent>
             </Card>
