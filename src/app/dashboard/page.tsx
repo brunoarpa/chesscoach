@@ -55,10 +55,23 @@ export default async function DashboardPage() {
     });
   }
 
-  const [incomingRequests, outgoingRequests, favouriteCoaches, weeklyTemplates] = await Promise.all([
-    // Coach incoming
+  const ACTIVE_STATUSES = ["PENDING", "ACCEPTED", "IN_PROGRESS", "DISPUTED"] as const;
+  const OTHER_STATUSES = new Set(["DECLINED", "CANCELLED", "EXPIRED", "NO_SHOW"]);
+
+  const [
+    incomingActive,
+    incomingCompletedRecent,
+    incomingStatusCounts,
+    incomingHasCompletedTrial,
+    outgoingActive,
+    outgoingCompletedRecent,
+    outgoingStatusCounts,
+    favouriteCoaches,
+    weeklyTemplates,
+  ] = await Promise.all([
+    // Coach incoming — active (rendered as cards)
     prisma.lessonRequest.findMany({
-      where: { coachId: session.user.id },
+      where: { coachId: session.user.id, status: { in: [...ACTIVE_STATUSES] } },
       include: {
         student: { select: { username: true, chessComUsername: true } },
         reviews: {
@@ -68,9 +81,33 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
-    // Student outgoing
+    // Coach incoming — most recent completed (max 3 shown)
     prisma.lessonRequest.findMany({
-      where: { studentId: session.user.id },
+      where: { coachId: session.user.id, status: "COMPLETED" },
+      include: {
+        student: { select: { username: true, chessComUsername: true } },
+        reviews: {
+          where: { fromUserId: session.user.id },
+          select: { id: true, rating: true, comment: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    }),
+    // Coach incoming — counts by status (for "View all (N)" links)
+    prisma.lessonRequest.groupBy({
+      by: ["status"],
+      where: { coachId: session.user.id },
+      _count: { _all: true },
+    }),
+    // Has any completed trial? (unlocks paid bookings)
+    prisma.lessonRequest.findFirst({
+      where: { coachId: session.user.id, status: "COMPLETED", isTrial: true },
+      select: { id: true },
+    }),
+    // Student outgoing — active
+    prisma.lessonRequest.findMany({
+      where: { studentId: session.user.id, status: { in: [...ACTIVE_STATUSES] } },
       include: {
         coach: { select: { username: true, chessComUsername: true } },
         reviews: {
@@ -79,6 +116,25 @@ export default async function DashboardPage() {
         },
       },
       orderBy: { createdAt: "desc" },
+    }),
+    // Student outgoing — most recent completed (max 3)
+    prisma.lessonRequest.findMany({
+      where: { studentId: session.user.id, status: "COMPLETED" },
+      include: {
+        coach: { select: { username: true, chessComUsername: true } },
+        reviews: {
+          where: { fromUserId: session.user.id },
+          select: { id: true, rating: true, comment: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    }),
+    // Student outgoing — counts by status
+    prisma.lessonRequest.groupBy({
+      by: ["status"],
+      where: { studentId: session.user.id },
+      _count: { _all: true },
     }),
     // Favourite coaches
     prisma.favourite.findMany({
@@ -104,6 +160,22 @@ export default async function DashboardPage() {
       orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }, { startMinute: "asc" }],
     }),
   ]);
+
+  type StatusCount = { status: string; _count: { _all: number } };
+  const sumOther = (counts: StatusCount[]) =>
+    counts
+      .filter((s) => OTHER_STATUSES.has(s.status))
+      .reduce((sum, s) => sum + s._count._all, 0);
+  const completedOf = (counts: StatusCount[]) =>
+    counts.find((s) => s.status === "COMPLETED")?._count._all ?? 0;
+
+  const incomingCompletedTotal = completedOf(incomingStatusCounts);
+  const incomingOtherTotal = sumOther(incomingStatusCounts);
+  const outgoingCompletedTotal = completedOf(outgoingStatusCounts);
+  const outgoingOtherTotal = sumOther(outgoingStatusCounts);
+
+  const incomingRequests = [...incomingActive, ...incomingCompletedRecent];
+  const outgoingRequests = [...outgoingActive, ...outgoingCompletedRecent];
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -131,9 +203,9 @@ export default async function DashboardPage() {
       <section>
         <h2 className="text-xl font-semibold mb-4">
           Coach
-          {incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length > 0 && (
+          {incomingActive.length > 0 && (
             <span className="ml-2 text-base text-muted-foreground">
-              ({incomingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length} active)
+              ({incomingActive.length} active)
             </span>
           )}
         </h2>
@@ -141,6 +213,9 @@ export default async function DashboardPage() {
           requests={JSON.parse(JSON.stringify(incomingRequests))}
           coachAvailability={currentUser.coachAvailability}
           isCoach={isCoach}
+          completedTotal={incomingCompletedTotal}
+          otherTotal={incomingOtherTotal}
+          hasCompletedTrial={!!incomingHasCompletedTrial}
         />
         {isCoach && (
           <div className="mt-6">
@@ -154,9 +229,9 @@ export default async function DashboardPage() {
       <section>
         <h2 className="text-xl font-semibold mb-4">
           Student
-          {outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length > 0 && (
+          {outgoingActive.length > 0 && (
             <span className="ml-2 text-base text-muted-foreground">
-              ({outgoingRequests.filter((r: { status: string }) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "IN_PROGRESS" || r.status === "DISPUTED").length} active)
+              ({outgoingActive.length} active)
             </span>
           )}
         </h2>
@@ -165,6 +240,8 @@ export default async function DashboardPage() {
           freeTrialsRemaining={currentUser.freeTrialsRemaining}
           hasActiveDispute={currentUser.hasActiveDispute}
           favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
+          completedTotal={outgoingCompletedTotal}
+          otherTotal={outgoingOtherTotal}
         />
       </section>
     </div>

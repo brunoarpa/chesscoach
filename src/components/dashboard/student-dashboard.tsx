@@ -76,15 +76,12 @@ function RequestMeta({ request }: { request: Request }) {
   );
 }
 
-export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispute, favouriteCoaches }: { requests: Request[]; freeTrialsRemaining: number; hasActiveDispute: boolean; favouriteCoaches: FavouriteCoach[] }) {
+export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispute, favouriteCoaches, completedTotal, otherTotal }: { requests: Request[]; freeTrialsRemaining: number; hasActiveDispute: boolean; favouriteCoaches: FavouriteCoach[]; completedTotal: number; otherTotal: number }) {
   const pending = requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
   const inProgress = requests.filter((r) => r.status === "IN_PROGRESS");
   const disputed = requests.filter((r) => r.status === "DISPUTED");
   const completed = requests.filter((r) => r.status === "COMPLETED");
-  const other = requests.filter(
-    (r) => !["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "DISPUTED"].includes(r.status)
-  );
 
   return (
     <div className="space-y-8">
@@ -198,26 +195,26 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Completed</h2>
-            {completed.length > 3 && (
+            {completedTotal > 3 && (
               <Link href="/dashboard/history?role=student" className="text-sm text-muted-foreground underline">
-                View all ({completed.length}) &rarr;
+                View all ({completedTotal}) &rarr;
               </Link>
             )}
           </div>
           <div className="space-y-3">
-            {completed.slice(0, 3).map((r) => (
+            {completed.map((r) => (
               <StudentCompletedCard key={r.id} request={r} />
             ))}
           </div>
         </section>
       )}
 
-      {other.length > 0 && (
+      {otherTotal > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">History</h2>
             <Link href="/dashboard/history?role=student" className="text-sm text-muted-foreground underline">
-              View all ({other.length}) &rarr;
+              View all ({otherTotal}) &rarr;
             </Link>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -226,7 +223,7 @@ export function StudentDashboard({ requests, freeTrialsRemaining, hasActiveDispu
         </section>
       )}
 
-      {requests.length === 0 && favouriteCoaches.length === 0 && (
+      {requests.length === 0 && favouriteCoaches.length === 0 && otherTotal === 0 && (
         <p className="text-muted-foreground text-center py-8">
           No lessons yet. Search for a coach to get started!
           <br />
