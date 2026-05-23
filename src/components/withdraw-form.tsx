@@ -32,7 +32,7 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
   }, []);
 
   const pendingDollars = pendingEarnings / 100;
-  const isConnected = connectStatus?.connected && connectStatus?.chargesEnabled && connectStatus?.payoutsEnabled;
+  const isConnected = connectStatus?.connected && connectStatus?.payoutsEnabled;
   const meetsMinimum = pendingEarnings >= MIN_PAYOUT_CENTS;
 
   const parsedAmount = Number(amountStr);
@@ -58,7 +58,9 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(`$${(data.net / 100).toFixed(2)} withdrawn to your bank account!`);
+        toast.success(
+          `$${(data.net / 100).toFixed(2)} sent to your payout account — funds typically arrive in your bank in 1-2 business days.`,
+        );
         window.location.reload();
       } else {
         toast.error(data.error || "Withdrawal failed");

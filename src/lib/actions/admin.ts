@@ -196,7 +196,12 @@ export async function resolveDispute(
                 where: { id: lesson.studentId },
                 data: { walletBalance: { increment: lesson.estimatedCost } },
               }),
-              // Claw back coach earnings
+              // Claw back coach earnings. pendingEarnings may go negative if the
+              // coach already withdrew the money — that's a deficit they'll
+              // pay back out of future earnings (Stripe transfers can't be
+              // reversed once they've landed in the coach's Connect balance).
+              // The withdraw form's MIN_PAYOUT_CENTS check naturally blocks
+              // withdrawals while the balance is below the minimum.
               prisma.user.update({
                 where: { id: lesson.coachId },
                 data: {
@@ -209,6 +214,14 @@ export async function resolveDispute(
                   userId: lesson.studentId,
                   type: "LESSON_REFUND",
                   amount: lesson.estimatedCost,
+                  lessonRequestId: lessonId,
+                },
+              }),
+              prisma.transaction.create({
+                data: {
+                  userId: lesson.coachId,
+                  type: "LESSON_REFUND",
+                  amount: -lesson.estimatedCost,
                   lessonRequestId: lessonId,
                 },
               }),
