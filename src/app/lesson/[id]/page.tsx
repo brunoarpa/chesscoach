@@ -37,8 +37,15 @@ export default async function LessonPage({
   const isStudent = lesson.studentId === session.user.id;
   if (!isCoach && !isStudent) notFound();
 
-  // Only allow access for ACCEPTED or IN_PROGRESS lessons
-  if (lesson.status !== "ACCEPTED" && lesson.status !== "IN_PROGRESS") {
+  // Allow access for ACCEPTED or IN_PROGRESS lessons.
+  // After the lesson's scheduled end time, allow a 5-minute grace period so
+  // student and coach can wrap up. After that, the room is closed.
+  const GRACE_MS = 5 * 60 * 1000;
+  const isAllowedStatus = lesson.status === "ACCEPTED" || lesson.status === "IN_PROGRESS";
+  const pastGrace =
+    lesson.scheduledEndAt &&
+    Date.now() > new Date(lesson.scheduledEndAt).getTime() + GRACE_MS;
+  if (!isAllowedStatus || pastGrace) {
     redirect("/dashboard");
   }
 

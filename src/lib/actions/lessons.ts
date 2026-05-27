@@ -95,14 +95,6 @@ export async function createLessonRequest(formData: FormData) {
       return { error: "You have no free trials remaining" };
     }
 
-    // Rate limit: max 1 free trial request per hour
-    const h = await headers();
-    const ip = getClientIpFromHeaders(h);
-    const { success: rlSuccess } = await rateLimit(`free-trial:${ip}`, { maxAttempts: 1, windowMs: 60 * 60 * 1000 });
-    if (!rlSuccess) {
-      return { error: "You can only request one free trial per hour. Please try again later." };
-    }
-
     // Only allow 1 pending free trial at a time
     const pendingFreeTrial = await prisma.lessonRequest.findFirst({
       where: {
@@ -182,6 +174,21 @@ export async function createLessonRequest(formData: FormData) {
       scheduledEndAt: slot.endTime,
       acceptanceDeadline: deadline,
     };
+  }
+
+  // Rate-limit free trials: at most 3 trial requests per 30 minutes per IP.
+  // Done AFTER all validation so failed requests (invalid slot, no balance, etc.)
+  // don't burn the cooldown.
+  if (isTrial) {
+    const h = await headers();
+    const ip = getClientIpFromHeaders(h);
+    const { success: rlSuccess } = await rateLimit(`free-trial:${ip}`, {
+      maxAttempts: 3,
+      windowMs: 30 * 60 * 1000,
+    });
+    if (!rlSuccess) {
+      return { error: "You've sent 3 free trial requests recently. Please wait a bit before trying another." };
+    }
   }
 
   // Create request and reserve funds (or decrement free trial).

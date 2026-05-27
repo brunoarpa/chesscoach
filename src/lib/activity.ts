@@ -251,16 +251,7 @@ export async function detectConfirmationDisputes() {
           },
         }),
         ...(lesson.isTrial
-          ? [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: { lessonsTaken: { increment: 1 } },
-              }),
-              prisma.user.update({
-                where: { id: lesson.coachId },
-                data: { lessonsGiven: { increment: 1 } },
-              }),
-            ]
+          ? []
           : [
               prisma.user.update({
                 where: { id: lesson.studentId },
@@ -403,16 +394,7 @@ export async function autoCompleteLessons() {
         },
       });
 
-      if (lesson.isTrial) {
-        await tx.user.update({
-          where: { id: lesson.studentId },
-          data: { lessonsTaken: { increment: 1 } },
-        });
-        await tx.user.update({
-          where: { id: lesson.coachId },
-          data: { lessonsGiven: { increment: 1 } },
-        });
-      } else {
+      if (!lesson.isTrial) {
         await tx.user.update({
           where: { id: lesson.studentId },
           data: {
@@ -450,8 +432,9 @@ export async function autoCompleteLessons() {
         });
       }
 
+      // Free trials don't count toward playersTaught / lessonsGiven stats.
       const distinctStudents = await tx.lessonRequest.findMany({
-        where: { coachId: lesson.coachId, status: "COMPLETED" },
+        where: { coachId: lesson.coachId, status: "COMPLETED", isTrial: false },
         select: { studentId: true },
         distinct: ["studentId"],
       });

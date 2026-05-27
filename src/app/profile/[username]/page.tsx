@@ -408,6 +408,26 @@ export default async function ProfilePage({
             <ChessComVerificationForm />
           )}
 
+          {/* Sign-in prompt for logged-out visitors looking at a bookable coach */}
+          {!isOwnProfile &&
+            !session?.user &&
+            isCoachProfile &&
+            effectiveAvailability === "AVAILABLE" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Book a Lesson</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Sign in to book a lesson with {user.username}.
+                  </p>
+                  <Link href={`/login?callbackUrl=/profile/${user.username}`}>
+                    <Button className="w-full">Sign in to book</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+
           {/* Lesson booking for other profiles */}
           {!isOwnProfile &&
             session?.user &&
