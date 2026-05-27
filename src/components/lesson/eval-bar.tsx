@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Chess } from "chess.js";
+
+interface Line {
+  rank: number;       // 1..5
+  cp: number | null;  // centipawns, white perspective
+  mate: number | null; // mate-in-N, white perspective
+  san: string[];      // SAN move sequence
+}
 
 interface Props {
   fen: string;
   boardOrientation: "white" | "black";
+  onLinesChange?: (lines: Line[], depth: number) => void;
 }
 
-export function EvalBar({ fen, boardOrientation }: Props) {
+const MULTI_PV = 5;
+const MOVE_TIME_MS = 500;
+
+export function EvalBar({ fen, boardOrientation, onLinesChange }: Props) {
   const workerRef = useRef<Worker | null>(null);
   const [evaluation, setEvaluation] = useState<number>(0); // in centipawns
   const [mate, setMate] = useState<number | null>(null);
@@ -18,10 +30,10 @@ export function EvalBar({ fen, boardOrientation }: Props) {
   const activeFenRef = useRef<string>("");
   const activeTurnRef = useRef<"w" | "b">("w");
   const isAnalyzingRef = useRef(false);
+  const linesRef = useRef<Record<number, { cp: number | null; mate: number | null; pv: string[] }>>({});
 
   useEffect(() => {
     let terminated = false;
-    // Load Stockfish from self-hosted files in /public/stockfish/
     const worker = new Worker("/stockfish/stockfish-18-lite-single.js");
     workerRef.current = worker;
 
@@ -37,32 +49,76 @@ export function EvalBar({ fen, boardOrientation }: Props) {
       if (line.includes("uciok")) {
         worker.postMessage("setoption name Threads value 1");
         worker.postMessage("setoption name Hash value 16");
+        worker.postMessage(`setoption name MultiPV value ${MULTI_PV}`);
         worker.postMessage("isready");
       }
       if (line.includes("readyok")) {
         setIsReady(true);
       }
-      if (line.startsWith("info") && line.includes("score")) {
+      if (line.startsWith("info") && line.includes("score") && line.includes(" pv ")) {
         const depthMatch = line.match(/depth (\d+)/);
+        const multiPvMatch = line.match(/multipv (\d+)/);
         const cpMatch = line.match(/score cp (-?\d+)/);
         const mateMatch = line.match(/score mate (-?\d+)/);
+        const pvMatch = line.match(/ pv (.+?)(?:\s+bmc|\s+bs|$)/);
         const perspective = activeTurnRef.current === "w" ? 1 : -1;
 
         if (depthMatch) setDepth(parseInt(depthMatch[1], 10));
 
+        const pvIdx = multiPvMatch ? parseInt(multiPvMatch[1], 10) : 1;
+        const pvMoves = pvMatch ? pvMatch[1].trim().split(/\s+/).slice(0, 5) : [];
+
+        let lineCp: number | null = null;
+        let lineMate: number | null = null;
         if (mateMatch) {
           const sideToMoveMate = parseInt(mateMatch[1], 10);
-          const whitePerspectiveMate = sideToMoveMate * perspective;
-          setMate(whitePerspectiveMate);
-          setEvaluation(whitePerspectiveMate > 0 ? 10000 : -10000);
+          lineMate = sideToMoveMate * perspective;
         } else if (cpMatch) {
-          setMate(null);
           const sideToMoveCp = parseInt(cpMatch[1], 10);
-          setEvaluation(sideToMoveCp * perspective);
+          lineCp = sideToMoveCp * perspective;
+        }
+
+        linesRef.current[pvIdx] = { cp: lineCp, mate: lineMate, pv: pvMoves };
+
+        // The principal variation (multipv 1) drives the bar
+        if (pvIdx === 1) {
+          if (lineMate !== null) {
+            setMate(lineMate);
+            setEvaluation(lineMate > 0 ? 10000 : -10000);
+          } else if (lineCp !== null) {
+            setMate(null);
+            setEvaluation(lineCp);
+          }
+        }
+
+        // Emit top-N lines (convert UCI moves to SAN) — throttled by React state
+        if (onLinesChange) {
+          const sorted = Object.entries(linesRef.current)
+            .map(([k, v]) => ({ rank: parseInt(k, 10), ...v }))
+            .sort((a, b) => a.rank - b.rank);
+          const converted: Line[] = sorted.map((l) => {
+            // Convert UCI moves to SAN
+            const game = new Chess(activeFenRef.current);
+            const san: string[] = [];
+            for (const uci of l.pv) {
+              try {
+                const mv = game.move({
+                  from: uci.slice(0, 2),
+                  to: uci.slice(2, 4),
+                  promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+                });
+                if (mv) san.push(mv.san);
+                else break;
+              } catch {
+                break;
+              }
+            }
+            return { rank: l.rank, cp: l.cp, mate: l.mate, san };
+          });
+          onLinesChange(converted, depthMatch ? parseInt(depthMatch[1], 10) : 0);
         }
       }
 
-      // When Stockfish finishes (or is stopped), check if there's a queued position to analyze.
       if (line.startsWith("bestmove")) {
         isAnalyzingRef.current = false;
         const next = pendingFenRef.current;
@@ -71,8 +127,9 @@ export function EvalBar({ fen, boardOrientation }: Props) {
           activeFenRef.current = next;
           activeTurnRef.current = next.split(" ")[1] === "b" ? "b" : "w";
           isAnalyzingRef.current = true;
+          linesRef.current = {};
           worker.postMessage(`position fen ${next}`);
-          worker.postMessage("go movetime 350");
+          worker.postMessage(`go movetime ${MOVE_TIME_MS}`);
         }
       }
     };
@@ -85,34 +142,32 @@ export function EvalBar({ fen, boardOrientation }: Props) {
       workerRef.current = null;
       isAnalyzingRef.current = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const analyze = useCallback((position: string) => {
     const worker = workerRef.current;
     if (!worker || !isReady) return;
 
-    // Always store the latest position as pending.
     pendingFenRef.current = position;
 
     if (isAnalyzingRef.current) {
-      // Stockfish is busy — send stop. The bestmove handler will start the queued position.
       worker.postMessage("stop");
     } else {
-      // Idle — start analysis immediately.
       const next = pendingFenRef.current;
       pendingFenRef.current = null;
       if (!next || next === activeFenRef.current) return;
       activeFenRef.current = next;
       activeTurnRef.current = next.split(" ")[1] === "b" ? "b" : "w";
       isAnalyzingRef.current = true;
+      linesRef.current = {};
       worker.postMessage(`position fen ${next}`);
-      worker.postMessage("go movetime 350");
+      worker.postMessage(`go movetime ${MOVE_TIME_MS}`);
     }
   }, [isReady]);
 
   useEffect(() => {
     if (!fen || !isReady) return;
-    // Debounce rapid position changes (e.g. clicking through moves quickly)
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       analyze(fen);
@@ -122,7 +177,6 @@ export function EvalBar({ fen, boardOrientation }: Props) {
     };
   }, [fen, isReady, analyze]);
 
-  // Calculate bar percentage (from white's perspective)
   const clampedEval = Math.max(-1000, Math.min(1000, evaluation));
   const whitePercent = 50 + (clampedEval / 1000) * 50;
   const displayPercent = boardOrientation === "white" ? whitePercent : 100 - whitePercent;
@@ -132,26 +186,23 @@ export function EvalBar({ fen, boardOrientation }: Props) {
     : `${evaluation >= 0 ? "+" : ""}${(evaluation / 100).toFixed(1)}`;
 
   return (
-    <div className="flex flex-col items-center gap-0.5 h-full select-none">
-      {/* Eval number */}
-      <div className="text-[10px] font-mono font-bold leading-none">
+    <div className="flex flex-col items-center gap-1 h-full select-none">
+      <div className="text-xs font-mono font-bold leading-none">
         {evalText}
       </div>
 
-      {/* Vertical bar */}
-      <div className="relative w-6 flex-1 rounded-sm overflow-hidden border border-border bg-zinc-800 min-h-[200px]">
-        {/* White portion (from bottom) */}
+      <div className="relative w-7 flex-1 rounded-sm overflow-hidden border border-border bg-zinc-800 min-h-[200px]">
         <div
           className="absolute bottom-0 left-0 right-0 bg-white transition-all duration-300 ease-out"
           style={{ height: `${displayPercent}%` }}
         />
-        {/* Black portion is just the dark background */}
       </div>
 
-      {/* Depth */}
-      <div className="text-[9px] text-muted-foreground font-mono leading-none">
+      <div className="text-[10px] text-muted-foreground font-mono leading-none">
         d{depth}
       </div>
     </div>
   );
 }
+
+export type { Line as EngineLine };

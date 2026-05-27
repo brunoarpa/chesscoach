@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { createLessonRequest } from "@/lib/actions/lessons";
 import { toast } from "sonner";
+import { CheckCircle2 } from "lucide-react";
 
 interface Props {
   coachId: string;
@@ -26,6 +28,7 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
   const [warningDismissed, setWarningDismissed] = useState(false);
   const [commMethod, setCommMethod] = useState<string>("");
   const [message, setMessage] = useState("");
+  const [lastSent, setLastSent] = useState<{ isTrial: boolean } | null>(null);
 
   const hasPricing = coachChatPrice !== null || coachCallPrice !== null;
 
@@ -43,6 +46,7 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
       toast.error(result.error);
     } else {
       toast.success(isTrial ? "Free trial request sent!" : "Lesson request sent!");
+      setLastSent({ isTrial });
       setIsTrial(false);
       setCommMethod("");
       setMessage("");
@@ -70,6 +74,26 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
         <CardTitle className="text-base">Request a Lesson</CardTitle>
       </CardHeader>
       <CardContent>
+        {lastSent && (
+          <div className="rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30 p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-green-900 dark:text-green-200">
+                  {lastSent.isTrial ? "Free trial request sent" : "Lesson request sent"}
+                </p>
+                <p className="text-green-800 dark:text-green-300 mt-0.5">
+                  Waiting for the coach to accept your request.
+                </p>
+                <Link href="/dashboard" className="block mt-2">
+                  <Button size="sm" variant="outline" className="w-full">
+                    View status in your dashboard →
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
         <form action={handleSubmit} className="space-y-4">
           <input type="hidden" name="coachId" value={coachId} />
           <input type="hidden" name="isTrial" value={isTrial ? "true" : "false"} />
@@ -145,10 +169,19 @@ export function LessonRequestForm({ coachId, coachChatPrice, coachCallPrice, coa
               Free trial — no charge
             </p>
           ) : slotPrice > 0 ? (
-            <p className={`text-sm font-medium ${slotPrice > availableBalance / 100 ? "text-destructive" : ""}`}>
-              Cost per slot: ${slotPrice.toFixed(2)}
-              {slotPrice > availableBalance / 100 && " — Insufficient balance"}
-            </p>
+            <>
+              <p className={`text-sm font-medium ${slotPrice > availableBalance / 100 ? "text-destructive" : ""}`}>
+                Cost per slot: ${slotPrice.toFixed(2)}
+                {slotPrice > availableBalance / 100 && " — Insufficient balance"}
+              </p>
+              {slotPrice > availableBalance / 100 && (
+                <Link href="/wallet">
+                  <Button size="sm" variant="outline" className="w-full">
+                    Add funds to your wallet →
+                  </Button>
+                </Link>
+              )}
+            </>
           ) : null}
 
           {!isTrial && !hasCompletedTrial && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { createLessonRequest } from "@/lib/actions/lessons";
 import { toast } from "sonner";
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, CheckCircle2, Clock } from "lucide-react";
 
 interface Slot {
   id: string;
@@ -68,6 +69,7 @@ export function SlotPicker({
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [localSlots, setLocalSlots] = useState(slots);
+  const [lastBookedSlot, setLastBookedSlot] = useState<{ startTime: string; isTrial: boolean } | null>(null);
 
   useEffect(() => {
     setLocalSlots(slots);
@@ -107,7 +109,11 @@ export function SlotPicker({
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success(isTrial ? "Free trial booked!" : "Lesson booked!");
+      const bookedSlot = localSlots.find((s) => s.id === selectedSlotId);
+      toast.success(isTrial ? "Free trial request sent!" : "Lesson request sent!");
+      if (bookedSlot) {
+        setLastBookedSlot({ startTime: bookedSlot.startTime, isTrial });
+      }
       // Remove the booked slot from local state
       setLocalSlots((prev) => prev.filter((s) => s.id !== selectedSlotId));
       setSelectedSlotId(null);
@@ -120,7 +126,27 @@ export function SlotPicker({
   if (!hasSlots) {
     return (
       <Card>
-        <CardContent className="py-8 text-center text-muted-foreground">
+        <CardContent className="py-8 text-center text-muted-foreground space-y-3">
+          {lastBookedSlot && (
+            <div className="rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30 p-3 text-left">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 text-sm">
+                  <p className="font-medium text-green-900 dark:text-green-200">
+                    {lastBookedSlot.isTrial ? "Free trial request sent" : "Lesson request sent"}
+                  </p>
+                  <p className="text-green-800 dark:text-green-300 mt-0.5">
+                    Waiting for the coach to accept.
+                  </p>
+                  <Link href="/dashboard" className="block mt-2">
+                    <Button size="sm" variant="outline" className="w-full">
+                      View status in your dashboard →
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
           <Calendar className="mx-auto h-8 w-8 mb-2 opacity-50" />
           <p>No available time slots this week.</p>
           <p className="text-sm mt-1">Check back later or try a different coach.</p>
@@ -138,6 +164,37 @@ export function SlotPicker({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        {lastBookedSlot && (
+          <div className="rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-green-900 dark:text-green-200">
+                  {lastBookedSlot.isTrial ? "Free trial request sent" : "Lesson request sent"}
+                </p>
+                <p className="text-green-800 dark:text-green-300 mt-0.5">
+                  Waiting for the coach to accept your request for{" "}
+                  <span className="font-medium">
+                    {new Date(lastBookedSlot.startTime).toLocaleString([], {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  .
+                </p>
+              </div>
+            </div>
+            <Link href="/dashboard" className="block">
+              <Button size="sm" variant="outline" className="w-full">
+                View status in your dashboard →
+              </Button>
+            </Link>
+          </div>
+        )}
+
         {/* Slot grid grouped by day */}
         <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
           {Object.entries(grouped).map(([date, daySlots]) => (
@@ -149,7 +206,7 @@ export function SlotPicker({
                     key={slot.id}
                     type="button"
                     onClick={() => setSelectedSlotId(selectedSlotId === slot.id ? null : slot.id)}
-                    className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${
+                    className={`px-3 py-1.5 rounded text-sm font-mono transition-colors ${
                       selectedSlotId === slot.id
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted hover:bg-muted-foreground/20"
@@ -237,15 +294,22 @@ export function SlotPicker({
             </div>
 
             {!isTrial && !hasCompletedTrial && (
-              <p className="text-xs text-amber-700 dark:text-amber-400">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
                 This coach hasn&apos;t completed a free trial yet — book a free trial first to unlock paid lessons with them.
               </p>
             )}
 
             {!isTrial && commMethod && availableBalance < slotPrice && (
-              <p className="text-xs text-destructive">
-                Insufficient balance. You have ${(availableBalance / 100).toFixed(2)} available.
-              </p>
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2.5 text-sm space-y-2">
+                <p className="text-destructive">
+                  Insufficient balance — you have ${(availableBalance / 100).toFixed(2)}, need ${(slotPrice / 100).toFixed(2)}.
+                </p>
+                <Link href="/wallet">
+                  <Button size="sm" variant="outline" className="w-full">
+                    Add funds to your wallet →
+                  </Button>
+                </Link>
+              </div>
             )}
 
             <Button

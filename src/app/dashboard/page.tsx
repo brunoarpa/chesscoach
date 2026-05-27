@@ -202,6 +202,27 @@ export default async function DashboardPage() {
 
       <section>
         <h2 className="text-xl font-semibold mb-4">
+          Student
+          {outgoingActive.length > 0 && (
+            <span className="ml-2 text-base text-muted-foreground">
+              ({outgoingActive.length} active)
+            </span>
+          )}
+        </h2>
+        <StudentDashboard
+          requests={JSON.parse(JSON.stringify(outgoingRequests))}
+          freeTrialsRemaining={currentUser.freeTrialsRemaining}
+          hasActiveDispute={currentUser.hasActiveDispute}
+          favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
+          completedTotal={outgoingCompletedTotal}
+          otherTotal={outgoingOtherTotal}
+        />
+      </section>
+
+      <hr className="my-8 border-border" />
+
+      <section>
+        <h2 className="text-xl font-semibold mb-4">
           Coach
           {incomingActive.length > 0 && (
             <span className="ml-2 text-base text-muted-foreground">
@@ -222,27 +243,6 @@ export default async function DashboardPage() {
             <CoachScheduleEditor initialTemplates={weeklyTemplates} />
           </div>
         )}
-      </section>
-
-      <hr className="my-8 border-border" />
-
-      <section>
-        <h2 className="text-xl font-semibold mb-4">
-          Student
-          {outgoingActive.length > 0 && (
-            <span className="ml-2 text-base text-muted-foreground">
-              ({outgoingActive.length} active)
-            </span>
-          )}
-        </h2>
-        <StudentDashboard
-          requests={JSON.parse(JSON.stringify(outgoingRequests))}
-          freeTrialsRemaining={currentUser.freeTrialsRemaining}
-          hasActiveDispute={currentUser.hasActiveDispute}
-          favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
-          completedTotal={outgoingCompletedTotal}
-          otherTotal={outgoingOtherTotal}
-        />
       </section>
     </div>
   );

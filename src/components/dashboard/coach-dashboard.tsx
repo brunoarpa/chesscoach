@@ -303,7 +303,7 @@ function AcceptedLessonCard({ request, role }: { request: Request; role: "coach"
           </div>
           <div className="flex gap-2">
             <Link href={`/lesson/${request.id}`}>
-              <Button size="sm" variant="default">Join Lesson</Button>
+              <Button size="sm" variant="default">Join Room</Button>
             </Link>
             {!myStartConfirmed && (
               <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
@@ -347,7 +347,7 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
           </div>
           <div className="flex gap-2">
             <Link href={`/lesson/${request.id}`}>
-              <Button size="sm" variant="default">Join Lesson</Button>
+              <Button size="sm" variant="default">Join Room</Button>
             </Link>
           </div>
         </div>

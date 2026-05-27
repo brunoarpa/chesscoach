@@ -308,7 +308,7 @@ function StudentAcceptedCard({ request }: { request: Request }) {
           </div>
           <div className="flex gap-2">
             <Link href={`/lesson/${request.id}`}>
-              <Button size="sm" variant="default">Join Lesson</Button>
+              <Button size="sm" variant="default">Join Room</Button>
             </Link>
             {!request.studentStartConfirmed && (
               <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
@@ -360,7 +360,7 @@ function StudentActiveCard({ request }: { request: Request }) {
           </div>
           <div className="flex items-center gap-2">
             <Link href={`/lesson/${request.id}`}>
-              <Button size="sm" variant="default">Join Lesson</Button>
+              <Button size="sm" variant="default">Join Room</Button>
             </Link>
             <Button size="sm" variant="destructive" onClick={() => setShowDispute(!showDispute)} disabled={loading}>
               Report Issue

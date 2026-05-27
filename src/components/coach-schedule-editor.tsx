@@ -147,14 +147,14 @@ export function CoachScheduleEditor({ initialTemplates }: Props) {
                   <div className="flex gap-0.5 justify-center mt-0.5">
                     <button
                       onClick={() => selectAllDay(i)}
-                      className="text-[10px] text-blue-500 hover:underline"
+                      className="text-xs text-blue-500 hover:underline"
                       type="button"
                     >
                       All
                     </button>
                     <button
                       onClick={() => clearDay(i)}
-                      className="text-[10px] text-muted-foreground hover:underline"
+                      className="text-xs text-muted-foreground hover:underline"
                       type="button"
                     >
                       Clear
@@ -175,7 +175,7 @@ export function CoachScheduleEditor({ initialTemplates }: Props) {
                     {/* Time label - only show on :00 */}
                     <div className="flex items-center justify-end pr-2">
                       {minute === 0 && (
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {formatTime(hour, minute)}
                         </span>
                       )}

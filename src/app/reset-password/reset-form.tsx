@@ -52,7 +52,9 @@ export function ResetForm({ token }: { token: string }) {
           type="password"
           required
           minLength={8}
-          autoComplete="new-password"
+          autoComplete="off"
+          data-1p-ignore
+          data-lpignore="true"
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <p className="text-xs text-muted-foreground">At least 8 characters.</p>
