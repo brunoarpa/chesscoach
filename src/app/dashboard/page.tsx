@@ -33,7 +33,6 @@ export default async function DashboardPage() {
     ? (wasInactive || (userCheck.coachChatPrice === null && userCheck.coachCallPrice === null)) && userCheck.coachAvailability !== "UNAVAILABLE"
     : false;
 
-  // Update activity and fetch user data
   const currentUser = await prisma.user.update({
     where: { id: session.user.id },
     data: {
@@ -46,7 +45,6 @@ export default async function DashboardPage() {
 
   const isCoach = !!(currentUser.coachChatPrice || currentUser.coachCallPrice);
 
-  // Recalculate coach ELO on every dashboard visit for anyone set up as a coach.
   if (isCoach) {
     const newElo = await calculateCoachElo(session.user.id);
     await prisma.user.update({
@@ -66,10 +64,9 @@ export default async function DashboardPage() {
     outgoingActive,
     outgoingCompletedRecent,
     outgoingStatusCounts,
-    favouriteCoaches,
     weeklyTemplates,
   ] = await Promise.all([
-    // Coach incoming — active (rendered as cards)
+    // Coach incoming — active
     prisma.lessonRequest.findMany({
       where: { coachId: session.user.id, status: { in: [...ACTIVE_STATUSES] } },
       include: {
@@ -81,7 +78,7 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
-    // Coach incoming — most recent completed (max 3 shown)
+    // Coach incoming — most recent completed (for review prompt)
     prisma.lessonRequest.findMany({
       where: { coachId: session.user.id, status: "COMPLETED" },
       include: {
@@ -92,15 +89,14 @@ export default async function DashboardPage() {
         },
       },
       orderBy: { createdAt: "desc" },
-      take: 3,
+      take: 1,
     }),
-    // Coach incoming — counts by status (for "View all (N)" links)
+    // Coach incoming — counts by status
     prisma.lessonRequest.groupBy({
       by: ["status"],
       where: { coachId: session.user.id },
       _count: { _all: true },
     }),
-    // Has any completed trial? (unlocks paid bookings)
     prisma.lessonRequest.findFirst({
       where: { coachId: session.user.id, status: "COMPLETED", isTrial: true },
       select: { id: true },
@@ -117,7 +113,7 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
-    // Student outgoing — most recent completed (max 3)
+    // Student outgoing — most recent completed (for review prompt)
     prisma.lessonRequest.findMany({
       where: { studentId: session.user.id, status: "COMPLETED" },
       include: {
@@ -128,32 +124,13 @@ export default async function DashboardPage() {
         },
       },
       orderBy: { createdAt: "desc" },
-      take: 3,
+      take: 1,
     }),
-    // Student outgoing — counts by status
     prisma.lessonRequest.groupBy({
       by: ["status"],
       where: { studentId: session.user.id },
       _count: { _all: true },
     }),
-    // Favourite coaches
-    prisma.favourite.findMany({
-      where: { userId: session.user.id },
-      include: {
-        coach: {
-          select: {
-            id: true,
-            username: true,
-            coachAvailability: true,
-            chessRating: true,
-            coachChatPrice: true,
-            coachCallPrice: true,
-            lastActiveAt: true,
-          },
-        },
-      },
-    }),
-    // Weekly schedule templates (for coaches)
     prisma.timeSlotTemplate.findMany({
       where: { coachId: session.user.id },
       select: { dayOfWeek: true, startHour: true, startMinute: true },
@@ -163,9 +140,7 @@ export default async function DashboardPage() {
 
   type StatusCount = { status: string; _count: { _all: number } };
   const sumOther = (counts: StatusCount[]) =>
-    counts
-      .filter((s) => OTHER_STATUSES.has(s.status))
-      .reduce((sum, s) => sum + s._count._all, 0);
+    counts.filter((s) => OTHER_STATUSES.has(s.status)).reduce((sum, s) => sum + s._count._all, 0);
   const completedOf = (counts: StatusCount[]) =>
     counts.find((s) => s.status === "COMPLETED")?._count._all ?? 0;
 
@@ -177,20 +152,19 @@ export default async function DashboardPage() {
   const incomingRequests = [...incomingActive, ...incomingCompletedRecent];
   const outgoingRequests = [...outgoingActive, ...outgoingCompletedRecent];
 
-  // Pending lesson requests from students need the user's response — hoist to top.
   const pendingIncoming = incomingActive.filter((r) => r.status === "PENDING");
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <AutoRefresh />
-      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
       {currentUser.isSuspended && (
         <div className="mb-6 p-4 rounded-lg border border-destructive bg-destructive/10 text-destructive">
           <p className="font-medium">Your account is suspended.</p>
           <p className="text-sm mt-1">
             You cannot book lessons, accept lessons, or deposit funds. You can still withdraw any remaining coach earnings.
-            Contact support at{" "}
+            Contact{" "}
             <a href="mailto:chesscoach.training@gmail.com" className="underline font-medium">
               chesscoach.training@gmail.com
             </a>{" "}
@@ -199,21 +173,18 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {!currentUser.isSuspended && !isCoach && (
-        <CoachInviteBanner />
-      )}
+      {!currentUser.isSuspended && !isCoach && <CoachInviteBanner />}
 
+      {/* Top priority: requests waiting for the user to accept/decline */}
       {pendingIncoming.length > 0 && (
         <section className="mb-8">
           <div className="rounded-lg border border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20 p-4">
-            <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-200">
-                Needs your response
-              </h2>
-              <span className="text-sm text-amber-800 dark:text-amber-300">
-                {pendingIncoming.length} lesson {pendingIncoming.length === 1 ? "request" : "requests"} from {pendingIncoming.length === 1 ? "a student" : "students"}
+            <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-200 mb-3">
+              Needs your response
+              <span className="ml-2 text-sm font-normal text-amber-800 dark:text-amber-300">
+                · {pendingIncoming.length} lesson {pendingIncoming.length === 1 ? "request" : "requests"} from {pendingIncoming.length === 1 ? "a student" : "students"}
               </span>
-            </div>
+            </h2>
             <div className="space-y-3">
               {pendingIncoming.map((r) => (
                 <PendingRequestCard key={r.id} request={JSON.parse(JSON.stringify(r))} />
@@ -223,59 +194,40 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="text-xl font-semibold mb-1">
-          Lessons you&apos;re taking
-          {outgoingActive.length > 0 && (
-            <span className="ml-2 text-base text-muted-foreground">
-              ({outgoingActive.length} active)
-            </span>
-          )}
-        </h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          Lessons you&apos;ve booked with coaches.
-        </p>
+      {/* Main: your lessons (as student) */}
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold mb-3">Your lessons</h2>
         <StudentDashboard
           requests={JSON.parse(JSON.stringify(outgoingRequests))}
           freeTrialsRemaining={currentUser.freeTrialsRemaining}
           hasActiveDispute={currentUser.hasActiveDispute}
-          favouriteCoaches={JSON.parse(JSON.stringify(favouriteCoaches.map((f) => f.coach)))}
           completedTotal={outgoingCompletedTotal}
           otherTotal={outgoingOtherTotal}
         />
       </section>
 
-      <hr className="my-8 border-border" />
+      {/* Coach side (if applicable) */}
+      {isCoach && (
+        <>
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold mb-3">Your students</h2>
+            <CoachDashboard
+              requests={JSON.parse(JSON.stringify(incomingRequests))}
+              coachAvailability={currentUser.coachAvailability}
+              isCoach={isCoach}
+              completedTotal={incomingCompletedTotal}
+              otherTotal={incomingOtherTotal}
+              hasCompletedTrial={!!incomingHasCompletedTrial}
+              hidePending
+            />
+          </section>
 
-      <section>
-        <h2 className="text-xl font-semibold mb-1">
-          Lessons you&apos;re teaching
-          {incomingActive.length > 0 && (
-            <span className="ml-2 text-base text-muted-foreground">
-              ({incomingActive.length} active)
-            </span>
-          )}
-        </h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          {isCoach
-            ? "Lessons students have booked with you."
-            : "You haven't set up a coach profile yet."}
-        </p>
-        <CoachDashboard
-          requests={JSON.parse(JSON.stringify(incomingRequests))}
-          coachAvailability={currentUser.coachAvailability}
-          isCoach={isCoach}
-          completedTotal={incomingCompletedTotal}
-          otherTotal={incomingOtherTotal}
-          hasCompletedTrial={!!incomingHasCompletedTrial}
-          hidePending
-        />
-        {isCoach && (
-          <div className="mt-6">
+          <section>
+            <h2 className="text-xl font-semibold mb-3">Your schedule</h2>
             <CoachScheduleEditor initialTemplates={weeklyTemplates} />
-          </div>
-        )}
-      </section>
+          </section>
+        </>
+      )}
     </div>
   );
 }
