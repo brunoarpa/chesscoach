@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calculateCoachElo } from "@/lib/elo";
-import { CoachDashboard } from "@/components/dashboard/coach-dashboard";
+import { CoachDashboard, PendingRequestCard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
@@ -177,6 +177,9 @@ export default async function DashboardPage() {
   const incomingRequests = [...incomingActive, ...incomingCompletedRecent];
   const outgoingRequests = [...outgoingActive, ...outgoingCompletedRecent];
 
+  // Pending lesson requests from students need the user's response — hoist to top.
+  const pendingIncoming = incomingActive.filter((r) => r.status === "PENDING");
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <AutoRefresh />
@@ -200,15 +203,38 @@ export default async function DashboardPage() {
         <CoachInviteBanner />
       )}
 
+      {pendingIncoming.length > 0 && (
+        <section className="mb-8">
+          <div className="rounded-lg border border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20 p-4">
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-xl font-semibold text-amber-900 dark:text-amber-200">
+                Needs your response
+              </h2>
+              <span className="text-sm text-amber-800 dark:text-amber-300">
+                {pendingIncoming.length} lesson {pendingIncoming.length === 1 ? "request" : "requests"} from {pendingIncoming.length === 1 ? "a student" : "students"}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {pendingIncoming.map((r) => (
+                <PendingRequestCard key={r.id} request={JSON.parse(JSON.stringify(r))} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section>
-        <h2 className="text-xl font-semibold mb-4">
-          Student
+        <h2 className="text-xl font-semibold mb-1">
+          Lessons you&apos;re taking
           {outgoingActive.length > 0 && (
             <span className="ml-2 text-base text-muted-foreground">
               ({outgoingActive.length} active)
             </span>
           )}
         </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Lessons you&apos;ve booked with coaches.
+        </p>
         <StudentDashboard
           requests={JSON.parse(JSON.stringify(outgoingRequests))}
           freeTrialsRemaining={currentUser.freeTrialsRemaining}
@@ -222,14 +248,19 @@ export default async function DashboardPage() {
       <hr className="my-8 border-border" />
 
       <section>
-        <h2 className="text-xl font-semibold mb-4">
-          Coach
+        <h2 className="text-xl font-semibold mb-1">
+          Lessons you&apos;re teaching
           {incomingActive.length > 0 && (
             <span className="ml-2 text-base text-muted-foreground">
               ({incomingActive.length} active)
             </span>
           )}
         </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          {isCoach
+            ? "Lessons students have booked with you."
+            : "You haven't set up a coach profile yet."}
+        </p>
         <CoachDashboard
           requests={JSON.parse(JSON.stringify(incomingRequests))}
           coachAvailability={currentUser.coachAvailability}
@@ -237,6 +268,7 @@ export default async function DashboardPage() {
           completedTotal={incomingCompletedTotal}
           otherTotal={incomingOtherTotal}
           hasCompletedTrial={!!incomingHasCompletedTrial}
+          hidePending
         />
         {isCoach && (
           <div className="mt-6">
