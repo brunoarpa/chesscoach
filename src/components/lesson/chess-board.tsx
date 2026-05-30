@@ -1,13 +1,40 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Chess, Square } from "chess.js";
 import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
+
+// Move quality classification — thresholds match the user's table (in centipawns).
+type MoveClass = "best" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
+
+const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; color: string; bg: string }> = {
+  best:        { label: "Best",       symbol: "★",  color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-950/40" },
+  excellent:   { label: "Excellent",  symbol: "!",  color: "text-green-700 dark:text-green-300",     bg: "bg-green-100 dark:bg-green-950/40" },
+  good:        { label: "Good",       symbol: "✓",  color: "text-lime-700 dark:text-lime-300",       bg: "bg-lime-100 dark:bg-lime-950/40" },
+  inaccuracy:  { label: "Inaccuracy", symbol: "?!", color: "text-yellow-700 dark:text-yellow-300",   bg: "bg-yellow-100 dark:bg-yellow-950/40" },
+  mistake:     { label: "Mistake",    symbol: "?",  color: "text-orange-700 dark:text-orange-300",   bg: "bg-orange-100 dark:bg-orange-950/40" },
+  blunder:     { label: "Blunder",    symbol: "??", color: "text-red-700 dark:text-red-300",         bg: "bg-red-100 dark:bg-red-950/40" },
+};
+
+function classifyByCpLoss(cpLoss: number): MoveClass {
+  // cpLoss is in centipawns; 0.02 pawns = 2 cp etc.
+  if (cpLoss <= 0.5) return "best";
+  if (cpLoss <= 2) return "excellent";
+  if (cpLoss <= 5) return "good";
+  if (cpLoss <= 10) return "inaccuracy";
+  if (cpLoss <= 20) return "mistake";
+  return "blunder";
+}
+
+function evalToCp(line: { cp: number | null; mate: number | null }): number {
+  if (line.mate !== null) return line.mate > 0 ? 100000 : -100000;
+  return line.cp ?? 0;
+}
 
 interface Props {
   lessonId: string;
@@ -54,6 +81,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [highlightedSquares, setHighlightedSquares] = useState<Record<string, React.CSSProperties>>({});
   const [engineLines, setEngineLines] = useState<EngineLine[]>([]);
+  // Eval cache: best eval (cp, white perspective) keyed by FEN. Populated as the
+  // engine analyzes each position the user visits — feeds move classification.
+  const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
+  const [showEngineArrows, setShowEngineArrows] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -411,9 +442,79 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
     });
   }
 
-  const handleLines = useCallback((lines: EngineLine[]) => {
+  const handleLines = useCallback((lines: EngineLine[], _depth: number, fen: string) => {
     setEngineLines(lines);
+    if (lines.length > 0) {
+      const bestCp = evalToCp(lines[0]);
+      setEvalCache((prev) => {
+        if (prev.get(fen) === bestCp) return prev;
+        const next = new Map(prev);
+        next.set(fen, bestCp);
+        return next;
+      });
+    }
   }, []);
+
+  // FEN at each move index (and -1 for starting position). Used to look up
+  // cached evals when classifying moves.
+  const fenByIndex = useMemo(() => {
+    const map = new Map<number, string>();
+    const g = new Chess();
+    map.set(-1, g.fen());
+    for (let i = 0; i < moveHistory.length; i++) {
+      try {
+        g.move(moveHistory[i]);
+        map.set(i, g.fen());
+      } catch {
+        break;
+      }
+    }
+    return map;
+  }, [moveHistory]);
+
+  // Engine arrows for the position currently displayed: bright green for the
+  // best move, lighter green for any other line within ~2cp ("excellent").
+  const currentFen = game.fen();
+  const engineArrows = useMemo<Arrow[]>(() => {
+    if (!showEngineArrows || engineLines.length === 0) return [];
+    const bestCp = evalToCp(engineLines[0]);
+    const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
+    const out: Arrow[] = [];
+    for (let i = 0; i < engineLines.length; i++) {
+      const line = engineLines[i];
+      if (line.san.length === 0) continue;
+      const lineCp = evalToCp(line);
+      const loss = sideToMove === "w" ? bestCp - lineCp : lineCp - bestCp;
+      if (loss > 2 && i > 0) break; // only "excellent" (≤2cp) shown alongside best
+      try {
+        const g = new Chess(currentFen);
+        const mv = g.move(line.san[0]);
+        if (!mv) continue;
+        out.push({
+          startSquare: mv.from,
+          endSquare: mv.to,
+          color: i === 0 ? "#81b64c" : "#a5d6a7",
+        } as Arrow);
+      } catch {
+        continue;
+      }
+    }
+    return out;
+  }, [engineLines, currentFen, showEngineArrows]);
+
+  // Classify a played move based on cached evals (parent best vs child best).
+  function classifyMoveAtIndex(index: number): MoveClass | null {
+    const parentFen = fenByIndex.get(index - 1);
+    const childFen = fenByIndex.get(index);
+    if (!parentFen || !childFen) return null;
+    const parentBest = evalCache.get(parentFen);
+    const childBest = evalCache.get(childFen);
+    if (parentBest == null || childBest == null) return null;
+    const parentTurn = parentFen.split(" ")[1];
+    let loss = parentTurn === "w" ? parentBest - childBest : childBest - parentBest;
+    loss = Math.max(0, loss);
+    return classifyByCpLoss(loss);
+  }
 
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
@@ -429,7 +530,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
               onSquareMouseDown: onSquareMouseDown,
               onSquareMouseUp: onSquareMouseUp,
               boardOrientation: boardOrientation,
-              arrows: arrows,
+              arrows: [...engineArrows, ...arrows],
               squareStyles: squareStyles,
               animationDurationInMs: 200,
               allowDrawingArrows: true,
@@ -465,6 +566,15 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowImport(!showImport)} title="Upload PGN or game link">
           <Upload className="h-5 w-5" />
         </Button>
+        <Button
+          variant={showEngineArrows ? "default" : "ghost"}
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => setShowEngineArrows((v) => !v)}
+          title={showEngineArrows ? "Hide engine hints" : "Show engine best moves"}
+        >
+          <Lightbulb className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Reset confirmation */}
@@ -485,51 +595,89 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
         </div>
       )}
 
-      {/* Engine lines (top 5 like chess.com) */}
-      {engineLines.length > 0 && (
-        <div className="w-full rounded border bg-muted/30 p-2 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground">Top engine lines</p>
-          <div className="space-y-0.5">
-            {engineLines.slice(0, 5).map((line) => (
-              <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
-                <span className="text-xs font-bold text-muted-foreground w-7 shrink-0">
-                  {formatLineEval(line)}
-                </span>
-                <span className="truncate text-sm">
-                  {line.san.slice(0, 6).join(" ")}
-                  {line.san.length > 6 && " …"}
-                </span>
-              </div>
-            ))}
+      {/* Top engine lines — best move (★) and any other "excellent" moves within 2cp */}
+      {engineLines.length > 0 && (() => {
+        const bestCp = evalToCp(engineLines[0]);
+        const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
+        const annotated = engineLines.map((line) => {
+          const lineCp = evalToCp(line);
+          const loss = sideToMove === "w" ? bestCp - lineCp : lineCp - bestCp;
+          return { line, loss: Math.max(0, loss) };
+        });
+        return (
+          <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
+            <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
+            <div className="space-y-1">
+              {annotated.map(({ line, loss }, i) => {
+                const cls: MoveClass = i === 0 ? "best" : classifyByCpLoss(loss);
+                const style = MOVE_CLASS_STYLE[cls];
+                return (
+                  <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
+                    <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded text-xs font-bold ${style.color} ${style.bg}`}>
+                      {style.symbol}
+                    </span>
+                    <span className="text-xs font-bold text-muted-foreground w-12 shrink-0">
+                      {formatLineEval(line)}
+                    </span>
+                    <span className="truncate text-sm">
+                      {line.san.slice(0, 6).join(" ")}
+                      {line.san.length > 6 && " …"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* Move list */}
+      {/* Move list — each move shows its quality classification (★ ! ✓ ?! ? ??) */}
       {movePairs.length > 0 && (
-        <div className="w-full max-h-[160px] overflow-y-auto rounded border bg-muted/30 p-2">
+        <div className="w-full max-h-[180px] overflow-y-auto rounded border bg-muted/30 p-2">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm font-mono">
-            {movePairs.map((pair) => (
-              <span key={pair.num}>
-                <span className="text-muted-foreground">{pair.num}.</span>
-                <button
-                  type="button"
-                  className={`ml-0.5 px-1 rounded ${currentMoveIndex === (pair.num - 1) * 2 ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                  onClick={() => handleMoveClick((pair.num - 1) * 2)}
-                >
-                  {pair.white}
-                </button>
-                {pair.black && (
+            {movePairs.map((pair) => {
+              const whiteIdx = (pair.num - 1) * 2;
+              const blackIdx = whiteIdx + 1;
+              const whiteClass = classifyMoveAtIndex(whiteIdx);
+              const blackClass = pair.black ? classifyMoveAtIndex(blackIdx) : null;
+              return (
+                <span key={pair.num} className="inline-flex items-baseline gap-1">
+                  <span className="text-muted-foreground">{pair.num}.</span>
                   <button
                     type="button"
-                    className={`ml-0.5 px-1 rounded ${currentMoveIndex === (pair.num - 1) * 2 + 1 ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                    onClick={() => handleMoveClick((pair.num - 1) * 2 + 1)}
+                    className={`inline-flex items-baseline gap-0.5 px-1 rounded ${currentMoveIndex === whiteIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+                    onClick={() => handleMoveClick(whiteIdx)}
                   >
-                    {pair.black}
+                    <span>{pair.white}</span>
+                    {whiteClass && (
+                      <span
+                        className={`text-[10px] font-bold ${MOVE_CLASS_STYLE[whiteClass].color}`}
+                        title={MOVE_CLASS_STYLE[whiteClass].label}
+                      >
+                        {MOVE_CLASS_STYLE[whiteClass].symbol}
+                      </span>
+                    )}
                   </button>
-                )}
-              </span>
-            ))}
+                  {pair.black && (
+                    <button
+                      type="button"
+                      className={`inline-flex items-baseline gap-0.5 px-1 rounded ${currentMoveIndex === blackIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+                      onClick={() => handleMoveClick(blackIdx)}
+                    >
+                      <span>{pair.black}</span>
+                      {blackClass && (
+                        <span
+                          className={`text-[10px] font-bold ${MOVE_CLASS_STYLE[blackClass].color}`}
+                          title={MOVE_CLASS_STYLE[blackClass].label}
+                        >
+                          {MOVE_CLASS_STYLE[blackClass].symbol}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

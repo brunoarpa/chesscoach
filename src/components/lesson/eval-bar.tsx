@@ -13,7 +13,7 @@ interface Line {
 interface Props {
   fen: string;
   boardOrientation: "white" | "black";
-  onLinesChange?: (lines: Line[], depth: number) => void;
+  onLinesChange?: (lines: Line[], depth: number, fen: string) => void;
 }
 
 const MULTI_PV = 5;
@@ -115,7 +115,7 @@ export function EvalBar({ fen, boardOrientation, onLinesChange }: Props) {
             }
             return { rank: l.rank, cp: l.cp, mate: l.mate, san };
           });
-          onLinesChange(converted, depthMatch ? parseInt(depthMatch[1], 10) : 0);
+          onLinesChange(converted, depthMatch ? parseInt(depthMatch[1], 10) : 0, activeFenRef.current);
         }
       }
 
