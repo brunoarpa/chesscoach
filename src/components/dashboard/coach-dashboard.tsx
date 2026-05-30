@@ -38,180 +38,147 @@ interface Request {
   reviews: MyReview[];
 }
 
-const statusColors: Record<string, string> = {
-  PENDING: "secondary",
-  ACCEPTED: "default",
-  IN_PROGRESS: "default",
-  DECLINED: "destructive",
-  EXPIRED: "outline",
-  COMPLETED: "default",
-  CANCELLED: "outline",
-  DISPUTED: "destructive",
-};
-
 const availabilityConfig: Record<string, { color: string; label: string }> = {
   AVAILABLE: { color: "bg-green-500", label: "Available" },
   UNAVAILABLE: { color: "bg-gray-400", label: "Unavailable" },
 };
 
+function StatusBadge({ status }: { status: string }) {
+  if (status === "PENDING") return <Badge variant="secondary">Pending</Badge>;
+  if (status === "ACCEPTED") return <Badge>Awaiting start</Badge>;
+  if (status === "IN_PROGRESS") return <Badge className="bg-green-600 hover:bg-green-700">In progress</Badge>;
+  if (status === "DISPUTED") return <Badge variant="destructive">Disputed</Badge>;
+  return null;
+}
+
 function RequestMeta({ request }: { request: Request }) {
   return (
-    <>
-      <span className="text-sm text-muted-foreground sm:ml-2 block sm:inline mt-0.5 sm:mt-0">
-        Lesson · {request.durationMinutes}min · {request.isTrial ? "Free" : `$${(request.estimatedCost / 100).toFixed(2)}`}
-        {request.communicationMethod && ` · ${request.communicationMethod === "CALL" ? "Call" : "Chat"}`}
-        {request.scheduledStartAt && ` · ${new Date(request.scheduledStartAt).toLocaleString()}`}
-      </span>
-      {request.isTrial && <Badge variant="secondary" className="ml-2">FREE TRIAL</Badge>}
-    </>
+    <div className="text-sm text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+      <span>{request.durationMinutes} min</span>
+      <span>·</span>
+      <span>{request.isTrial ? "Free trial" : `$${(request.estimatedCost / 100).toFixed(2)}`}</span>
+      {request.communicationMethod && (
+        <>
+          <span>·</span>
+          <span>{request.communicationMethod === "CALL" ? "Audio call" : "Chat"}</span>
+        </>
+      )}
+      {request.scheduledStartAt && (
+        <>
+          <span>·</span>
+          <span>{new Date(request.scheduledStartAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+        </>
+      )}
+    </div>
   );
 }
 
-export function CoachDashboard({ requests, coachAvailability, isCoach, completedTotal, otherTotal, hasCompletedTrial, hidePending = false }: { requests: Request[]; coachAvailability: string; isCoach: boolean; completedTotal: number; otherTotal: number; hasCompletedTrial: boolean; hidePending?: boolean }) {
-  const pending = hidePending ? [] : requests.filter((r) => r.status === "PENDING");
-  const accepted = requests.filter((r) => r.status === "ACCEPTED");
-  const inProgress = requests.filter((r) => r.status === "IN_PROGRESS");
-  const disputed = requests.filter((r) => r.status === "DISPUTED");
+export function CoachDashboard({
+  requests,
+  coachAvailability,
+  isCoach,
+  completedTotal,
+  otherTotal,
+  hasCompletedTrial,
+  hidePending = false,
+}: {
+  requests: Request[];
+  coachAvailability: string;
+  isCoach: boolean;
+  completedTotal: number;
+  otherTotal: number;
+  hasCompletedTrial: boolean;
+  hidePending?: boolean;
+}) {
+  const STATUS_ORDER: Record<string, number> = {
+    IN_PROGRESS: 0,
+    ACCEPTED: 1,
+    PENDING: 2,
+    DISPUTED: 3,
+  };
+  const active = requests
+    .filter((r) => {
+      if (!(r.status in STATUS_ORDER)) return false;
+      if (hidePending && r.status === "PENDING") return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const sa = STATUS_ORDER[a.status] ?? 99;
+      const sb = STATUS_ORDER[b.status] ?? 99;
+      if (sa !== sb) return sa - sb;
+      const ta = a.scheduledStartAt ? new Date(a.scheduledStartAt).getTime() : Infinity;
+      const tb = b.scheduledStartAt ? new Date(b.scheduledStartAt).getTime() : Infinity;
+      if (ta !== tb) return ta - tb;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
   const completed = requests.filter((r) => r.status === "COMPLETED");
+  const lastReviewable = completed.find((r) => !(r.reviews?.[0]));
+  const pastTotal = completedTotal + otherTotal;
   const showTrialNotice = isCoach && !hasCompletedTrial;
 
+  if (!isCoach) {
+    return null;
+  }
+
   return (
-    <div className="space-y-8">
-      {/* Availability status banner */}
-      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+    <div className="space-y-3">
+      {/* Availability status */}
+      <div className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${
         coachAvailability === "AVAILABLE"
           ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30"
           : "border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-950/30"
       }`}>
-        <span className={`w-3 h-3 rounded-full ${availabilityConfig[coachAvailability]?.color ?? "bg-gray-400"}`} />
-        <span className="text-sm font-medium">
+        <span className={`w-2.5 h-2.5 rounded-full ${availabilityConfig[coachAvailability]?.color ?? "bg-gray-400"}`} />
+        <span className="font-medium">
           {availabilityConfig[coachAvailability]?.label ?? "Unknown"}
         </span>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-muted-foreground">
           {coachAvailability === "AVAILABLE"
-            ? "— You are accepting lesson requests"
-            : "— Students cannot send you new requests"}
+            ? "— accepting requests"
+            : "— students can't book new lessons"}
         </span>
       </div>
 
       {showTrialNotice && (
-        <div className="p-4 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            You need to complete 1 successful free trial lesson before you can receive paid bookings.
-          </p>
-          <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
-            Until then, students can only book free trials with you. Accept a trial request and complete the lesson to unlock paid bookings.
+        <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 text-sm">
+          <p className="font-medium text-amber-900 dark:text-amber-200">
+            Complete 1 free trial lesson to unlock paid bookings.
           </p>
         </div>
       )}
 
-      {pending.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Pending Requests</h2>
-          <div className="space-y-3">
-            {pending.map((r) => (
-              <PendingRequestCard key={r.id} request={r} />
-            ))}
-          </div>
-        </section>
+      {active.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No active lessons with students.</p>
+      ) : (
+        active.map((r) => <CoachCard key={r.id} request={r} />)
       )}
 
-      {accepted.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Awaiting Start</h2>
-          <p className="text-sm text-muted-foreground mb-3">Both you and the student must confirm the lesson has started.</p>
-          <div className="space-y-3">
-            {accepted.map((r) => (
-              <AcceptedLessonCard key={r.id} request={r} role="coach" />
-            ))}
-          </div>
-        </section>
+      {lastReviewable && (
+        <Card>
+          <CardContent className="pt-4">
+            <ReviewBlock request={lastReviewable} />
+          </CardContent>
+        </Card>
       )}
 
-      {inProgress.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Active Lessons</h2>
-          <div className="space-y-3">
-            {inProgress.map((r) => (
-              <ActiveLessonCard key={r.id} request={r} role="coach" />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {disputed.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Disputed</h2>
-          <div className="space-y-3">
-            {disputed.map((r) => (
-              <Card key={r.id}>
-                <CardContent className="pt-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-medium">{r.student.username}</span>
-                      <RequestMeta request={r} />
-                    </div>
-                    <Badge variant="destructive">Disputed — Under Review</Badge>
-                  </div>
-                  {r.disputeReason && (
-                    <div className="mt-2 p-2 bg-destructive/10 rounded text-sm">
-                      <span className="text-xs font-medium text-destructive">Reason: </span>
-                      {r.disputeReason}
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    The student has raised a dispute. An admin will review this.
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {completed.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Completed</h2>
-            {completedTotal > 3 && (
-              <Link href="/dashboard/history?role=coach" className="text-sm text-muted-foreground underline">
-                View all ({completedTotal}) &rarr;
-              </Link>
-            )}
-          </div>
-          <div className="space-y-3">
-            {completed.map((r) => (
-              <CompletedCard key={r.id} request={r} otherUser={r.student} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {otherTotal > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">History</h2>
-            <Link href="/dashboard/history?role=coach" className="text-sm text-muted-foreground underline">
-              View all ({otherTotal}) &rarr;
-            </Link>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Declined, cancelled, expired and no-show requests are kept in your history page.
-          </p>
-        </section>
-      )}
-
-      {requests.length === 0 && otherTotal === 0 && (
-        <p className="text-muted-foreground text-center py-8">
-          No lesson requests yet. Set your coaching prices in your profile to start receiving requests.
-          <br />
-          <a href="/how-it-works" className="underline text-sm mt-1 inline-block">
-            Not sure where to start? Learn how it works
-          </a>
-        </p>
-      )}
+      <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
+        {pastTotal > 0 && (
+          <Link href="/dashboard/history?role=coach" className="underline">
+            View past lessons ({pastTotal}) →
+          </Link>
+        )}
+      </div>
     </div>
   );
+}
+
+function CoachCard({ request }: { request: Request }) {
+  if (request.status === "PENDING") return <PendingRequestCard request={request} />;
+  if (request.status === "ACCEPTED") return <AcceptedLessonCard request={request} />;
+  if (request.status === "IN_PROGRESS") return <ActiveLessonCard request={request} />;
+  if (request.status === "DISPUTED") return <DisputedCard request={request} />;
+  return null;
 }
 
 function PendingRequestCard({ request }: { request: Request }) {
@@ -236,41 +203,43 @@ function PendingRequestCard({ request }: { request: Request }) {
 
   return (
     <Card>
-      <CardContent className="pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="font-medium">{request.student.username}</span>
+      <CardContent className="pt-4 space-y-2">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium">{request.student.username}</span>
+              <StatusBadge status={request.status} />
+              {request.isTrial && <Badge variant="outline">Free trial</Badge>}
+            </div>
             <RequestMeta request={request} />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button size="sm" onClick={() => handleRespond("accept")} disabled={loading}>
               Accept
             </Button>
             <Button size="sm" variant="outline" onClick={() => handleRespond("decline")} disabled={loading}>
               Decline
             </Button>
-            <Button size="sm" variant="ghost" className="text-destructive" onClick={handleBlock} disabled={blockLoading} title="Block student">
+            <Button size="sm" variant="ghost" className="text-destructive" onClick={handleBlock} disabled={blockLoading}>
               Block
             </Button>
           </div>
         </div>
         {request.message && (
-          <div className="mt-2 p-2 bg-muted rounded text-sm">
-            <span className="text-xs text-muted-foreground">Message: </span>
-            {request.message}
-          </div>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium">Message:</span> {request.message}
+          </p>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function AcceptedLessonCard({ request, role }: { request: Request; role: "coach" | "student" }) {
+function AcceptedLessonCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [declLoading, setDeclLoading] = useState(false);
-  const otherUser = role === "coach" ? request.student : (request as unknown as { coach: Request["student"] }).coach;
-  const myStartConfirmed = role === "coach" ? request.coachStartConfirmed : request.studentStartConfirmed;
-  const otherStartConfirmed = role === "coach" ? request.studentStartConfirmed : request.coachStartConfirmed;
+  const myStartConfirmed = request.coachStartConfirmed;
+  const otherStartConfirmed = request.studentStartConfirmed;
 
   async function handleConfirmStart() {
     setLoading(true);
@@ -290,65 +259,78 @@ function AcceptedLessonCard({ request, role }: { request: Request; role: "coach"
 
   return (
     <Card>
-      <CardContent className="pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="font-medium">{otherUser.username}</span>
-            <RequestMeta request={request} />
-            <div className="text-xs text-muted-foreground mt-1">
-              {myStartConfirmed ? "✓ You confirmed start" : "⏳ Confirm when lesson starts"}
-              {" · "}
-              {otherStartConfirmed ? "✓ They confirmed start" : "⏳ Awaiting their start confirmation"}
+      <CardContent className="pt-4 space-y-2">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium">{request.student.username}</span>
+              <StatusBadge status={request.status} />
+              {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
+            <RequestMeta request={request} />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Link href={`/lesson/${request.id}`}>
-              <Button size="sm" variant="default">Join Room</Button>
+              <Button size="sm">Join Room</Button>
             </Link>
             {!myStartConfirmed && (
               <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
                 Confirm Start
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={handleDecline} disabled={declLoading}>
+            <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
               Decline
             </Button>
           </div>
         </div>
-        {request.message && (
-          <div className="mt-2 p-2 bg-muted rounded text-sm">
-            <span className="text-xs text-muted-foreground">Message: </span>
-            {request.message}
-          </div>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {myStartConfirmed ? "✓ You confirmed" : "⏳ Waiting on you"}
+          {" · "}
+          {otherStartConfirmed ? "✓ Student confirmed" : "⏳ Waiting on student"}
+        </p>
       </CardContent>
     </Card>
   );
 }
 
-function ActiveLessonCard({ request, role }: { request: Request; role: "coach" | "student" }) {
-  const otherUser = role === "coach" ? request.student : (request as unknown as { coach: Request["student"] }).coach;
-  const autoCompleteAt = request.scheduledEndAt
-    ? new Date(new Date(request.scheduledEndAt).getTime() + 24 * 60 * 60 * 1000)
-    : null;
-
+function ActiveLessonCard({ request }: { request: Request }) {
   return (
     <Card>
       <CardContent className="pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="font-medium">{otherUser.username}</span>
-            <RequestMeta request={request} />
-            <div className="text-xs text-muted-foreground mt-1">
-              {autoCompleteAt
-                ? `Auto-completes ${autoCompleteAt.toLocaleString()} if the student doesn't report an issue.`
-                : "Will auto-complete after the dispute window."}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium">{request.student.username}</span>
+              <StatusBadge status={request.status} />
+              {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
+            <RequestMeta request={request} />
           </div>
-          <div className="flex gap-2">
-            <Link href={`/lesson/${request.id}`}>
-              <Button size="sm" variant="default">Join Room</Button>
-            </Link>
+          <Link href={`/lesson/${request.id}`}>
+            <Button size="sm">Join Room</Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DisputedCard({ request }: { request: Request }) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium">{request.student.username}</span>
+              <StatusBadge status={request.status} />
+            </div>
+            <RequestMeta request={request} />
+            {request.disputeReason && (
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className="font-medium">Reason:</span> {request.disputeReason}
+              </p>
+            )}
           </div>
         </div>
       </CardContent>
@@ -356,75 +338,73 @@ function ActiveLessonCard({ request, role }: { request: Request; role: "coach" |
   );
 }
 
-function CompletedCard({ request, otherUser }: { request: Request; otherUser: { username: string | null } }) {
-  const existingReview = request.reviews?.[0] ?? null;
+function ReviewBlock({ request }: { request: Request }) {
   const [showReview, setShowReview] = useState(false);
-  const [rating, setRating] = useState(existingReview?.rating?.toString() ?? "5");
-  const [comment, setComment] = useState(existingReview?.comment ?? "");
+  const [rating, setRating] = useState("5");
+  const [comment, setComment] = useState("");
   const [saved, setSaved] = useState(false);
 
   async function handleReview(formData: FormData) {
     const result = await submitReview(formData);
     if (result.error) toast.error(result.error);
     else {
-      toast.success(existingReview ? "Review updated!" : "Review submitted!");
+      toast.success("Review submitted!");
       setSaved(true);
       setShowReview(false);
     }
   }
 
+  if (saved) return null;
+
   return (
-    <Card>
-      <CardContent className="pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="font-medium">{otherUser.username}</span>
-            <RequestMeta request={request} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge>Completed</Badge>
-            {existingReview && !saved ? (
-              <Button size="sm" variant="outline" onClick={() => setShowReview(!showReview)}>
-                Edit Review
-              </Button>
-            ) : !saved ? (
-              <Button size="sm" variant="outline" onClick={() => setShowReview(!showReview)}>
-                Review
-              </Button>
-            ) : null}
-          </div>
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-medium">
+            Rate {request.student.username}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Leave a quick review of your last completed lesson.
+          </p>
         </div>
-        {showReview && (
-          <form action={handleReview} className="mt-4 space-y-3 border-t pt-4">
-            <input type="hidden" name="lessonId" value={request.id} />
-            <div className="flex items-center gap-2">
-              <label className="text-sm">Rating:</label>
-              <Input
-                name="rating"
-                type="number"
-                min={1}
-                max={5}
-                value={rating}
-                onChange={(e) => setRating(e.target.value)}
-                className="w-20"
-              />
-              <span className="text-sm text-muted-foreground">/ 5</span>
-            </div>
-            <Textarea
-              name="comment"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Optional comment..."
-              maxLength={500}
-            />
-            <Button size="sm" type="submit">
-              {existingReview ? "Update Review" : "Submit Review"}
-            </Button>
-          </form>
+        {!showReview && (
+          <Button size="sm" variant="outline" onClick={() => setShowReview(true)}>
+            Leave a review
+          </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+      {showReview && (
+        <form action={handleReview} className="space-y-2 border-t pt-3">
+          <input type="hidden" name="lessonId" value={request.id} />
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Rating:</label>
+            <Input
+              name="rating"
+              type="number"
+              min={1}
+              max={5}
+              value={rating}
+              onChange={(e) => setRating(e.target.value)}
+              className="w-20"
+            />
+            <span className="text-sm text-muted-foreground">/ 5</span>
+          </div>
+          <Textarea
+            name="comment"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Optional comment..."
+            maxLength={500}
+            rows={2}
+          />
+          <div className="flex gap-2">
+            <Button size="sm" type="submit">Submit review</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowReview(false)}>Cancel</Button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 
-export { AcceptedLessonCard, ActiveLessonCard, CompletedCard, PendingRequestCard };
+export { PendingRequestCard };
