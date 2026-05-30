@@ -67,8 +67,8 @@ function RequestMeta({ request }: { request: Request }) {
   );
 }
 
-export function CoachDashboard({ requests, coachAvailability, isCoach, completedTotal, otherTotal, hasCompletedTrial }: { requests: Request[]; coachAvailability: string; isCoach: boolean; completedTotal: number; otherTotal: number; hasCompletedTrial: boolean }) {
-  const pending = requests.filter((r) => r.status === "PENDING");
+export function CoachDashboard({ requests, coachAvailability, isCoach, completedTotal, otherTotal, hasCompletedTrial, hidePending = false }: { requests: Request[]; coachAvailability: string; isCoach: boolean; completedTotal: number; otherTotal: number; hasCompletedTrial: boolean; hidePending?: boolean }) {
+  const pending = hidePending ? [] : requests.filter((r) => r.status === "PENDING");
   const accepted = requests.filter((r) => r.status === "ACCEPTED");
   const inProgress = requests.filter((r) => r.status === "IN_PROGRESS");
   const disputed = requests.filter((r) => r.status === "DISPUTED");
@@ -427,4 +427,4 @@ function CompletedCard({ request, otherUser }: { request: Request; otherUser: { 
   );
 }
 
-export { AcceptedLessonCard, ActiveLessonCard, CompletedCard };
+export { AcceptedLessonCard, ActiveLessonCard, CompletedCard, PendingRequestCard };
