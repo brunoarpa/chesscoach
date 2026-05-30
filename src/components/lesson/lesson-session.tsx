@@ -75,7 +75,11 @@ export function LessonSession({
   }, []);
 
   // ---- Presence tracking (heartbeat-based) ----
-  const [otherOnPage, setOtherOnPage] = useState<boolean>(otherJoined);
+  // We start `otherOnPage = false` regardless of `otherJoined` (the historical
+  // "have they ever joined" flag from the DB) and only flip to true once we
+  // actually receive a heartbeat ping. Otherwise the indicator would lie:
+  // "they're here!" simply because they had joined at some point in the past.
+  const [otherOnPage, setOtherOnPage] = useState<boolean>(false);
   const lastPingRef = useRef<number>(0);
 
   // Send heartbeat
@@ -91,9 +95,27 @@ export function LessonSession({
     };
     send();
     const interval = setInterval(send, PRESENCE_HEARTBEAT_MS);
+
+    // If the page becomes hidden (tab switch, minimize) tell the other side
+    // immediately rather than waiting for the heartbeat to expire.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        fetch(`/api/lesson/${lessonId}/board/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: "presence:leave", data: {} }),
+          keepalive: true,
+        }).catch(() => {});
+      } else {
+        send(); // re-announce when tab comes back
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       // Mark ourselves gone on unmount
       fetch(`/api/lesson/${lessonId}/board/sync`, {
         method: "POST",
@@ -126,9 +148,10 @@ export function LessonSession({
     channel.bind("presence:ping", onPing);
     channel.bind("presence:leave", onLeave);
 
-    // Mark other as gone if no ping recently
+    // Mark other as gone if no recent ping. Runs once we have ever seen a
+    // ping (lastPingRef.current > 0) — before then the badge stays "not here yet".
     const checkInterval = setInterval(() => {
-      if (lastPingRef.current && Date.now() - lastPingRef.current > PRESENCE_TIMEOUT_MS) {
+      if (lastPingRef.current > 0 && Date.now() - lastPingRef.current > PRESENCE_TIMEOUT_MS) {
         setOtherOnPage(false);
       }
     }, 2000);
