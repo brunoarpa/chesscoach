@@ -5,10 +5,28 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cancelLessonRequest, confirmLessonStart, declineAcceptedLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
+
+// Room stays open for 5 minutes past the scheduled end. After that the
+// /lesson/[id] page redirects away so the join button is pointless.
+const ROOM_GRACE_MS = 5 * 60 * 1000;
+
+function isRoomClosed(scheduledEndAt: string | null, now: number): boolean {
+  if (!scheduledEndAt) return false;
+  return now > new Date(scheduledEndAt).getTime() + ROOM_GRACE_MS;
+}
+
+function useNow(intervalMs = 15_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
+  return now;
+}
 
 interface MyReview {
   id: string;
@@ -36,10 +54,13 @@ interface Request {
   reviews: MyReview[];
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, roomClosed = false }: { status: string; roomClosed?: boolean }) {
   if (status === "PENDING") return <Badge variant="secondary">Waiting for coach</Badge>;
   if (status === "ACCEPTED") return <Badge>Awaiting start</Badge>;
-  if (status === "IN_PROGRESS") return <Badge className="bg-green-600 hover:bg-green-700">In progress</Badge>;
+  if (status === "IN_PROGRESS") {
+    if (roomClosed) return <Badge variant="outline">Lesson ended · awaiting confirmation</Badge>;
+    return <Badge className="bg-green-600 hover:bg-green-700">In progress</Badge>;
+  }
   if (status === "DISPUTED") return <Badge variant="destructive">Disputed</Badge>;
   return null;
 }
@@ -200,6 +221,8 @@ function PendingCard({ request }: { request: Request }) {
 function StudentAcceptedCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [declLoading, setDeclLoading] = useState(false);
+  const now = useNow();
+  const roomClosed = isRoomClosed(request.scheduledEndAt, now);
 
   async function handleConfirmStart() {
     setLoading(true);
@@ -224,16 +247,18 @@ function StudentAcceptedCard({ request }: { request: Request }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium">{request.coach.username}</span>
-              <StatusBadge status={request.status} />
+              <StatusBadge status={request.status} roomClosed={roomClosed} />
               {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
             <RequestMeta request={request} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Link href={`/lesson/${request.id}`}>
-              <Button size="sm">Join Room</Button>
-            </Link>
-            {!request.studentStartConfirmed && (
+            {!roomClosed && (
+              <Link href={`/lesson/${request.id}`}>
+                <Button size="sm">Join Room</Button>
+              </Link>
+            )}
+            {!roomClosed && !request.studentStartConfirmed && (
               <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
                 Confirm Start
               </Button>
@@ -243,11 +268,13 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             </Button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {request.studentStartConfirmed ? "✓ You confirmed" : "⏳ Waiting on you"}
-          {" · "}
-          {request.coachStartConfirmed ? "✓ Coach confirmed" : "⏳ Waiting on coach"}
-        </p>
+        {!roomClosed && (
+          <p className="text-xs text-muted-foreground">
+            {request.studentStartConfirmed ? "✓ You confirmed" : "⏳ Waiting on you"}
+            {" · "}
+            {request.coachStartConfirmed ? "✓ Coach confirmed" : "⏳ Waiting on coach"}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -257,6 +284,8 @@ function StudentActiveCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
+  const now = useNow();
+  const roomClosed = isRoomClosed(request.scheduledEndAt, now);
 
   async function handleDispute() {
     if (disputeReason.trim().length < 30) {
@@ -277,15 +306,22 @@ function StudentActiveCard({ request }: { request: Request }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium">{request.coach.username}</span>
-              <StatusBadge status={request.status} />
+              <StatusBadge status={request.status} roomClosed={roomClosed} />
               {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
             <RequestMeta request={request} />
+            {roomClosed && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-completes 24h after the lesson ended unless you report an issue.
+              </p>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Link href={`/lesson/${request.id}`}>
-              <Button size="sm">Join Room</Button>
-            </Link>
+            {!roomClosed && (
+              <Link href={`/lesson/${request.id}`}>
+                <Button size="sm">Join Room</Button>
+              </Link>
+            )}
             <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setShowDispute(!showDispute)}>
               Report issue
             </Button>

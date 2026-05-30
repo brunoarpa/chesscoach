@@ -194,9 +194,9 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      {/* Main: your lessons (as student) */}
+      {/* You as a student — lessons you've booked */}
       <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-3">Your lessons</h2>
+        <h2 className="text-xl font-semibold mb-3">Student</h2>
         <StudentDashboard
           requests={JSON.parse(JSON.stringify(outgoingRequests))}
           freeTrialsRemaining={currentUser.freeTrialsRemaining}
@@ -206,27 +206,28 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* Coach side (if applicable) */}
+      {/* You as a coach — lessons your students booked with you */}
       {isCoach && (
-        <>
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold mb-3">Your students</h2>
-            <CoachDashboard
-              requests={JSON.parse(JSON.stringify(incomingRequests))}
-              coachAvailability={currentUser.coachAvailability}
-              isCoach={isCoach}
-              completedTotal={incomingCompletedTotal}
-              otherTotal={incomingOtherTotal}
-              hasCompletedTrial={!!incomingHasCompletedTrial}
-              hidePending
-            />
-          </section>
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-3">Coach</h2>
+          <CoachDashboard
+            requests={JSON.parse(JSON.stringify(incomingRequests))}
+            coachAvailability={currentUser.coachAvailability}
+            isCoach={isCoach}
+            completedTotal={incomingCompletedTotal}
+            otherTotal={incomingOtherTotal}
+            hasCompletedTrial={!!incomingHasCompletedTrial}
+            hidePending
+          />
+        </section>
+      )}
 
-          <section>
-            <h2 className="text-xl font-semibold mb-3">Your schedule</h2>
-            <CoachScheduleEditor initialTemplates={weeklyTemplates} />
-          </section>
-        </>
+      {/* Coaching schedule — pinned to the bottom */}
+      {isCoach && (
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Coaching</h2>
+          <CoachScheduleEditor initialTemplates={weeklyTemplates} />
+        </section>
       )}
     </div>
   );
