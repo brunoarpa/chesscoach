@@ -100,7 +100,9 @@ export function StudentDashboard({
   completedTotal: number;
   otherTotal: number;
 }) {
-  // Active = anything that still matters now.
+  const now = useNow();
+
+  // "Truly active" = needs your attention or is happening now.
   // Sort: in-progress first, then accepted (soonest start first),
   // then pending, then disputed. Tie-break by createdAt desc.
   const STATUS_ORDER: Record<string, number> = {
@@ -109,8 +111,20 @@ export function StudentDashboard({
     PENDING: 2,
     DISPUTED: 3,
   };
+
+  const inActiveStatuses = (r: Request) => r.status in STATUS_ORDER;
+
+  // IN_PROGRESS + past grace = "recently ended" — collapse into a compact list
+  // at the bottom so they don't pile up in the main view. They live in the DB
+  // for up to 24h before auto-completing, but they don't need attention any
+  // longer beyond the dispute option.
+  const recentlyEnded = requests.filter(
+    (r) => r.status === "IN_PROGRESS" && isRoomClosed(r.scheduledEndAt, now)
+  );
+  const recentlyEndedIds = new Set(recentlyEnded.map((r) => r.id));
+
   const active = requests
-    .filter((r) => r.status in STATUS_ORDER)
+    .filter((r) => inActiveStatuses(r) && !recentlyEndedIds.has(r.id))
     .sort((a, b) => {
       const sa = STATUS_ORDER[a.status] ?? 99;
       const sb = STATUS_ORDER[b.status] ?? 99;
@@ -156,6 +170,11 @@ export function StudentDashboard({
         </Card>
       )}
 
+      {/* Recently-ended lessons (room closed, awaiting auto-complete in DB) */}
+      {recentlyEnded.length > 0 && (
+        <RecentlyEndedList requests={recentlyEnded} />
+      )}
+
       {/* Compact footer */}
       <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
         {freeTrialsRemaining > 0 && (
@@ -169,6 +188,86 @@ export function StudentDashboard({
           </Link>
         )}
       </div>
+    </div>
+  );
+}
+
+function RecentlyEndedList({ requests }: { requests: Request[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? requests : requests.slice(0, 1);
+  const moreCount = requests.length - shown.length;
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+      <p className="text-sm font-medium text-muted-foreground">
+        Recently ended ({requests.length}) — auto-completes within 24h
+      </p>
+      {shown.map((r) => (
+        <RecentlyEndedItem key={r.id} request={r} />
+      ))}
+      {moreCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-xs text-muted-foreground underline"
+        >
+          Show {moreCount} more
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RecentlyEndedItem({ request }: { request: Request }) {
+  const [loading, setLoading] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+
+  async function handleDispute() {
+    if (disputeReason.trim().length < 30) {
+      toast.error("Please describe the issue in a sentence (at least 30 characters)");
+      return;
+    }
+    setLoading(true);
+    const result = await disputeLesson(request.id, disputeReason.trim());
+    setLoading(false);
+    if (result.error) toast.error(result.error);
+    else toast.success("Issue reported. An admin will review.");
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-t pt-2 first:border-t-0 first:pt-0">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span>
+          <span className="font-medium">{request.coach.username}</span>
+          {request.scheduledStartAt && (
+            <span className="text-muted-foreground ml-2">
+              {new Date(request.scheduledStartAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowDispute((v) => !v)}
+          className="text-xs text-destructive underline"
+        >
+          Report issue
+        </button>
+      </div>
+      {showDispute && (
+        <div className="space-y-2">
+          <Textarea
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value)}
+            placeholder="Describe what went wrong (at least 30 characters)..."
+            maxLength={1000}
+            rows={3}
+          />
+          <Button size="sm" variant="destructive" onClick={handleDispute} disabled={loading || disputeReason.trim().length < 30}>
+            Submit report
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -284,8 +383,6 @@ function StudentActiveCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
-  const now = useNow();
-  const roomClosed = isRoomClosed(request.scheduledEndAt, now);
 
   async function handleDispute() {
     if (disputeReason.trim().length < 30) {
@@ -306,22 +403,15 @@ function StudentActiveCard({ request }: { request: Request }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium">{request.coach.username}</span>
-              <StatusBadge status={request.status} roomClosed={roomClosed} />
+              <StatusBadge status={request.status} />
               {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
             <RequestMeta request={request} />
-            {roomClosed && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Auto-completes 24h after the lesson ended unless you report an issue.
-              </p>
-            )}
           </div>
           <div className="flex gap-2 flex-wrap">
-            {!roomClosed && (
-              <Link href={`/lesson/${request.id}`}>
-                <Button size="sm">Join Room</Button>
-              </Link>
-            )}
+            <Link href={`/lesson/${request.id}`}>
+              <Button size="sm">Join Room</Button>
+            </Link>
             <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setShowDispute(!showDispute)}>
               Report issue
             </Button>

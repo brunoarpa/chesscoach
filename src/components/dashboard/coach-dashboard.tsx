@@ -109,16 +109,26 @@ export function CoachDashboard({
   hasCompletedTrial: boolean;
   hidePending?: boolean;
 }) {
+  const now = useNow();
   const STATUS_ORDER: Record<string, number> = {
     IN_PROGRESS: 0,
     ACCEPTED: 1,
     PENDING: 2,
     DISPUTED: 3,
   };
+
+  // Recently-ended (room closed, still IN_PROGRESS in DB) — pulled out of the
+  // main list so they don't pile up. Coach just sees a one-liner count.
+  const recentlyEnded = requests.filter(
+    (r) => r.status === "IN_PROGRESS" && isRoomClosed(r.scheduledEndAt, now)
+  );
+  const recentlyEndedIds = new Set(recentlyEnded.map((r) => r.id));
+
   const active = requests
     .filter((r) => {
       if (!(r.status in STATUS_ORDER)) return false;
       if (hidePending && r.status === "PENDING") return false;
+      if (recentlyEndedIds.has(r.id)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -182,6 +192,11 @@ export function CoachDashboard({
       )}
 
       <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
+        {recentlyEnded.length > 0 && (
+          <span>
+            {recentlyEnded.length} recently ended · auto-completes within 24h
+          </span>
+        )}
         {pastTotal > 0 && (
           <Link href="/dashboard/history?role=coach" className="underline">
             View past lessons ({pastTotal}) →
@@ -319,9 +334,6 @@ function AcceptedLessonCard({ request }: { request: Request }) {
 }
 
 function ActiveLessonCard({ request }: { request: Request }) {
-  const now = useNow();
-  const roomClosed = isRoomClosed(request.scheduledEndAt, now);
-
   return (
     <Card>
       <CardContent className="pt-4">
@@ -329,21 +341,14 @@ function ActiveLessonCard({ request }: { request: Request }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium">{request.student.username}</span>
-              <StatusBadge status={request.status} roomClosed={roomClosed} />
+              <StatusBadge status={request.status} />
               {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
             <RequestMeta request={request} />
-            {roomClosed && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Auto-completes 24h after the lesson ended.
-              </p>
-            )}
           </div>
-          {!roomClosed && (
-            <Link href={`/lesson/${request.id}`}>
-              <Button size="sm">Join Room</Button>
-            </Link>
-          )}
+          <Link href={`/lesson/${request.id}`}>
+            <Button size="sm">Join Room</Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
