@@ -6,47 +6,42 @@ export default async function Home() {
   const session = await auth();
 
   return (
-    <div className="flex flex-col items-center px-4">
-      {/* Sticky hero — stays visible as the page scrolls */}
-      <div className="sticky top-0 z-20 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b">
-        <div className="flex flex-col items-center gap-6 py-10 max-w-2xl mx-auto text-center">
-          <div className="space-y-3">
-            <h1 className="text-5xl font-bold tracking-tight">
-              ♝ ChessCoach
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Find the perfect chess coach, or share your knowledge.
-              Everyone can teach, everyone can learn.
-            </p>
-          </div>
+    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 px-4 pt-12">
+      <div className="text-center space-y-4 max-w-2xl">
+        <h1 className="text-5xl font-bold tracking-tight">
+          ♝ ChessCoach
+        </h1>
+        <p className="text-xl text-muted-foreground">
+          Find the perfect chess coach, or share your knowledge.
+          Everyone can teach, everyone can learn.
+        </p>
+      </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link href="/search">
-              <Button size="lg">Find a Coach</Button>
+      <div className="flex gap-4">
+        <Link href="/search">
+          <Button size="lg">Find a Coach</Button>
+        </Link>
+        {session?.user ? (
+          session.user.needsUsername ? (
+            <Link href="/setup-username">
+              <Button size="lg" variant="outline">
+                Set Up Your Profile →
+              </Button>
             </Link>
-            {session?.user ? (
-              session.user.needsUsername ? (
-                <Link href="/setup-username">
-                  <Button size="lg" variant="outline">
-                    Set Up Your Profile →
-                  </Button>
-                </Link>
-              ) : (
-                <Link href="/dashboard">
-                  <Button size="lg" variant="outline">
-                    Dashboard
-                  </Button>
-                </Link>
-              )
-            ) : (
-              <Link href="/login">
-                <Button size="lg" variant="outline">
-                  Get Started
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
+          ) : (
+            <Link href="/dashboard">
+              <Button size="lg" variant="outline">
+                Dashboard
+              </Button>
+            </Link>
+          )
+        ) : (
+          <Link href="/login">
+            <Button size="lg" variant="outline">
+              Get Started
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 max-w-4xl w-full">
