@@ -19,6 +19,13 @@ function isRoomClosed(scheduledEndAt: string | null, now: number): boolean {
   return now > new Date(scheduledEndAt).getTime() + ROOM_GRACE_MS;
 }
 
+// Lesson time is over but the room is still open for the grace window.
+function isInGrace(scheduledEndAt: string | null, now: number): boolean {
+  if (!scheduledEndAt) return false;
+  const end = new Date(scheduledEndAt).getTime();
+  return now > end && now <= end + ROOM_GRACE_MS;
+}
+
 function useNow(intervalMs = 15_000): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -54,11 +61,12 @@ interface Request {
   reviews: MyReview[];
 }
 
-function StatusBadge({ status, roomClosed = false }: { status: string; roomClosed?: boolean }) {
+function StatusBadge({ status, roomClosed = false, inGrace = false }: { status: string; roomClosed?: boolean; inGrace?: boolean }) {
   if (status === "PENDING") return <Badge variant="secondary">Waiting for coach</Badge>;
   if (status === "ACCEPTED") return <Badge>Awaiting start</Badge>;
   if (status === "IN_PROGRESS") {
     if (roomClosed) return <Badge variant="outline">Lesson ended · awaiting confirmation</Badge>;
+    if (inGrace) return <Badge className="bg-orange-500 hover:bg-orange-600">Wrapping up</Badge>;
     return <Badge className="bg-green-600 hover:bg-green-700">In progress</Badge>;
   }
   if (status === "DISPUTED") return <Badge variant="destructive">Disputed</Badge>;
@@ -383,6 +391,8 @@ function StudentActiveCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
+  const now = useNow();
+  const inGrace = isInGrace(request.scheduledEndAt, now);
 
   async function handleDispute() {
     if (disputeReason.trim().length < 30) {
@@ -403,7 +413,7 @@ function StudentActiveCard({ request }: { request: Request }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium">{request.coach.username}</span>
-              <StatusBadge status={request.status} />
+              <StatusBadge status={request.status} inGrace={inGrace} />
               {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
             <RequestMeta request={request} />
