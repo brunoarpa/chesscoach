@@ -2,27 +2,35 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Chess, Square } from "chess.js";
-import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
+import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, type LucideIcon } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 
 // Move quality classification.
 type MoveClass = "best" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
 
-// Per-class presentation: `color`/`bg` are Tailwind classes for the text labels
-// in the move list & engine panel; `badge` (solid) and `tint` (translucent) are
-// raw CSS colors for the on-board chess.com-style markers.
-const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; color: string; bg: string; badge: string; tint: string }> = {
-  best:        { label: "Best",       symbol: "★",  color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-950/40", badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
-  excellent:   { label: "Excellent",  symbol: "!",  color: "text-green-700 dark:text-green-300",     bg: "bg-green-100 dark:bg-green-950/40",     badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
-  good:        { label: "Good",       symbol: "✓",  color: "text-lime-700 dark:text-lime-300",       bg: "bg-lime-100 dark:bg-lime-950/40",       badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
-  inaccuracy:  { label: "Inaccuracy", symbol: "?!", color: "text-yellow-700 dark:text-yellow-300",   bg: "bg-yellow-100 dark:bg-yellow-950/40",   badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
-  mistake:     { label: "Mistake",    symbol: "?",  color: "text-orange-700 dark:text-orange-300",   bg: "bg-orange-100 dark:bg-orange-950/40",   badge: "#ffa459", tint: "rgba(255,164,89,0.45)" },
-  blunder:     { label: "Blunder",    symbol: "??", color: "text-red-700 dark:text-red-300",         bg: "bg-red-100 dark:bg-red-950/40",         badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
+// Per-class presentation for the on-board chess.com-style markers: `label` for
+// the tooltip, `symbol`/`icon` for the glyph (icon wins when set), `badge` (solid)
+// and `tint` (translucent) for the colors.
+const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?: LucideIcon; badge: string; tint: string }> = {
+  best:        { label: "Best",       symbol: "★",                  badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
+  excellent:   { label: "Excellent",  symbol: "!", icon: ThumbsUp,  badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
+  good:        { label: "Good",       symbol: "✓",                  badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
+  inaccuracy:  { label: "Inaccuracy", symbol: "?!",                 badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
+  mistake:     { label: "Mistake",    symbol: "?",                  badge: "#ffa459", tint: "rgba(255,164,89,0.45)" },
+  blunder:     { label: "Blunder",    symbol: "??",                 badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
 };
+
+// Promotion picker piece options, queen-first (nearest the promotion square).
+const PROMOTION_PIECES: Array<{ type: "q" | "r" | "b" | "n"; key: string }> = [
+  { type: "q", key: "Q" },
+  { type: "r", key: "R" },
+  { type: "b", key: "B" },
+  { type: "n", key: "N" },
+];
 
 // Logistic curve mapping a centipawn eval to "expected points" (win probability,
 // 0..1) — the chess.com win-percentage model. The constant is chess.com's.
@@ -108,6 +116,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
   const [showEngineArrows, setShowEngineArrows] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [squareSize, setSquareSize] = useState(0);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string; color: "w" | "b" } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -178,6 +187,21 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
 
   const game = getGameAtIndex(moveHistory, currentMoveIndex);
 
+  // Game status for the displayed position. chess.js enforces all move legality
+  // (castling, en passant, pins, promotion) by rejecting illegal moves; here we
+  // surface terminal/check states so the outcome is visible.
+  const gameStatus: { text: string; tone: "over" | "check" } | null = (() => {
+    const sideToMove = game.turn() === "w" ? "White" : "Black";
+    const winner = game.turn() === "w" ? "Black" : "White";
+    if (game.isCheckmate()) return { text: `Checkmate — ${winner} wins`, tone: "over" };
+    if (game.isStalemate()) return { text: "Stalemate — draw", tone: "over" };
+    if (game.isThreefoldRepetition()) return { text: "Draw by threefold repetition", tone: "over" };
+    if (game.isInsufficientMaterial()) return { text: "Draw by insufficient material", tone: "over" };
+    if (game.isDraw()) return { text: "Draw by 50-move rule", tone: "over" };
+    if (game.isCheck()) return { text: `${sideToMove} is in check`, tone: "check" };
+    return null;
+  })();
+
   const legalMoveSquares = selectedSquare
     ? game.moves({ square: selectedSquare, verbose: true }).map((m) => m.to)
     : [];
@@ -199,19 +223,36 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
     }
   }
 
-  function makeMove(sourceSquare: string, targetSquare: string, piece?: string) {
+  function makeMove(
+    sourceSquare: string,
+    targetSquare: string,
+    piece?: string,
+    promotion?: "q" | "r" | "b" | "n",
+  ) {
     const currentHistory = moveHistory.slice(0, currentMoveIndex + 1);
     const gameCopy = getGameAtIndex(currentHistory, currentHistory.length - 1);
 
     const isPromotion =
-      piece && piece.toLowerCase().includes("p") &&
+      !!piece && piece.toLowerCase().includes("p") &&
       (targetSquare[1] === "8" || targetSquare[1] === "1");
+
+    // A promotion without a chosen piece: open the picker and wait. Only do this
+    // when the underlying move is actually legal (e.g. ignore a pawn dropped on
+    // an occupied straight-ahead square), so we never show a dead picker.
+    if (isPromotion && !promotion) {
+      const legal = gameCopy
+        .moves({ square: sourceSquare as Square, verbose: true })
+        .some((m) => m.to === targetSquare && m.promotion);
+      if (!legal) return false;
+      setPendingPromotion({ from: sourceSquare, to: targetSquare, color: gameCopy.turn() });
+      return false;
+    }
 
     try {
       const moveResult = gameCopy.move({
         from: sourceSquare,
         to: targetSquare,
-        promotion: isPromotion ? "q" : undefined,
+        promotion: isPromotion ? promotion : undefined,
       });
       if (!moveResult) return false;
     } catch {
@@ -230,6 +271,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
       broadcastMoves(newHistory, newIndex);
     }
     return true;
+  }
+
+  function completePromotion(promotion: "q" | "r" | "b" | "n") {
+    if (!pendingPromotion) return;
+    makeMove(pendingPromotion.from, pendingPromotion.to, "p", promotion);
+    setPendingPromotion(null);
   }
 
   function onDrop({ sourceSquare, targetSquare, piece }: PieceDropHandlerArgs): boolean {
@@ -604,19 +651,67 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
               pointerEvents: "none",
             }}
           >
-            {MOVE_CLASS_STYLE[currentMoveClass].symbol}
+            {(() => {
+              const Icon = MOVE_CLASS_STYLE[currentMoveClass].icon;
+              return Icon
+                ? <Icon size={badgePx * 0.62} strokeWidth={2.5} fill="#fff" />
+                : MOVE_CLASS_STYLE[currentMoveClass].symbol;
+            })()}
           </div>
         )}
       </div>
     );
   };
 
+  // Promotion picker: a vertical strip of Q/R/B/N over the promotion file,
+  // queen nearest the promotion square (chess.com-style). Click outside to cancel.
+  function renderPromotionPicker() {
+    if (!pendingPromotion || squareSize <= 0) return null;
+    const { from, to, color } = pendingPromotion;
+    // Only show if the promotion is still legal in the displayed position (it may
+    // have changed via navigation / a remote move since the picker was opened).
+    const stillValid = game
+      .moves({ square: from as Square, verbose: true })
+      .some((m) => m.to === to && m.promotion && m.color === color);
+    if (!stillValid) return null;
+    const f = to.charCodeAt(0) - 97; // 0..7
+    const r = parseInt(to[1], 10); // 1..8
+    const dCol = boardOrientation === "white" ? f : 7 - f;
+    const dRow = boardOrientation === "white" ? 8 - r : r - 1; // 0 = top of display
+    const goingDown = dRow === 0;
+    const pieces = goingDown ? PROMOTION_PIECES : [...PROMOTION_PIECES].reverse();
+    const stripTop = goingDown ? 0 : (8 - PROMOTION_PIECES.length) * squareSize;
+
+    return (
+      <div className="absolute inset-0 z-20">
+        <div className="absolute inset-0 bg-black/40" onClick={() => setPendingPromotion(null)} />
+        <div
+          className="absolute flex flex-col overflow-hidden rounded shadow-2xl"
+          style={{ left: dCol * squareSize, top: stripTop, width: squareSize }}
+        >
+          {pieces.map((p) => (
+            <button
+              key={p.type}
+              type="button"
+              onClick={() => completePromotion(p.type)}
+              className="bg-white hover:bg-emerald-200 transition-colors"
+              style={{ width: squareSize, height: squareSize, padding: squareSize * 0.06, border: "none", cursor: "pointer" }}
+              title={`Promote to ${p.key}`}
+            >
+              {defaultPieces[`${color}${p.key}`]?.({ svgStyle: { width: "100%", height: "100%" } })}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar */}
       <div className="flex gap-1 w-full">
         <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} />
-        <div ref={boardRef} className="flex-1 aspect-square">
+        <div ref={boardRef} className="relative flex-1 aspect-square">
           <Chessboard
             options={{
               position: game.fen(),
@@ -635,8 +730,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
               onArrowsChange: handleArrowsChange,
             }}
           />
+          {renderPromotionPicker()}
         </div>
       </div>
+
+      {/* Game status — check / checkmate / stalemate / draws (incl. repetition) */}
+      {gameStatus && (
+        <div
+          className={`w-full text-center text-sm font-semibold rounded-md px-3 py-1.5 ${
+            gameStatus.tone === "over"
+              ? "bg-primary/15 text-foreground"
+              : "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          }`}
+        >
+          {gameStatus.text}
+        </div>
+      )}
 
       {/* Move navigation */}
       <div className="flex items-center gap-1 flex-wrap justify-center">
@@ -691,80 +800,50 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
         </div>
       )}
 
-      {/* Top engine lines — best move (★) and any other "excellent" moves within 2cp */}
-      {engineLines.length > 0 && (() => {
-        const bestCp = evalToCp(engineLines[0]);
-        const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
-        const annotated = engineLines.map((line) => ({ line, cp: evalToCp(line) }));
-        return (
-          <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
-            <div className="space-y-1">
-              {annotated.map(({ line, cp }, i) => {
-                const cls: MoveClass = i === 0 ? "best" : classifyMove(bestCp, cp, sideToMove === "w");
-                const style = MOVE_CLASS_STYLE[cls];
-                return (
-                  <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
-                    <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1 rounded text-xs font-bold ${style.color} ${style.bg}`}>
-                      {style.symbol}
-                    </span>
-                    <span className="text-xs font-bold text-muted-foreground w-12 shrink-0">
-                      {formatLineEval(line)}
-                    </span>
-                    <span className="truncate text-sm">
-                      {line.san.slice(0, 6).join(" ")}
-                      {line.san.length > 6 && " …"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+      {/* Top engine lines — eval + principal variation for each */}
+      {engineLines.length > 0 && (
+        <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
+          <div className="space-y-1">
+            {engineLines.map((line) => (
+              <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
+                <span className="text-xs font-bold text-muted-foreground w-12 shrink-0">
+                  {formatLineEval(line)}
+                </span>
+                <span className="truncate text-sm">
+                  {line.san.slice(0, 6).join(" ")}
+                  {line.san.length > 6 && " …"}
+                </span>
+              </div>
+            ))}
           </div>
-        );
-      })()}
+        </div>
+      )}
 
-      {/* Move list — each move shows its quality classification (★ ! ✓ ?! ? ??) */}
+      {/* Move list — move classifications are shown on the board, not here */}
       {movePairs.length > 0 && (
         <div className="w-full max-h-[180px] overflow-y-auto rounded border bg-muted/30 p-2">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm font-mono">
             {movePairs.map((pair) => {
               const whiteIdx = (pair.num - 1) * 2;
               const blackIdx = whiteIdx + 1;
-              const whiteClass = classifyMoveAtIndex(whiteIdx);
-              const blackClass = pair.black ? classifyMoveAtIndex(blackIdx) : null;
               return (
                 <span key={pair.num} className="inline-flex items-baseline gap-1">
                   <span className="text-muted-foreground">{pair.num}.</span>
                   <button
                     type="button"
-                    className={`inline-flex items-baseline gap-0.5 px-1 rounded ${currentMoveIndex === whiteIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+                    className={`px-1 rounded ${currentMoveIndex === whiteIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
                     onClick={() => handleMoveClick(whiteIdx)}
                   >
-                    <span>{pair.white}</span>
-                    {whiteClass && (
-                      <span
-                        className={`text-[10px] font-bold ${MOVE_CLASS_STYLE[whiteClass].color}`}
-                        title={MOVE_CLASS_STYLE[whiteClass].label}
-                      >
-                        {MOVE_CLASS_STYLE[whiteClass].symbol}
-                      </span>
-                    )}
+                    {pair.white}
                   </button>
                   {pair.black && (
                     <button
                       type="button"
-                      className={`inline-flex items-baseline gap-0.5 px-1 rounded ${currentMoveIndex === blackIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+                      className={`px-1 rounded ${currentMoveIndex === blackIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
                       onClick={() => handleMoveClick(blackIdx)}
                     >
-                      <span>{pair.black}</span>
-                      {blackClass && (
-                        <span
-                          className={`text-[10px] font-bold ${MOVE_CLASS_STYLE[blackClass].color}`}
-                          title={MOVE_CLASS_STYLE[blackClass].label}
-                        >
-                          {MOVE_CLASS_STYLE[blackClass].symbol}
-                        </span>
-                      )}
+                      {pair.black}
                     </button>
                   )}
                 </span>
