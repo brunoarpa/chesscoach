@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored static assets (e.g. the Stockfish engine) and Prisma-generated
+    // code are third-party/generated and should not be linted.
+    "public/**",
+    "src/generated/**",
   ]),
 ]);
 

@@ -27,6 +27,7 @@ export default async function DashboardPage() {
   });
 
   const wasInactive = userCheck
+    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
     ? (Date.now() - userCheck.lastActiveAt.getTime()) >= 24 * 60 * 60 * 1000
     : false;
   const shouldForceUnavailable = userCheck

@@ -94,6 +94,7 @@ export default async function SearchPage({
   }
 
   if (params.lastSeen && params.lastSeen !== "any") {
+    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
     const now = Date.now();
     const thresholds: Record<string, number> = {
       online: 5 * 60 * 1000,

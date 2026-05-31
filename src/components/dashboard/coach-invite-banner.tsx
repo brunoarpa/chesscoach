@@ -12,6 +12,7 @@ export function CoachInviteBanner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount/hydration.
     setDismissed(window.localStorage.getItem(STORAGE_KEY) === "1");
   }, []);
 

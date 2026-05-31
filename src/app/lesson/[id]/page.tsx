@@ -44,6 +44,7 @@ export default async function LessonPage({
   const isAllowedStatus = lesson.status === "ACCEPTED" || lesson.status === "IN_PROGRESS";
   const pastGrace =
     lesson.scheduledEndAt &&
+    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
     Date.now() > new Date(lesson.scheduledEndAt).getTime() + GRACE_MS;
   if (!isAllowedStatus || pastGrace) {
     redirect("/dashboard");

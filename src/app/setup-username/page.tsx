@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useEffect } from "react";
+import { useActionState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 
 export default function SetupUsernamePage() {
   const router = useRouter();
-  const [step, setStep] = useState<"username" | "coach">("username");
 
   const [state, formAction, isPending] = useActionState(
     async (_prev: unknown, formData: FormData) => {
@@ -20,11 +19,9 @@ export default function SetupUsernamePage() {
     null,
   );
 
-  useEffect(() => {
-    if (state?.success) {
-      setStep("coach");
-    }
-  }, [state]);
+  // The flow only ever moves forward to the "coach" step once the username has
+  // been saved successfully, so the step is derived directly from the action result.
+  const step = state?.success ? "coach" : "username";
 
   if (step === "coach") {
     return (

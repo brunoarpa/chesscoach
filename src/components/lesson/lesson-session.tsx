@@ -56,7 +56,6 @@ export function LessonSession({
   scheduledEndAt,
   communicationMethod,
   initialMessages,
-  otherJoined,
   initialBoardPgn,
 }: Props) {
   const router = useRouter();

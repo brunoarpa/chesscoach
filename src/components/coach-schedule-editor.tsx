@@ -41,18 +41,6 @@ export function CoachScheduleEditor({ initialTemplates }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragAction, setDragAction] = useState<"add" | "remove">("add");
 
-  const toggleSlot = useCallback((key: SlotKey) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }, []);
-
   const handleMouseDown = useCallback((key: SlotKey) => {
     setIsDragging(true);
     const action = selected.has(key) ? "remove" : "add";

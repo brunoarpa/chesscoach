@@ -119,18 +119,6 @@ export async function generateUpcomingSlots(coachId: string) {
         const timeStr = `${String(template.startHour).padStart(2, "0")}:${String(template.startMinute).padStart(2, "0")}:00`;
         const localStr = `${dateStr}T${timeStr}`;
 
-        // Use Intl to get the UTC offset for the coach's timezone on this date
-        const formatter = new Intl.DateTimeFormat("en-US", {
-          timeZone: coach.timezone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        });
-
         // Parse localStr to get the components, then use Date.UTC
         // Simpler approach: create date as if UTC, then adjust by timezone offset
         const tempDate = new Date(`${localStr}Z`); // treat as UTC first

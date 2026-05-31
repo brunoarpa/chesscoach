@@ -148,6 +148,7 @@ export default async function ProfilePage({
   }
 
   const websiteAge = Math.round(
+    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
     (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 

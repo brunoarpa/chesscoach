@@ -20,6 +20,7 @@ export function LessonControls({ lessonId, lessonStatus, isCoach, scheduledStart
 
   // Show no-show button once the scheduled start has passed and the other party hasn't joined
   const canReportNoShow = !otherJoined && scheduledStartAt &&
+    // eslint-disable-next-line react-hooks/purity -- Intentional: re-checked on each render as the parent refreshes/polls.
     Date.now() >= new Date(scheduledStartAt).getTime();
 
   async function handleConfirmStart() {
