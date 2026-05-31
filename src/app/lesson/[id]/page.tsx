@@ -38,15 +38,20 @@ export default async function LessonPage({
   if (!isCoach && !isStudent) notFound();
 
   // Allow access for ACCEPTED or IN_PROGRESS lessons.
-  // After the lesson's scheduled end time, allow a 5-minute grace period so
-  // student and coach can wrap up. After that, the room is closed.
+  // The room opens 5 minutes before the scheduled start and closes 5 minutes
+  // after the scheduled end (grace period so student and coach can wrap up).
   const GRACE_MS = 5 * 60 * 1000;
+  const EARLY_JOIN_MS = 5 * 60 * 1000;
+  // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
+  const nowMs = Date.now();
   const isAllowedStatus = lesson.status === "ACCEPTED" || lesson.status === "IN_PROGRESS";
+  const beforeJoinWindow =
+    lesson.scheduledStartAt &&
+    nowMs < new Date(lesson.scheduledStartAt).getTime() - EARLY_JOIN_MS;
   const pastGrace =
     lesson.scheduledEndAt &&
-    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
-    Date.now() > new Date(lesson.scheduledEndAt).getTime() + GRACE_MS;
-  if (!isAllowedStatus || pastGrace) {
+    nowMs > new Date(lesson.scheduledEndAt).getTime() + GRACE_MS;
+  if (!isAllowedStatus || beforeJoinWindow || pastGrace) {
     redirect("/dashboard");
   }
 

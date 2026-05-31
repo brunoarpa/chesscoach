@@ -13,10 +13,19 @@ import Link from "next/link";
 // Room stays open for 5 minutes past the scheduled end. After that the
 // /lesson/[id] page redirects away so the join button is pointless.
 const ROOM_GRACE_MS = 5 * 60 * 1000;
+// Room opens 5 minutes before the scheduled start. Before that the
+// /lesson/[id] page redirects away, so the join button shouldn't show.
+const EARLY_JOIN_MS = 5 * 60 * 1000;
 
 function isRoomClosed(scheduledEndAt: string | null, now: number): boolean {
   if (!scheduledEndAt) return false;
   return now > new Date(scheduledEndAt).getTime() + ROOM_GRACE_MS;
+}
+
+// Too early to join — the join window hasn't opened yet.
+function isBeforeJoinWindow(scheduledStartAt: string | null, now: number): boolean {
+  if (!scheduledStartAt) return false;
+  return now < new Date(scheduledStartAt).getTime() - EARLY_JOIN_MS;
 }
 
 // Lesson time is over but the room is still open for the grace window.
@@ -330,6 +339,7 @@ function StudentAcceptedCard({ request }: { request: Request }) {
   const [declLoading, setDeclLoading] = useState(false);
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
+  const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
 
   async function handleConfirmStart() {
     setLoading(true);
@@ -360,10 +370,15 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             <RequestMeta request={request} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {!roomClosed && (
+            {!roomClosed && !tooEarly && (
               <Link href={`/lesson/${request.id}`}>
                 <Button size="sm">Join Room</Button>
               </Link>
+            )}
+            {!roomClosed && tooEarly && (
+              <Button size="sm" disabled title="You can join 5 minutes before the lesson starts">
+                Join Room
+              </Button>
             )}
             {!roomClosed && !request.studentStartConfirmed && (
               <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
