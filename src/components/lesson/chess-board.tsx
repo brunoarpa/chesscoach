@@ -2,33 +2,54 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Chess, Square } from "chess.js";
-import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow } from "react-chessboard";
+import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 
-// Move quality classification — thresholds match the user's table (in centipawns).
+// Move quality classification.
 type MoveClass = "best" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
 
-const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; color: string; bg: string }> = {
-  best:        { label: "Best",       symbol: "★",  color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-950/40" },
-  excellent:   { label: "Excellent",  symbol: "!",  color: "text-green-700 dark:text-green-300",     bg: "bg-green-100 dark:bg-green-950/40" },
-  good:        { label: "Good",       symbol: "✓",  color: "text-lime-700 dark:text-lime-300",       bg: "bg-lime-100 dark:bg-lime-950/40" },
-  inaccuracy:  { label: "Inaccuracy", symbol: "?!", color: "text-yellow-700 dark:text-yellow-300",   bg: "bg-yellow-100 dark:bg-yellow-950/40" },
-  mistake:     { label: "Mistake",    symbol: "?",  color: "text-orange-700 dark:text-orange-300",   bg: "bg-orange-100 dark:bg-orange-950/40" },
-  blunder:     { label: "Blunder",    symbol: "??", color: "text-red-700 dark:text-red-300",         bg: "bg-red-100 dark:bg-red-950/40" },
+// Per-class presentation: `color`/`bg` are Tailwind classes for the text labels
+// in the move list & engine panel; `badge` (solid) and `tint` (translucent) are
+// raw CSS colors for the on-board chess.com-style markers.
+const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; color: string; bg: string; badge: string; tint: string }> = {
+  best:        { label: "Best",       symbol: "★",  color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-950/40", badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
+  excellent:   { label: "Excellent",  symbol: "!",  color: "text-green-700 dark:text-green-300",     bg: "bg-green-100 dark:bg-green-950/40",     badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
+  good:        { label: "Good",       symbol: "✓",  color: "text-lime-700 dark:text-lime-300",       bg: "bg-lime-100 dark:bg-lime-950/40",       badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
+  inaccuracy:  { label: "Inaccuracy", symbol: "?!", color: "text-yellow-700 dark:text-yellow-300",   bg: "bg-yellow-100 dark:bg-yellow-950/40",   badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
+  mistake:     { label: "Mistake",    symbol: "?",  color: "text-orange-700 dark:text-orange-300",   bg: "bg-orange-100 dark:bg-orange-950/40",   badge: "#ffa459", tint: "rgba(255,164,89,0.45)" },
+  blunder:     { label: "Blunder",    symbol: "??", color: "text-red-700 dark:text-red-300",         bg: "bg-red-100 dark:bg-red-950/40",         badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
 };
 
-function classifyByCpLoss(cpLoss: number): MoveClass {
-  // cpLoss is in centipawns; 0.02 pawns = 2 cp etc.
-  if (cpLoss <= 0.5) return "best";
-  if (cpLoss <= 2) return "excellent";
-  if (cpLoss <= 5) return "good";
-  if (cpLoss <= 10) return "inaccuracy";
-  if (cpLoss <= 20) return "mistake";
+// Logistic curve mapping a centipawn eval to "expected points" (win probability,
+// 0..1) — the chess.com win-percentage model. The constant is chess.com's.
+const WIN_PROB_K = 0.00368208;
+function cpToExpectedPoints(cp: number): number {
+  return 1 / (1 + Math.exp(-WIN_PROB_K * cp));
+}
+
+// Classify by expected points *lost* by the move. Cutoffs match the user's table:
+// Best 0, Excellent ≤0.02, Good ≤0.05, Inaccuracy ≤0.10, Mistake ≤0.20, else Blunder.
+function classifyByExpectedPointsLost(loss: number): MoveClass {
+  if (loss <= 0) return "best";
+  if (loss <= 0.02) return "excellent";
+  if (loss <= 0.05) return "good";
+  if (loss <= 0.10) return "inaccuracy";
+  if (loss <= 0.20) return "mistake";
   return "blunder";
+}
+
+// Classify a played move from the mover's perspective: how much did the position's
+// expected points drop from the best available (before) to the result (after)?
+// Both evals are white-perspective centipawns.
+function classifyMove(parentBestCp: number, resultCp: number, moverIsWhite: boolean): MoveClass {
+  const sign = moverIsWhite ? 1 : -1;
+  const epBefore = cpToExpectedPoints(sign * parentBestCp);
+  const epAfter = cpToExpectedPoints(sign * resultCp);
+  return classifyByExpectedPointsLost(Math.max(0, epBefore - epAfter));
 }
 
 function evalToCp(line: { cp: number | null; mate: number | null }): number {
@@ -86,7 +107,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
   const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
   const [showEngineArrows, setShowEngineArrows] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [squareSize, setSquareSize] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const rightClickStartRef = useRef<string | null>(null);
   const isRemoteUpdateRef = useRef(false);
@@ -335,6 +358,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
     setShowResetConfirm(true);
   }, [moveHistory.length]);
 
+  // Track board size so the on-board move badge scales with one square.
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const update = () => setSquareSize(el.clientWidth / 8);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Keyboard arrow navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -511,17 +545,78 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
     const childBest = evalCache.get(childFen);
     if (parentBest == null || childBest == null) return null;
     const parentTurn = parentFen.split(" ")[1];
-    let loss = parentTurn === "w" ? parentBest - childBest : childBest - parentBest;
-    loss = Math.max(0, loss);
-    return classifyByCpLoss(loss);
+    return classifyMove(parentBest, childBest, parentTurn === "w");
   }
+
+  // Destination/source squares + classification of the move that produced the
+  // currently displayed position — drives the on-board chess.com-style marker.
+  const lastMove = useMemo(() => {
+    if (currentMoveIndex < 0) return null;
+    const g = new Chess();
+    for (let i = 0; i <= currentMoveIndex && i < moveHistory.length; i++) {
+      try { g.move(moveHistory[i]); } catch { return null; }
+    }
+    const verbose = g.history({ verbose: true });
+    const last = verbose[verbose.length - 1];
+    return last ? { from: last.from as string, to: last.to as string } : null;
+  }, [moveHistory, currentMoveIndex]);
+
+  const currentMoveClass = currentMoveIndex >= 0 ? classifyMoveAtIndex(currentMoveIndex) : null;
+
+  // Square size in px (board width / 8), so the corner badge scales with the board.
+  const renderSquare: SquareRenderer = ({ square, children }) => {
+    const isDest = !!currentMoveClass && lastMove?.to === square;
+    const isFrom = !!currentMoveClass && lastMove?.from === square;
+    const style: React.CSSProperties = {
+      position: "relative",
+      width: "100%",
+      height: "100%",
+      ...squareStyles[square],
+    };
+    if (currentMoveClass && (isDest || isFrom) && !squareStyles[square]?.backgroundColor) {
+      style.backgroundColor = MOVE_CLASS_STYLE[currentMoveClass].tint;
+    }
+    const badgePx = squareSize * 0.4;
+    return (
+      <div style={style}>
+        {children}
+        {isDest && currentMoveClass && squareSize > 0 && (
+          <div
+            title={MOVE_CLASS_STYLE[currentMoveClass].label}
+            style={{
+              position: "absolute",
+              top: "4%",
+              right: "4%",
+              width: badgePx,
+              height: badgePx,
+              borderRadius: "50%",
+              background: MOVE_CLASS_STYLE[currentMoveClass].badge,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 800,
+              fontSize: badgePx * 0.55,
+              lineHeight: 1,
+              border: "1.5px solid #fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+              zIndex: 6,
+              pointerEvents: "none",
+            }}
+          >
+            {MOVE_CLASS_STYLE[currentMoveClass].symbol}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar */}
       <div className="flex gap-1 w-full">
         <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} />
-        <div className="flex-1 aspect-square">
+        <div ref={boardRef} className="flex-1 aspect-square">
           <Chessboard
             options={{
               position: game.fen(),
@@ -532,6 +627,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
               boardOrientation: boardOrientation,
               arrows: [...engineArrows, ...arrows],
               squareStyles: squareStyles,
+              squareRenderer: renderSquare,
               animationDurationInMs: 200,
               allowDrawingArrows: true,
               clearArrowsOnClick: true,
@@ -599,17 +695,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
       {engineLines.length > 0 && (() => {
         const bestCp = evalToCp(engineLines[0]);
         const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
-        const annotated = engineLines.map((line) => {
-          const lineCp = evalToCp(line);
-          const loss = sideToMove === "w" ? bestCp - lineCp : lineCp - bestCp;
-          return { line, loss: Math.max(0, loss) };
-        });
+        const annotated = engineLines.map((line) => ({ line, cp: evalToCp(line) }));
         return (
           <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
             <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
             <div className="space-y-1">
-              {annotated.map(({ line, loss }, i) => {
-                const cls: MoveClass = i === 0 ? "best" : classifyByCpLoss(loss);
+              {annotated.map(({ line, cp }, i) => {
+                const cls: MoveClass = i === 0 ? "best" : classifyMove(bestCp, cp, sideToMove === "w");
                 const style = MOVE_CLASS_STYLE[cls];
                 return (
                   <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
