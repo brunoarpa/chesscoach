@@ -25,6 +25,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -83,6 +84,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
     if (!content || sending) return;
 
     setSending(true);
+    setError(null);
     setInput("");
 
     // Optimistic update
@@ -108,11 +110,18 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
         setMessages((prev) =>
           prev.map((m) => (m.id === optimisticMsg.id ? data.message : m))
         );
+      } else {
+        // Roll back optimistic message and surface the server error
+        const data = await res.json().catch(() => null);
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+        setInput(content);
+        setError(data?.error ?? "Failed to send message.");
       }
     } catch {
       // Remove optimistic message on failure
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
       setInput(content);
+      setError("Failed to send message.");
     } finally {
       setSending(false);
     }
@@ -162,13 +171,16 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
       </div>
 
       {/* Input */}
+      {error && (
+        <p className="px-3 py-1 text-xs text-destructive border-t">{error}</p>
+      )}
       <div className="border-t p-2 flex gap-2">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
-          maxLength={1000}
+          maxLength={100}
           className="flex-1"
         />
         <Button size="icon" onClick={handleSend} disabled={!input.trim() || sending}>
