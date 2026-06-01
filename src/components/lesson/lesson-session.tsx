@@ -10,6 +10,7 @@ import { LessonControls } from "@/components/lesson/lesson-controls";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff, LogOut, Clock } from "lucide-react";
 import { getPusherClient } from "@/lib/pusher-client";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 interface Message {
   id: string;
@@ -57,6 +58,7 @@ export function LessonSession({
   initialBoardPgn,
 }: Props) {
   const router = useRouter();
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const [activeTab, setActiveTab] = useState<string>("board");
   const [inCall, setInCall] = useState(false);
   const callActionsRef = useRef<CallActions | null>(null);
@@ -186,7 +188,6 @@ export function LessonSession({
 
   const handleJoinCall = useCallback(() => {
     callActionsRef.current?.start();
-    setActiveTab("call");
   }, []);
 
   const handleLeaveCall = useCallback(() => {
@@ -294,15 +295,46 @@ export function LessonSession({
         </div>
       </div>
 
-      {/* Desktop layout */}
-      <div className="hidden md:flex flex-1 min-h-0">
-        {/* Board */}
-        <div className="flex-1 flex items-start justify-center p-4 overflow-y-auto min-h-0">
-          <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
-        </div>
+      {/* Single layout: desktop renders board + side panel, mobile renders
+          tabbed board/chat. We render only ONE of these at a time (driven by a
+          media query) so each child — ChessBoard, ChatPanel, AudioCall — mounts
+          exactly once. Mounting both layouts (CSS-hidden) duplicated every
+          component, gave PeerJS two peers fighting over one id, and let a tab
+          switch unmount a board whose cleanup tore down the shared Pusher
+          channel — breaking board/chat/presence sync for everyone. */}
+      {isDesktop ? (
+        <div className="flex flex-1 min-h-0">
+          {/* Board */}
+          <div className="flex-1 flex items-start justify-center p-4 overflow-y-auto min-h-0">
+            <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
+          </div>
 
-        {/* Side panel */}
-        <div className="w-[360px] border-l flex flex-col min-h-0">
+          {/* Side panel */}
+          <div className="w-[360px] border-l flex flex-col min-h-0">
+            {isCall && (
+              <div className="border-b">
+                <AudioCall
+                  lessonId={lessonId}
+                  isCoach={isCoach}
+                  onCallStatusChange={handleCallStatusChange}
+                  callActionsRef={callActionsRef}
+                />
+              </div>
+            )}
+            <div className="flex-1 min-h-0">
+              <ChatPanel
+                lessonId={lessonId}
+                userId={userId}
+                otherName={otherName}
+                initialMessages={initialMessages}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-1 min-h-0 flex-col">
+          {/* Call controls stay mounted above the tabs so switching between
+              Board and Chat never unmounts AudioCall and drops the call. */}
           {isCall && (
             <div className="border-b">
               <AudioCall
@@ -313,50 +345,30 @@ export function LessonSession({
               />
             </div>
           )}
-          <div className="flex-1 min-h-0">
-            <ChatPanel
-              lessonId={lessonId}
-              userId={userId}
-              otherName={otherName}
-              initialMessages={initialMessages}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile layout - tabbed */}
-      <div className="flex md:hidden flex-1 min-h-0 flex-col">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-          <TabsList className="w-full justify-start rounded-none border-b bg-background">
-            <TabsTrigger value="board">Board</TabsTrigger>
-            <TabsTrigger value="chat">Chat</TabsTrigger>
-            {isCall && <TabsTrigger value="call">Call</TabsTrigger>}
-          </TabsList>
-          <TabsContent value="board" className="flex-1 overflow-y-auto p-2 m-0">
-            <div className="flex justify-center">
-              <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
-            </div>
-          </TabsContent>
-          <TabsContent value="chat" className="flex-1 min-h-0 m-0">
-            <ChatPanel
-              lessonId={lessonId}
-              userId={userId}
-              otherName={otherName}
-              initialMessages={initialMessages}
-            />
-          </TabsContent>
-          {isCall && (
-            <TabsContent value="call" className="flex-1 m-0 p-2">
-              <AudioCall
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+            <TabsList className="w-full justify-start rounded-none border-b bg-background">
+              <TabsTrigger value="board">Board</TabsTrigger>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+            </TabsList>
+            {/* forceMount keeps both panels mounted (Radix just toggles the
+                `hidden` attribute), so switching tabs doesn't unmount the board
+                or chat and reset their live state / realtime subscriptions. */}
+            <TabsContent forceMount value="board" className="flex-1 overflow-y-auto p-2 m-0 data-[state=inactive]:hidden">
+              <div className="flex justify-center">
+                <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
+              </div>
+            </TabsContent>
+            <TabsContent forceMount value="chat" className="flex-1 min-h-0 m-0 data-[state=inactive]:hidden">
+              <ChatPanel
                 lessonId={lessonId}
-                isCoach={isCoach}
-                onCallStatusChange={handleCallStatusChange}
-                callActionsRef={callActionsRef}
+                userId={userId}
+                otherName={otherName}
+                initialMessages={initialMessages}
               />
             </TabsContent>
-          )}
-        </Tabs>
-      </div>
+          </Tabs>
+        </div>
+      )}
     </div>
   );
 }
