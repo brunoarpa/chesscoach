@@ -43,7 +43,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
 
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
 
-    channel.bind("chat:message", (data: { message: Message }) => {
+    const onMessage = (data: { message: Message }) => {
       // Don't add our own messages (already added optimistically)
       if (data.message.senderId === userId) return;
       setMessages((prev) => {
@@ -51,11 +51,14 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
         if (prev.some((m) => m.id === data.message.id)) return prev;
         return [...prev, data.message];
       });
-    });
+    };
+
+    channel.bind("chat:message", onMessage);
 
     return () => {
-      channel.unbind("chat:message");
-      // Don't unsubscribe — board sync uses the same channel
+      // Unbind only our handler; board sync / presence / call share this channel,
+      // so we never unsubscribe it here.
+      channel.unbind("chat:message", onMessage);
     };
   }, [lessonId, userId]);
 

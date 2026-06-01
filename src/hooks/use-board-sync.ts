@@ -34,38 +34,42 @@ export function useBoardSync({
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
     channelRef.current = channel;
 
-    channel.bind("board:moves", (data: { moveHistory: string[]; currentMoveIndex: number; senderId: string }) => {
+    const onMoves = (data: { moveHistory: string[]; currentMoveIndex: number; senderId: string }) => {
       if (data.senderId === userId) return; // Ignore own events
       onRemoteMoves(data.moveHistory, data.currentMoveIndex);
-    });
-
-    channel.bind("board:navigate", (data: { currentMoveIndex: number; senderId: string }) => {
+    };
+    const onNavigate = (data: { currentMoveIndex: number; senderId: string }) => {
       if (data.senderId === userId) return;
       onRemoteNavigate(data.currentMoveIndex);
-    });
-
-    channel.bind("board:arrows", (data: { arrows: Arrow[]; senderId: string }) => {
+    };
+    const onArrows = (data: { arrows: Arrow[]; senderId: string }) => {
       if (data.senderId === userId) return;
       onRemoteArrows(data.arrows);
-    });
-
-    channel.bind("board:highlights", (data: { highlights: Record<string, React.CSSProperties>; senderId: string }) => {
+    };
+    const onHighlights = (data: { highlights: Record<string, React.CSSProperties>; senderId: string }) => {
       if (data.senderId === userId) return;
       onRemoteHighlights(data.highlights);
-    });
-
-    channel.bind("board:reset", (data: { senderId: string }) => {
+    };
+    const onReset = (data: { senderId: string }) => {
       if (data.senderId === userId) return;
       onRemoteReset();
-    });
+    };
+
+    channel.bind("board:moves", onMoves);
+    channel.bind("board:navigate", onNavigate);
+    channel.bind("board:arrows", onArrows);
+    channel.bind("board:highlights", onHighlights);
+    channel.bind("board:reset", onReset);
 
     return () => {
-      channel.unbind("board:moves");
-      channel.unbind("board:navigate");
-      channel.unbind("board:arrows");
-      channel.unbind("board:highlights");
-      channel.unbind("board:reset");
-      pusher.unsubscribe(`private-lesson-${lessonId}`);
+      // Unbind only *our* handlers (pass the reference) and never unsubscribe —
+      // chat, presence, and call:status share this same channel, so tearing it
+      // down here would silently break their realtime sync.
+      channel.unbind("board:moves", onMoves);
+      channel.unbind("board:navigate", onNavigate);
+      channel.unbind("board:arrows", onArrows);
+      channel.unbind("board:highlights", onHighlights);
+      channel.unbind("board:reset", onReset);
       channelRef.current = null;
     };
   }, [lessonId, userId, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteReset]);
