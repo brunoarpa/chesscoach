@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPusherServer } from "@/lib/pusher";
+import { rateLimit } from "@/lib/rate-limit";
+
+const MAX_MESSAGE_LENGTH = 100;
 
 export async function GET(
   _request: Request,
@@ -82,11 +85,27 @@ export async function POST(
     return NextResponse.json({ error: "Lesson is not active" }, { status: 400 });
   }
 
+  // Rate limit: max 10 messages per 10 seconds per user per lesson, to
+  // prevent flooding/spam from a participant in the room.
+  const { success } = await rateLimit(`chat:${id}:${session.user.id}`, {
+    maxAttempts: 10,
+    windowMs: 10 * 1000,
+  });
+  if (!success) {
+    return NextResponse.json(
+      { error: "You're sending messages too quickly. Please slow down." },
+      { status: 429 }
+    );
+  }
+
   const body = await request.json();
   const content = typeof body.content === "string" ? body.content.trim() : "";
 
-  if (!content || content.length > 1000) {
-    return NextResponse.json({ error: "Message must be 1-1000 characters" }, { status: 400 });
+  if (!content || content.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: `Message must be 1-${MAX_MESSAGE_LENGTH} characters` },
+      { status: 400 }
+    );
   }
 
   const message = await prisma.chatMessage.create({
