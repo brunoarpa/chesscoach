@@ -270,8 +270,6 @@ model LessonRequest {
   studentJoinedAt DateTime?
   
   status          LessonRequestStatus @default(PENDING)
-  studentStartConfirmed Boolean @default(false)
-  coachStartConfirmed   Boolean @default(false)
   studentConfirmed Boolean @default(false)
   coachConfirmed   Boolean @default(false)
   disputeReason    String?

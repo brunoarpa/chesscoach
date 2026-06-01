@@ -660,63 +660,6 @@ export async function submitReview(formData: FormData) {
 }
 
 /**
- * Confirm lesson start. Both coach and student must confirm.
- * When both confirm, status moves from ACCEPTED → IN_PROGRESS.
- */
-export async function confirmLessonStart(requestId: string) {
-  const session = await auth();
-  if (!session?.user?.id) return { error: "Not authenticated" };
-
-  if (!requestId || typeof requestId !== "string") return { error: "Invalid request ID" };
-
-  const request = await prisma.lessonRequest.findUnique({
-    where: { id: requestId },
-  });
-
-  if (!request) return { error: "Request not found" };
-  if (request.status !== "ACCEPTED") return { error: "Lesson must be accepted first" };
-
-  const isStudent = request.studentId === session.user.id;
-  const isCoach = request.coachId === session.user.id;
-  if (!isStudent && !isCoach) return { error: "Not authorized" };
-
-  const updateData: Record<string, boolean> = {};
-  if (isStudent) updateData.studentStartConfirmed = true;
-  if (isCoach) updateData.coachStartConfirmed = true;
-
-  const newStudentStart = isStudent ? true : request.studentStartConfirmed;
-  const newCoachStart = isCoach ? true : request.coachStartConfirmed;
-  const bothConfirmed = newStudentStart && newCoachStart;
-
-  if (bothConfirmed) {
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
-        where: { id: requestId },
-        data: { ...updateData, status: "IN_PROGRESS" },
-      }),
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-      }),
-    ]);
-  } else {
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
-        where: { id: requestId },
-        data: updateData,
-      }),
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-      }),
-    ]);
-  }
-
-  revalidatePath("/dashboard");
-  return { success: true };
-}
-
-/**
  * Decline an accepted lesson before it starts.
  * Either coach or student can do this. Full refund, no admin needed.
  */

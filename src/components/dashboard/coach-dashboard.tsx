@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { respondToLessonRequest, confirmLessonStart, declineAcceptedLesson, submitReview, blockStudent } from "@/lib/actions/lessons";
+import { respondToLessonRequest, declineAcceptedLesson, submitReview, blockStudent } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -59,8 +59,6 @@ interface Request {
   message: string | null;
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
-  studentStartConfirmed: boolean;
-  coachStartConfirmed: boolean;
   studentConfirmed: boolean;
   coachConfirmed: boolean;
   studentId: string;
@@ -287,21 +285,10 @@ function PendingRequestCard({ request }: { request: Request }) {
 }
 
 function AcceptedLessonCard({ request }: { request: Request }) {
-  const [loading, setLoading] = useState(false);
   const [declLoading, setDeclLoading] = useState(false);
-  const myStartConfirmed = request.coachStartConfirmed;
-  const otherStartConfirmed = request.studentStartConfirmed;
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
   const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
-
-  async function handleConfirmStart() {
-    setLoading(true);
-    const result = await confirmLessonStart(request.id);
-    setLoading(false);
-    if (result.error) toast.error(result.error);
-    else toast.success("Start confirmed!");
-  }
 
   async function handleDecline() {
     setDeclLoading(true);
@@ -334,23 +321,11 @@ function AcceptedLessonCard({ request }: { request: Request }) {
                 Join Room
               </Button>
             )}
-            {!roomClosed && !myStartConfirmed && (
-              <Button size="sm" variant="outline" onClick={handleConfirmStart} disabled={loading}>
-                Confirm Start
-              </Button>
-            )}
             <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
               Decline
             </Button>
           </div>
         </div>
-        {!roomClosed && (
-          <p className="text-xs text-muted-foreground">
-            {myStartConfirmed ? "✓ You confirmed" : "⏳ Waiting on you"}
-            {" · "}
-            {otherStartConfirmed ? "✓ Student confirmed" : "⏳ Waiting on student"}
-          </p>
-        )}
       </CardContent>
     </Card>
   );

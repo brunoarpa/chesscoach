@@ -21,7 +21,6 @@ interface Message {
 
 interface Props {
   lessonId: string;
-  lessonStatus: string;
   userId: string;
   isCoach: boolean;
   coachName: string;
@@ -47,7 +46,6 @@ function formatDuration(ms: number): string {
 
 export function LessonSession({
   lessonId,
-  lessonStatus,
   userId,
   isCoach,
   coachName,
@@ -285,7 +283,6 @@ export function LessonSession({
           )}
           <LessonControls
             lessonId={lessonId}
-            lessonStatus={lessonStatus}
             isCoach={isCoach}
             scheduledStartAt={scheduledStartAt}
             otherJoined={otherOnPage}
