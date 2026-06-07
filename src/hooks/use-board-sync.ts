@@ -8,6 +8,10 @@ import { getPusherClient } from "@/lib/pusher-client";
 interface UseBoardSyncOptions {
   lessonId: string;
   userId: string;
+  // Practice/sandbox mode: a solo room with no second participant. We skip the
+  // Pusher subscription and turn every broadcast into a no-op so the board runs
+  // purely on local chess.js state (no realtime, no DB persistence, no API).
+  local?: boolean;
   onRemoteMoves: (moveHistory: string[], currentMoveIndex: number) => void;
   onRemoteNavigate: (currentMoveIndex: number) => void;
   onRemoteArrows: (arrows: Arrow[]) => void;
@@ -18,6 +22,7 @@ interface UseBoardSyncOptions {
 export function useBoardSync({
   lessonId,
   userId,
+  local = false,
   onRemoteMoves,
   onRemoteNavigate,
   onRemoteArrows,
@@ -28,6 +33,7 @@ export function useBoardSync({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (local) return; // Practice mode — no realtime sync
     const pusher = getPusherClient();
     if (!pusher) return; // Pusher not configured — skip real-time sync
 
@@ -72,11 +78,12 @@ export function useBoardSync({
       channel.unbind("board:reset", onReset);
       channelRef.current = null;
     };
-  }, [lessonId, userId, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteReset]);
+  }, [lessonId, userId, local, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteReset]);
 
   // Broadcast move + persist to DB (debounced DB write)
   const broadcastMoves = useCallback(
     (moveHistory: string[], currentMoveIndex: number) => {
+      if (local) return; // Practice mode — nothing to sync or persist
       // Build PGN string from move history for DB persistence
       const pgn = moveHistory.length > 0 ? buildPgnFromMoves(moveHistory) : "";
 
@@ -90,19 +97,20 @@ export function useBoardSync({
         }).catch(() => {});
       }, 300);
     },
-    [lessonId]
+    [lessonId, local]
   );
 
   // Broadcast ephemeral state (no DB persist)
   const broadcastSync = useCallback(
     (event: string, data: Record<string, unknown>) => {
+      if (local) return; // Practice mode — no realtime broadcast
       fetch(`/api/lesson/${lessonId}/board/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ event, data }),
       }).catch(() => {});
     },
-    [lessonId]
+    [lessonId, local]
   );
 
   const broadcastNavigate = useCallback(

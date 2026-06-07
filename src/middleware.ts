@@ -24,9 +24,13 @@ export default authMiddleware((req) => {
     }
   }
 
-  // Protected routes that require authentication
+  // Protected routes that require authentication. The practice room
+  // (/lesson/practice) is a public, login-free sandbox of the lesson UI, so it
+  // is exempt even though the rest of /lesson requires auth.
   const protectedPaths = ["/dashboard", "/wallet", "/profile/edit", "/lesson"];
-  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+  const isProtected =
+    pathname !== "/lesson/practice" &&
+    protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtected && !req.auth) {
     const url = req.nextUrl.clone();
