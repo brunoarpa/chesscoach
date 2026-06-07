@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -64,18 +63,23 @@ export default async function HowItWorksPage() {
               Rate each other 1–5 stars with an optional comment.
             </p>
           </li>
-          <li className="pl-8">
-            <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Play className="h-3 w-3 fill-current" />
-            </span>
-            <p className="font-semibold">Try it first (optional)</p>
-            <p className="text-sm text-muted-foreground">
-              Curious what the lesson room looks like? Open a free{" "}
-              <Link href="/lesson/practice" className="underline font-medium">practice room</Link>{" "}
-              with the real board, chat, and tools, just for you. Play both sides and explore. No sign-up, nothing saved.
-            </p>
-          </li>
         </ol>
+
+        {/* Try the lesson room hands-on, no booking needed */}
+        <Card className="mt-8 border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 pt-6">
+            <div className="flex-1">
+              <p className="font-semibold">Want to see what a lesson looks like?</p>
+              <p className="text-sm text-muted-foreground">
+                Open a free practice room with the real board, chat, and tools, just for you. Play both
+                sides and explore. No sign-up, nothing saved.
+              </p>
+            </div>
+            <Link href="/lesson/practice">
+              <Button className="w-full sm:w-auto">Try a practice lesson</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </section>
 
       <Separator className="my-8" />

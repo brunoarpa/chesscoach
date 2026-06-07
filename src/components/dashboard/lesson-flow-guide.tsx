@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, HelpCircle } from "lucide-react";
+import { X, HelpCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const steps = [
@@ -96,6 +97,20 @@ export function LessonFlowGuide() {
               </li>
             ))}
           </ol>
+
+          {/* Hands-on practice room — try the lesson UI without booking */}
+          <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <p className="text-sm font-medium">Want to try it first?</p>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+              Open a free practice room with the real board and tools, just for you. No booking, nothing saved.
+            </p>
+            <Button asChild size="sm" className="w-full gap-2">
+              <Link href="/lesson/practice" onClick={() => setOpen(false)}>
+                <Play className="h-3.5 w-3.5 fill-current" />
+                Try a practice lesson
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </>
