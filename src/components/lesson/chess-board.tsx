@@ -714,7 +714,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar */}
       <div className="flex gap-1 w-full">
-        <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} />
+        <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={squareSize > 0 ? squareSize * 8 : undefined} />
         <div ref={boardRef} className="relative flex-1 aspect-square">
           <Chessboard
             options={{

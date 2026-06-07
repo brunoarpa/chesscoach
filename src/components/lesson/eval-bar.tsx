@@ -14,12 +14,16 @@ interface Props {
   fen: string;
   boardOrientation: "white" | "black";
   onLinesChange?: (lines: Line[], depth: number, fen: string) => void;
+  // Explicit pixel height so the bar always matches the board. The board sizes
+  // itself internally, so relying on flex stretch collapses the bar to its
+  // min-height; the parent passes the measured board size instead.
+  heightPx?: number;
 }
 
 const MULTI_PV = 5;
 const MOVE_TIME_MS = 500;
 
-export function EvalBar({ fen, boardOrientation, onLinesChange }: Props) {
+export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Props) {
   const workerRef = useRef<Worker | null>(null);
   const [evaluation, setEvaluation] = useState<number>(0); // in centipawns
   const [mate, setMate] = useState<number | null>(null);
@@ -186,12 +190,15 @@ export function EvalBar({ fen, boardOrientation, onLinesChange }: Props) {
     : `${evaluation >= 0 ? "+" : ""}${(evaluation / 100).toFixed(1)}`;
 
   return (
-    <div className="flex flex-col items-center gap-1 h-full select-none">
+    <div
+      className="flex flex-col items-center gap-1 select-none"
+      style={{ height: heightPx ?? "100%" }}
+    >
       <div className="text-xs font-mono font-bold leading-none">
         {evalText}
       </div>
 
-      <div className="relative w-7 flex-1 rounded-sm overflow-hidden border border-border bg-zinc-800 min-h-[200px]">
+      <div className="relative w-7 flex-1 min-h-0 rounded-sm overflow-hidden border border-border bg-zinc-800">
         <div
           className="absolute bottom-0 left-0 right-0 bg-white transition-all duration-300 ease-out"
           style={{ height: `${displayPercent}%` }}
