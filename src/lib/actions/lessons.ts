@@ -479,33 +479,40 @@ export async function reportNoShow(requestId: string) {
       return { error: "Coach has already joined the lesson" };
     }
 
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
-        where: { id: requestId },
+    const claimed = await prisma.$transaction(async (tx) => {
+      // Atomically claim the lesson so a concurrent cron sweep or the coach's
+      // own report can't process (and refund) it twice.
+      const flipped = await tx.lessonRequest.updateMany({
+        where: { id: requestId, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
         data: { status: "NO_SHOW" },
-      }),
+      });
+      if (flipped.count === 0) return false;
+
       // Make the student whole: refund paid cost, or restore the free trial if it was a trial.
-      request.isTrial
-        ? prisma.user.update({
-            where: { id: request.studentId },
-            data: { freeTrialsRemaining: { increment: 1 } },
-          })
-        : prisma.user.update({
-            where: { id: request.studentId },
-            data: { reservedBalance: { decrement: request.estimatedCost } },
-          }),
+      if (request.isTrial) {
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: { freeTrialsRemaining: { increment: 1 } },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: { reservedBalance: { decrement: request.estimatedCost } },
+        });
+      }
       // Apply ELO penalty to coach
-      prisma.user.update({
+      await tx.user.update({
         where: { id: request.coachId },
-        data: {
-          coachRatingPenalty: { increment: NO_SHOW_ELO_PENALTY },
-        },
-      }),
+        data: { coachRatingPenalty: { increment: NO_SHOW_ELO_PENALTY } },
+      });
       // Release timeslot
-      ...(request.timeSlotId
-        ? [prisma.timeSlot.update({ where: { id: request.timeSlotId }, data: { status: "AVAILABLE" } })]
-        : []),
-      prisma.abuseFlag.create({
+      if (request.timeSlotId) {
+        await tx.timeSlot.update({
+          where: { id: request.timeSlotId },
+          data: { status: "AVAILABLE" },
+        });
+      }
+      await tx.abuseFlag.create({
         data: {
           userId: request.coachId,
           type: "COACH_NO_SHOW",
@@ -514,8 +521,11 @@ export async function reportNoShow(requestId: string) {
           relatedLessonId: requestId,
           relatedUserId: request.studentId,
         },
-      }),
-    ]);
+      });
+      return true;
+    });
+
+    if (!claimed) return { error: "This lesson has already been processed" };
 
     // Recalculate coach ELO
     const newElo = await calculateCoachElo(request.coachId);
@@ -529,58 +539,57 @@ export async function reportNoShow(requestId: string) {
       return { error: "Student has already joined the lesson" };
     }
 
-    await prisma.$transaction([
-      prisma.lessonRequest.update({
-        where: { id: requestId },
+    const claimed = await prisma.$transaction(async (tx) => {
+      const flipped = await tx.lessonRequest.updateMany({
+        where: { id: requestId, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
         data: {
           status: "COMPLETED",
           completedAt: new Date(),
           coachConfirmed: true,
           studentConfirmed: true,
         },
-      }),
-      ...(request.isTrial
-        ? []
-        : [
-            // Move from reserved to actual payment
-            prisma.user.update({
-              where: { id: request.studentId },
-              data: {
-                reservedBalance: { decrement: request.estimatedCost },
-              },
-            }),
-            prisma.user.update({
-              where: { id: request.coachId },
-              data: {
-                pendingEarnings: { increment: request.estimatedCost },
-                totalEarningsAllTime: { increment: request.estimatedCost },
-                lessonsGiven: { increment: 1 },
-              },
-            }),
-            prisma.transaction.create({
-              data: {
-                userId: request.studentId,
-                type: "LESSON_PAYMENT",
-                amount: -request.estimatedCost,
-                lessonRequestId: requestId,
-              },
-            }),
-            prisma.transaction.create({
-              data: {
-                userId: request.coachId,
-                type: "LESSON_PAYMENT",
-                amount: request.estimatedCost,
-                lessonRequestId: requestId,
-              },
-            }),
-            prisma.earningRecord.create({
-              data: {
-                userId: request.coachId,
-                amount: request.estimatedCost,
-              },
-            }),
-          ]),
-      prisma.abuseFlag.create({
+      });
+      if (flipped.count === 0) return false;
+
+      if (!request.isTrial) {
+        // Money actually leaves the student's wallet AND releases the hold.
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: {
+            walletBalance: { decrement: request.estimatedCost },
+            reservedBalance: { decrement: request.estimatedCost },
+            lessonsTaken: { increment: 1 },
+          },
+        });
+        await tx.user.update({
+          where: { id: request.coachId },
+          data: {
+            pendingEarnings: { increment: request.estimatedCost },
+            totalEarningsAllTime: { increment: request.estimatedCost },
+            lessonsGiven: { increment: 1 },
+          },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: request.studentId,
+            type: "LESSON_PAYMENT",
+            amount: -request.estimatedCost,
+            lessonRequestId: requestId,
+          },
+        });
+        await tx.transaction.create({
+          data: {
+            userId: request.coachId,
+            type: "LESSON_PAYMENT",
+            amount: request.estimatedCost,
+            lessonRequestId: requestId,
+          },
+        });
+        await tx.earningRecord.create({
+          data: { userId: request.coachId, amount: request.estimatedCost },
+        });
+      }
+      await tx.abuseFlag.create({
         data: {
           userId: request.studentId,
           type: "STUDENT_NO_SHOW",
@@ -589,8 +598,11 @@ export async function reportNoShow(requestId: string) {
           relatedLessonId: requestId,
           relatedUserId: request.coachId,
         },
-      }),
-    ]);
+      });
+      return true;
+    });
+
+    if (!claimed) return { error: "This lesson has already been processed" };
   }
 
   revalidatePath("/dashboard");

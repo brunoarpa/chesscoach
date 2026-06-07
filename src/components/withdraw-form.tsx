@@ -72,7 +72,31 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
   }
 
   if (connectStatus === null) return null;
-  if (!isConnected) return null;
+
+  if (!isConnected) {
+    // Don't silently hide withdrawals — explain that a payout account is the
+    // prerequisite, so the "Set Up Payouts" card above makes sense.
+    const detailsPending = connectStatus.connected && !connectStatus.payoutsEnabled;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Withdraw Earnings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {detailsPending
+              ? "Withdrawals unlock once Stripe finishes reviewing your payout account (usually 1–2 business days)."
+              : "To withdraw your earnings, connect a payout account using “Set Up Payouts” above. This is how the money reaches your bank — it only takes a minute."}
+          </p>
+          {pendingEarnings > 0 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              You have <span className="font-medium">${pendingDollars.toFixed(2)}</span> in earnings waiting.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

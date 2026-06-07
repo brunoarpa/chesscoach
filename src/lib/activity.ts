@@ -211,121 +211,116 @@ export async function detectConfirmationDisputes() {
     const coachConfirmed = lesson.coachConfirmed;
 
     if (!studentConfirmed && !coachConfirmed) {
-      // Neither confirmed — timeout, expire and refund
-      const txOps = [
-        prisma.lessonRequest.update({
-          where: { id: lesson.id },
+      // Neither confirmed — timeout, expire and refund.
+      const claimed = await prisma.$transaction(async (tx) => {
+        // Guard against the no-show sweep (which runs concurrently) having
+        // already claimed this lesson — otherwise we'd refund reserved twice.
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: lesson.id, status: "ACCEPTED" },
           data: { status: "EXPIRED" },
-        }),
-        ...(lesson.isTrial
-          ? []
-          : [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: { reservedBalance: { decrement: lesson.estimatedCost } },
-              }),
-            ]),
-      ];
-      await prisma.$transaction(txOps);
-
-      await prisma.abuseFlag.create({
-        data: {
-          userId: lesson.studentId,
-          type: "CONFIRMATION_TIMEOUT",
-          severity: "LOW",
-          details: `Neither party confirmed lesson completion. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
-          relatedLessonId: lesson.id,
-          relatedUserId: lesson.coachId,
-        },
+        });
+        if (flipped.count === 0) return false;
+        if (!lesson.isTrial) {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { reservedBalance: { decrement: lesson.estimatedCost } },
+          });
+        }
+        return true;
       });
+
+      if (claimed) {
+        await prisma.abuseFlag.create({
+          data: {
+            userId: lesson.studentId,
+            type: "CONFIRMATION_TIMEOUT",
+            severity: "LOW",
+            details: `Neither party confirmed lesson completion. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
+            relatedLessonId: lesson.id,
+            relatedUserId: lesson.coachId,
+          },
+        });
+      }
     } else if (coachConfirmed && !studentConfirmed) {
       // Coach confirmed but student didn't respond within 48h — auto-complete
       // (student silence = satisfaction)
-      const txOps = [
-        prisma.lessonRequest.update({
-          where: { id: lesson.id },
+      await prisma.$transaction(async (tx) => {
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: lesson.id, status: "ACCEPTED" },
           data: {
             status: "COMPLETED",
             studentConfirmed: true,
             completedAt: new Date(),
           },
-        }),
-        ...(lesson.isTrial
-          ? []
-          : [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: {
-                  walletBalance: { decrement: lesson.estimatedCost },
-                  reservedBalance: { decrement: lesson.estimatedCost },
-                  lessonsTaken: { increment: 1 },
-                },
-              }),
-              prisma.user.update({
-                where: { id: lesson.coachId },
-                data: {
-                  pendingEarnings: { increment: lesson.estimatedCost },
-                  totalEarningsAllTime: { increment: lesson.estimatedCost },
-                  lessonsGiven: { increment: 1 },
-                },
-              }),
-              prisma.transaction.create({
-                data: {
-                  userId: lesson.studentId,
-                  type: "LESSON_PAYMENT",
-                  amount: -lesson.estimatedCost,
-                  lessonRequestId: lesson.id,
-                },
-              }),
-              prisma.transaction.create({
-                data: {
-                  userId: lesson.coachId,
-                  type: "LESSON_PAYMENT",
-                  amount: lesson.estimatedCost,
-                  lessonRequestId: lesson.id,
-                },
-              }),
-              prisma.earningRecord.create({
-                data: {
-                  userId: lesson.coachId,
-                  amount: lesson.estimatedCost,
-                },
-              }),
-            ]),
-      ];
-      await prisma.$transaction(txOps);
+        });
+        if (flipped.count === 0) return;
+        if (!lesson.isTrial) {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: {
+              walletBalance: { decrement: lesson.estimatedCost },
+              reservedBalance: { decrement: lesson.estimatedCost },
+              lessonsTaken: { increment: 1 },
+            },
+          });
+          await tx.user.update({
+            where: { id: lesson.coachId },
+            data: {
+              pendingEarnings: { increment: lesson.estimatedCost },
+              totalEarningsAllTime: { increment: lesson.estimatedCost },
+              lessonsGiven: { increment: 1 },
+            },
+          });
+          await tx.transaction.create({
+            data: {
+              userId: lesson.studentId,
+              type: "LESSON_PAYMENT",
+              amount: -lesson.estimatedCost,
+              lessonRequestId: lesson.id,
+            },
+          });
+          await tx.transaction.create({
+            data: {
+              userId: lesson.coachId,
+              type: "LESSON_PAYMENT",
+              amount: lesson.estimatedCost,
+              lessonRequestId: lesson.id,
+            },
+          });
+          await tx.earningRecord.create({
+            data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+          });
+        }
+      });
     } else {
       // Student confirmed but coach didn't — expire and refund
-      const flaggedUserId = lesson.coachId;
-      const relatedUserId = lesson.studentId;
-
-      // Expire and refund
-      const txOps = [
-        prisma.lessonRequest.update({
-          where: { id: lesson.id },
+      const claimed = await prisma.$transaction(async (tx) => {
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: lesson.id, status: "ACCEPTED" },
           data: { status: "EXPIRED" },
-        }),
-        ...(lesson.isTrial
-          ? []
-          : [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: { reservedBalance: { decrement: lesson.estimatedCost } },
-              }),
-            ]),
-      ];
-      await prisma.$transaction(txOps);
-
-      await prisma.abuseFlag.create({
-        data: {
-          userId: flaggedUserId,
-          type: "ONE_SIDED_CONFIRMATION",
-          severity: "MEDIUM",
-          details: `Student confirmed but coach did not within 48h. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
-          relatedLessonId: lesson.id,
-          relatedUserId,
-        },
+        });
+        if (flipped.count === 0) return false;
+        if (!lesson.isTrial) {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { reservedBalance: { decrement: lesson.estimatedCost } },
+          });
+        }
+        return true;
       });
+
+      if (claimed) {
+        await prisma.abuseFlag.create({
+          data: {
+            userId: lesson.coachId,
+            type: "ONE_SIDED_CONFIRMATION",
+            severity: "MEDIUM",
+            details: `Student confirmed but coach did not within 48h. Student: ${lesson.student.username}, Coach: ${lesson.coach.username}. Lesson expired and funds returned.`,
+            relatedLessonId: lesson.id,
+            relatedUserId: lesson.studentId,
+          },
+        });
+      }
     }
   }
 }
@@ -477,50 +472,66 @@ export async function detectNoShows() {
 
   for (const lesson of lessons) {
     if (!lesson.coachJoinedAt && !lesson.studentJoinedAt) {
-      // Neither joined — expire, make student whole
-      const txOps = [
-        prisma.lessonRequest.update({
-          where: { id: lesson.id },
+      // Neither joined — expire, make student whole.
+      await prisma.$transaction(async (tx) => {
+        // Atomically claim the lesson. If another task (manual report, the
+        // confirmation-dispute sweep, or an overlapping cron) already moved it
+        // out of ACCEPTED/IN_PROGRESS, bail so we don't double-refund.
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
           data: { status: "EXPIRED" },
-        }),
-        lesson.isTrial
-          ? prisma.user.update({
-              where: { id: lesson.studentId },
-              data: { freeTrialsRemaining: { increment: 1 } },
-            })
-          : prisma.user.update({
-              where: { id: lesson.studentId },
-              data: { reservedBalance: { decrement: lesson.estimatedCost } },
-            }),
-        ...(lesson.timeSlotId
-          ? [prisma.timeSlot.update({ where: { id: lesson.timeSlotId }, data: { status: "AVAILABLE" } })]
-          : []),
-      ];
-      await prisma.$transaction(txOps);
+        });
+        if (flipped.count === 0) return;
+
+        if (lesson.isTrial) {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { freeTrialsRemaining: { increment: 1 } },
+          });
+        } else {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { reservedBalance: { decrement: lesson.estimatedCost } },
+          });
+        }
+        if (lesson.timeSlotId) {
+          await tx.timeSlot.update({
+            where: { id: lesson.timeSlotId },
+            data: { status: "AVAILABLE" },
+          });
+        }
+      });
     } else if (!lesson.coachJoinedAt) {
-      // Coach didn't join — no-show
-      await prisma.$transaction([
-        prisma.lessonRequest.update({
-          where: { id: lesson.id },
+      // Coach didn't join — no-show. Student made whole, coach penalised.
+      const claimed = await prisma.$transaction(async (tx) => {
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
           data: { status: "NO_SHOW" },
-        }),
-        lesson.isTrial
-          ? prisma.user.update({
-              where: { id: lesson.studentId },
-              data: { freeTrialsRemaining: { increment: 1 } },
-            })
-          : prisma.user.update({
-              where: { id: lesson.studentId },
-              data: { reservedBalance: { decrement: lesson.estimatedCost } },
-            }),
-        prisma.user.update({
+        });
+        if (flipped.count === 0) return false;
+
+        if (lesson.isTrial) {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { freeTrialsRemaining: { increment: 1 } },
+          });
+        } else {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { reservedBalance: { decrement: lesson.estimatedCost } },
+          });
+        }
+        await tx.user.update({
           where: { id: lesson.coachId },
           data: { coachRatingPenalty: { increment: NO_SHOW_ELO_PENALTY } },
-        }),
-        ...(lesson.timeSlotId
-          ? [prisma.timeSlot.update({ where: { id: lesson.timeSlotId }, data: { status: "AVAILABLE" } })]
-          : []),
-        prisma.abuseFlag.create({
+        });
+        if (lesson.timeSlotId) {
+          await tx.timeSlot.update({
+            where: { id: lesson.timeSlotId },
+            data: { status: "AVAILABLE" },
+          });
+        }
+        await tx.abuseFlag.create({
           data: {
             userId: lesson.coachId,
             type: "COACH_NO_SHOW",
@@ -529,67 +540,70 @@ export async function detectNoShows() {
             relatedLessonId: lesson.id,
             relatedUserId: lesson.studentId,
           },
-        }),
-      ]);
-
-      const newElo = await calculateCoachElo(lesson.coachId);
-      await prisma.user.update({
-        where: { id: lesson.coachId },
-        data: { coachElo: newElo },
+        });
+        return true;
       });
+
+      if (claimed) {
+        const newElo = await calculateCoachElo(lesson.coachId);
+        await prisma.user.update({
+          where: { id: lesson.coachId },
+          data: { coachElo: newElo },
+        });
+      }
     } else if (!lesson.studentJoinedAt) {
-      // Student didn't join — coach gets paid
-      await prisma.$transaction([
-        prisma.lessonRequest.update({
-          where: { id: lesson.id },
+      // Student didn't join — coach gets paid.
+      await prisma.$transaction(async (tx) => {
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
           data: {
             status: "COMPLETED",
             completedAt: new Date(),
             coachConfirmed: true,
             studentConfirmed: true,
           },
-        }),
-        ...(lesson.isTrial
-          ? []
-          : [
-              prisma.user.update({
-                where: { id: lesson.studentId },
-                data: {
-                  reservedBalance: { decrement: lesson.estimatedCost },
-                },
-              }),
-              prisma.user.update({
-                where: { id: lesson.coachId },
-                data: {
-                  pendingEarnings: { increment: lesson.estimatedCost },
-                  totalEarningsAllTime: { increment: lesson.estimatedCost },
-                  lessonsGiven: { increment: 1 },
-                },
-              }),
-              prisma.transaction.create({
-                data: {
-                  userId: lesson.studentId,
-                  type: "LESSON_PAYMENT",
-                  amount: -lesson.estimatedCost,
-                  lessonRequestId: lesson.id,
-                },
-              }),
-              prisma.transaction.create({
-                data: {
-                  userId: lesson.coachId,
-                  type: "LESSON_PAYMENT",
-                  amount: lesson.estimatedCost,
-                  lessonRequestId: lesson.id,
-                },
-              }),
-              prisma.earningRecord.create({
-                data: {
-                  userId: lesson.coachId,
-                  amount: lesson.estimatedCost,
-                },
-              }),
-            ]),
-        prisma.abuseFlag.create({
+        });
+        if (flipped.count === 0) return;
+
+        if (!lesson.isTrial) {
+          // Money actually leaves the student's wallet AND releases the hold.
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: {
+              walletBalance: { decrement: lesson.estimatedCost },
+              reservedBalance: { decrement: lesson.estimatedCost },
+              lessonsTaken: { increment: 1 },
+            },
+          });
+          await tx.user.update({
+            where: { id: lesson.coachId },
+            data: {
+              pendingEarnings: { increment: lesson.estimatedCost },
+              totalEarningsAllTime: { increment: lesson.estimatedCost },
+              lessonsGiven: { increment: 1 },
+            },
+          });
+          await tx.transaction.create({
+            data: {
+              userId: lesson.studentId,
+              type: "LESSON_PAYMENT",
+              amount: -lesson.estimatedCost,
+              lessonRequestId: lesson.id,
+            },
+          });
+          await tx.transaction.create({
+            data: {
+              userId: lesson.coachId,
+              type: "LESSON_PAYMENT",
+              amount: lesson.estimatedCost,
+              lessonRequestId: lesson.id,
+            },
+          });
+          await tx.earningRecord.create({
+            data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+          });
+        }
+        await tx.abuseFlag.create({
           data: {
             userId: lesson.studentId,
             type: "STUDENT_NO_SHOW",
@@ -598,8 +612,8 @@ export async function detectNoShows() {
             relatedLessonId: lesson.id,
             relatedUserId: lesson.coachId,
           },
-        }),
-      ]);
+        });
+      });
     }
   }
 }
