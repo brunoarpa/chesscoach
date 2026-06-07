@@ -19,9 +19,12 @@ interface Props {
   userId: string;
   otherName: string;
   initialMessages: Message[];
+  // Practice/sandbox mode: a solo room with no second person. Messages echo
+  // back as your own bubbles only — no Pusher subscription, polling, or API.
+  local?: boolean;
 }
 
-export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Props) {
+export function ChatPanel({ lessonId, userId, otherName, initialMessages, local = false }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -38,6 +41,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
 
   // Subscribe to Pusher for real-time messages
   useEffect(() => {
+    if (local) return; // Practice mode — no second participant to sync with
     const pusher = getPusherClient();
     if (!pusher) return; // Pusher not configured — rely on polling
 
@@ -60,7 +64,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
       // so we never unsubscribe it here.
       channel.unbind("chat:message", onMessage);
     };
-  }, [lessonId, userId]);
+  }, [lessonId, userId, local]);
 
   // Fallback: poll every 30s in case Pusher connection drops
   const fetchMessages = useCallback(async () => {
@@ -76,11 +80,12 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
   }, [lessonId]);
 
   useEffect(() => {
+    if (local) return; // Practice mode — nothing to poll
     pollRef.current = setInterval(fetchMessages, 30000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchMessages]);
+  }, [fetchMessages, local]);
 
   async function handleSend() {
     const content = input.trim();
@@ -99,6 +104,13 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages }: Prop
       readAt: null,
     };
     setMessages((prev) => [...prev, optimisticMsg]);
+
+    // Practice mode: the bubble we just added is all there is — no server,
+    // no second person. Keep it and we're done.
+    if (local) {
+      setSending(false);
+      return;
+    }
 
     try {
       const res = await fetch(`/api/lesson/${lessonId}/chat`, {

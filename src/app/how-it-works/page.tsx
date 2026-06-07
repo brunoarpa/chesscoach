@@ -64,6 +64,22 @@ export default async function HowItWorksPage() {
             </p>
           </li>
         </ol>
+
+        {/* Try the lesson room hands-on, no booking needed */}
+        <Card className="mt-8 border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 pt-6">
+            <div className="flex-1">
+              <p className="font-semibold">Want to see what a lesson looks like?</p>
+              <p className="text-sm text-muted-foreground">
+                Open a free practice room with the real board, chat, and tools, just for you. Play both
+                sides and explore. No sign-up, nothing saved.
+              </p>
+            </div>
+            <Link href="/lesson/practice">
+              <Button className="w-full sm:w-auto">Try a practice lesson</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </section>
 
       <Separator className="my-8" />

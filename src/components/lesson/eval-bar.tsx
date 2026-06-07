@@ -14,12 +14,23 @@ interface Props {
   fen: string;
   boardOrientation: "white" | "black";
   onLinesChange?: (lines: Line[], depth: number, fen: string) => void;
+  // Explicit pixel height so the bar always matches the board. The board sizes
+  // itself internally, so relying on flex stretch collapses the bar to its
+  // min-height; the parent passes the measured board size instead.
+  heightPx?: number;
 }
 
 const MULTI_PV = 5;
 const MOVE_TIME_MS = 500;
 
-export function EvalBar({ fen, boardOrientation, onLinesChange }: Props) {
+// chess.com's win-probability constant. Maps a centipawn eval to a 0..1 win
+// chance via a logistic curve — steep near 0 (small edges shift the bar a lot)
+// and flattening at large advantages (+4 vs +7 barely differ), just like
+// chess.com. Replaces a naive linear fill that moved too little near 0 and too
+// much at the extremes.
+const WIN_PROB_K = 0.00368208;
+
+export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Props) {
   const workerRef = useRef<Worker | null>(null);
   const [evaluation, setEvaluation] = useState<number>(0); // in centipawns
   const [mate, setMate] = useState<number | null>(null);
@@ -177,29 +188,52 @@ export function EvalBar({ fen, boardOrientation, onLinesChange }: Props) {
     };
   }, [fen, isReady, analyze]);
 
-  const clampedEval = Math.max(-1000, Math.min(1000, evaluation));
-  const whitePercent = 50 + (clampedEval / 1000) * 50;
-  const displayPercent = boardOrientation === "white" ? whitePercent : 100 - whitePercent;
+  // White's share of the bar via the logistic win-probability curve. Mate is
+  // pinned to a full bar for the mating side.
+  const whitePercent = mate !== null
+    ? (mate > 0 ? 100 : 0)
+    : 100 / (1 + Math.exp(-WIN_PROB_K * evaluation));
 
-  const evalText = mate !== null
+  // White sits at the bottom unless the board is flipped.
+  const whiteAtBottom = boardOrientation === "white";
+
+  // Who's ahead, the magnitude to print, and which end / color the number takes.
+  const leaderIsWhite = mate !== null ? mate > 0 : evaluation >= 0;
+  const evalMagnitude = mate !== null
     ? `M${Math.abs(mate)}`
-    : `${evaluation >= 0 ? "+" : ""}${(evaluation / 100).toFixed(1)}`;
+    : Math.abs(evaluation / 100).toFixed(1);
+  // The number sits at the leading side's end of the bar (chess.com style).
+  const leaderAtBottom = leaderIsWhite ? whiteAtBottom : !whiteAtBottom;
 
   return (
-    <div className="flex flex-col items-center gap-1 h-full select-none">
-      <div className="text-xs font-mono font-bold leading-none">
-        {evalText}
+    <div
+      className="relative w-7 shrink-0 min-h-[120px] rounded-sm overflow-hidden border border-border bg-zinc-800 select-none"
+      style={{ height: heightPx ?? "100%" }}
+    >
+      {/* White's portion — anchored to whichever end White is on. */}
+      <div
+        className="absolute left-0 right-0 bg-white transition-all duration-300 ease-out"
+        style={{ height: `${whitePercent}%`, ...(whiteAtBottom ? { bottom: 0 } : { top: 0 }) }}
+      />
+
+      {/* Eval number, inside the bar on the leader's side, contrasting color. */}
+      <div
+        className={`absolute left-0 right-0 text-center text-[10px] font-mono font-bold leading-none ${
+          leaderIsWhite ? "text-zinc-900" : "text-white"
+        }`}
+        style={{ [leaderAtBottom ? "bottom" : "top"]: 2 }}
+      >
+        {evalMagnitude}
       </div>
 
-      <div className="relative w-7 flex-1 rounded-sm overflow-hidden border border-border bg-zinc-800 min-h-[200px]">
-        <div
-          className="absolute bottom-0 left-0 right-0 bg-white transition-all duration-300 ease-out"
-          style={{ height: `${displayPercent}%` }}
-        />
-      </div>
-
-      <div className="text-[10px] text-muted-foreground font-mono leading-none">
-        d{depth}
+      {/* Search depth, faint, at the opposite end. */}
+      <div
+        className={`absolute left-0 right-0 text-center text-[8px] font-mono leading-none ${
+          leaderIsWhite ? "text-white/50" : "text-zinc-900/50"
+        }`}
+        style={{ [leaderAtBottom ? "top" : "bottom"]: 2 }}
+      >
+        {depth > 0 ? depth : ""}
       </div>
     </div>
   );

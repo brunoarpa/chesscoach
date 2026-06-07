@@ -70,6 +70,9 @@ interface Props {
   userId: string;
   isCoach: boolean;
   initialBoardPgn?: string;
+  // Practice/sandbox mode: one person exploring the board alone. Disables the
+  // realtime sync so moves stay local and copy stops referring to a partner.
+  local?: boolean;
 }
 
 function formatLineEval(line: EngineLine): string {
@@ -81,7 +84,7 @@ function formatLineEval(line: EngineLine): string {
   return "—";
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local = false }: Props) {
   const [moveHistory, setMoveHistory] = useState<string[]>(() => {
     if (initialBoardPgn) {
       try {
@@ -170,6 +173,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
   } = useBoardSync({
     lessonId,
     userId,
+    local,
     onRemoteMoves,
     onRemoteNavigate,
     onRemoteArrows,
@@ -710,7 +714,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar */}
       <div className="flex gap-1 w-full">
-        <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} />
+        <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={squareSize > 0 ? squareSize * 8 : undefined} />
         <div ref={boardRef} className="relative flex-1 aspect-square">
           <Chessboard
             options={{
@@ -786,7 +790,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn }: Props
       {showResetConfirm && (
         <div className="w-full rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 p-3 space-y-2">
           <p className="text-sm text-amber-900 dark:text-amber-200">
-            Start a new game? This clears the board for both you and the {isCoach ? "student" : "coach"}.
+            Start a new game? This clears the board
+            {local ? "" : ` for both you and the ${isCoach ? "student" : "coach"}`}.
             Move history will be lost.
           </p>
           <div className="flex gap-2 justify-end">
