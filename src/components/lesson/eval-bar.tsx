@@ -23,6 +23,13 @@ interface Props {
 const MULTI_PV = 5;
 const MOVE_TIME_MS = 500;
 
+// Cap how often we push engine lines up to the parent. Stockfish emits info
+// lines extremely fast in simple/endgame positions (it races to very high
+// depth), and each push re-renders the whole board — which caused lag and
+// stuttering piece animations near the end of a game. We rate-limit the push
+// and always flush a final time when the search settles.
+const LINES_EMIT_THROTTLE_MS = 120;
+
 // chess.com's win-probability constant. Maps a centipawn eval to a 0..1 win
 // chance via a logistic curve — steep near 0 (small edges shift the bar a lot)
 // and flattening at large advantages (+4 vs +7 barely differ), just like
@@ -42,6 +49,8 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
   const activeTurnRef = useRef<"w" | "b">("w");
   const isAnalyzingRef = useRef(false);
   const linesRef = useRef<Record<number, { cp: number | null; mate: number | null; pv: string[] }>>({});
+  const lastEmitRef = useRef(0);
+  const lastDepthRef = useRef(0);
 
   useEffect(() => {
     let terminated = false;
@@ -50,6 +59,35 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
 
     worker.onerror = () => {
       if (!terminated) setIsReady(false);
+    };
+
+    // Convert the accumulated PV lines to SAN and hand them to the parent.
+    const emitLines = (curDepth: number) => {
+      if (!onLinesChange) return;
+      lastEmitRef.current = performance.now();
+      const sorted = Object.entries(linesRef.current)
+        .map(([k, v]) => ({ rank: parseInt(k, 10), ...v }))
+        .sort((a, b) => a.rank - b.rank);
+      const converted: Line[] = sorted.map((l) => {
+        // Convert UCI moves to SAN
+        const game = new Chess(activeFenRef.current);
+        const san: string[] = [];
+        for (const uci of l.pv) {
+          try {
+            const mv = game.move({
+              from: uci.slice(0, 2),
+              to: uci.slice(2, 4),
+              promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+            });
+            if (mv) san.push(mv.san);
+            else break;
+          } catch {
+            break;
+          }
+        }
+        return { rank: l.rank, cp: l.cp, mate: l.mate, san };
+      });
+      onLinesChange(converted, curDepth, activeFenRef.current);
     };
 
     worker.onmessage = (e: MessageEvent) => {
@@ -74,7 +112,9 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
         const pvMatch = line.match(/ pv (.+?)(?:\s+bmc|\s+bs|$)/);
         const perspective = activeTurnRef.current === "w" ? 1 : -1;
 
-        if (depthMatch) setDepth(parseInt(depthMatch[1], 10));
+        const curDepth = depthMatch ? parseInt(depthMatch[1], 10) : lastDepthRef.current;
+        lastDepthRef.current = curDepth;
+        if (depthMatch) setDepth(curDepth);
 
         const pvIdx = multiPvMatch ? parseInt(multiPvMatch[1], 10) : 1;
         const pvMoves = pvMatch ? pvMatch[1].trim().split(/\s+/).slice(0, 5) : [];
@@ -102,36 +142,16 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
           }
         }
 
-        // Emit top-N lines (convert UCI moves to SAN) — throttled by React state
-        if (onLinesChange) {
-          const sorted = Object.entries(linesRef.current)
-            .map(([k, v]) => ({ rank: parseInt(k, 10), ...v }))
-            .sort((a, b) => a.rank - b.rank);
-          const converted: Line[] = sorted.map((l) => {
-            // Convert UCI moves to SAN
-            const game = new Chess(activeFenRef.current);
-            const san: string[] = [];
-            for (const uci of l.pv) {
-              try {
-                const mv = game.move({
-                  from: uci.slice(0, 2),
-                  to: uci.slice(2, 4),
-                  promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
-                });
-                if (mv) san.push(mv.san);
-                else break;
-              } catch {
-                break;
-              }
-            }
-            return { rank: l.rank, cp: l.cp, mate: l.mate, san };
-          });
-          onLinesChange(converted, depthMatch ? parseInt(depthMatch[1], 10) : 0, activeFenRef.current);
+        // Push lines to the parent, but rate-limited so a flood of info lines
+        // doesn't re-render the board dozens of times a second.
+        if (performance.now() - lastEmitRef.current >= LINES_EMIT_THROTTLE_MS) {
+          emitLines(curDepth);
         }
       }
 
       if (line.startsWith("bestmove")) {
         isAnalyzingRef.current = false;
+        emitLines(lastDepthRef.current); // flush the final, complete lines
         const next = pendingFenRef.current;
         if (next) {
           pendingFenRef.current = null;

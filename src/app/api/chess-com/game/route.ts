@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { callbackGameToPgn } from "@/lib/chesscom";
 
+// No auth: this is a read-only proxy for *public* chess.com game data, locked to
+// chess.com game ids below. It must work in the login-free practice room too
+// (mirroring Lichess import, which the browser fetches directly).
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
 
@@ -14,7 +12,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
   }
 
-  // SSRF prevention: only allow chess.com URLs
+  // SSRF prevention: only allow chess.com URLs, and only pull the numeric id.
   const match = url.match(/chess\.com\/(?:game\/(?:live|daily)|live|daily)\/(\d+)/);
   if (!match) {
     return NextResponse.json({ error: "Invalid Chess.com game URL" }, { status: 400 });
@@ -22,34 +20,26 @@ export async function GET(request: Request) {
 
   const gameId = match[1];
 
-  // Try live game endpoint first
-  try {
-    const liveRes = await fetch(`https://api.chess.com/pub/game/live/${gameId}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (liveRes.ok) {
-      const data = await liveRes.json();
-      if (data.pgn) {
-        return NextResponse.json({ pgn: data.pgn });
+  // chess.com has no public single-game PGN endpoint, so use the callback
+  // endpoint (returns TCN-encoded moves) and rebuild the PGN ourselves. A live
+  // URL can still be a daily game and vice versa, so try both.
+  for (const kind of ["live", "daily"] as const) {
+    try {
+      const res = await fetch(`https://www.chess.com/callback/${kind}/game/${gameId}`, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; ChessCoach)",
+        },
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const pgn = callbackGameToPgn(data?.game ?? {});
+      if (pgn) {
+        return NextResponse.json({ pgn });
       }
+    } catch {
+      // Try the next game type.
     }
-  } catch {
-    // Fall through to daily
-  }
-
-  // Try daily game endpoint
-  try {
-    const dailyRes = await fetch(`https://api.chess.com/pub/game/daily/${gameId}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (dailyRes.ok) {
-      const data = await dailyRes.json();
-      if (data.pgn) {
-        return NextResponse.json({ pgn: data.pgn });
-      }
-    }
-  } catch {
-    // Fall through
   }
 
   return NextResponse.json(
