@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { callbackGameToPgn } from "@/lib/chesscom";
 
+// No auth: this is a read-only proxy for *public* chess.com game data, locked to
+// chess.com game ids below. It must work in the login-free practice room too
+// (mirroring Lichess import, which the browser fetches directly).
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
 
