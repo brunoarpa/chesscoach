@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { getPlatformCurrency } from "@/lib/stripe";
 
 const FEE_FLAT_CENTS = 40;      // $0.40
 const FEE_PERCENT = 0.02;       // 2%
@@ -58,13 +59,17 @@ export async function POST(request: Request) {
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
 
+  // Charge in the platform's settlement currency so deposits settle 1:1 (no FX
+  // conversion) and the resulting balance is withdrawable in the same currency.
+  const currency = await getPlatformCurrency(stripeClient);
+
   const checkoutSession = await stripeClient.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency,
           product_data: { name: "ChessCoach Wallet Deposit" },
           unit_amount: amount,
         },
@@ -72,7 +77,7 @@ export async function POST(request: Request) {
       },
       {
         price_data: {
-          currency: "usd",
+          currency,
           product_data: { name: "Processing Fee" },
           unit_amount: feeCents,
         },
