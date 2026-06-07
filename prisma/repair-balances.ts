@@ -9,16 +9,23 @@
  *   npx tsx prisma/repair-balances.ts            # dry run — prints drift, writes nothing
  *   npx tsx prisma/repair-balances.ts --commit   # apply the corrections
  *
- * Sources of truth:
- *   reservedBalance      = Σ estimatedCost of the student's non-trial lessons that
- *                          are still live (PENDING / ACCEPTED / IN_PROGRESS / DISPUTED).
+ * reservedBalance is always recomputed from live lessons — it is fully
+ * derivable and the field most likely to be corrupted (it went negative).
+ *
+ * walletBalance / pendingEarnings / totalEarningsAllTime are only rewritten when
+ * the RAW (non-deduplicated) ledger already equals the stored value — proving the
+ * field is fully ledger-backed and the sole error is a duplicate row left by the
+ * double-processing bug. We then write the DEDUPLICATED total. If the raw ledger
+ * doesn't match the stored value (e.g. balances seeded directly in the DB without
+ * DEPOSIT rows), the field is reported but NOT touched, so we never wipe out
+ * manually-entered money.
+ *
+ * Sources of truth (ledger):
  *   walletBalance        = deposits + student lesson payments (negative) + student refunds.
  *   pendingEarnings      = coach lesson earnings − payouts − clawbacks.
  *   totalEarningsAllTime = coach lesson earnings − clawbacks.
- *
- * Lesson-linked transactions are de-duplicated by (lessonRequestId, type, sign)
- * so a lesson that was accidentally processed twice (and thus has duplicate
- * ledger rows) only counts once.
+ *   reservedBalance      = Σ estimatedCost of the student's non-trial lessons that
+ *                          are still live (PENDING / ACCEPTED / IN_PROGRESS / DISPUTED).
  */
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -69,65 +76,75 @@ async function main() {
       orderBy: { createdAt: "asc" },
     });
 
-    // Collapse duplicate lesson rows: one entry per (lesson, type, sign).
-    const seen = new Set<string>();
-    const deduped = txns.filter((t) => {
-      if (t.type !== "LESSON_PAYMENT" && t.type !== "LESSON_REFUND") return true;
-      if (!t.lessonRequestId) return true;
-      const key = `${t.lessonRequestId}:${t.type}:${t.amount < 0 ? "-" : "+"}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    let deposits = 0;
-    let studentSpend = 0; // negative LESSON_PAYMENT + positive LESSON_REFUND
-    let coachEarn = 0; // positive LESSON_PAYMENT
-    let clawback = 0; // negative LESSON_REFUND
-    let payouts = 0; // negative PAYOUT
-
-    for (const t of deduped) {
-      if (t.type === "DEPOSIT") deposits += t.amount;
-      else if (t.type === "PAYOUT") payouts += t.amount;
-      else if (t.type === "LESSON_PAYMENT") {
-        if (t.amount < 0) studentSpend += t.amount;
-        else coachEarn += t.amount;
-      } else if (t.type === "LESSON_REFUND") {
-        if (t.amount > 0) studentSpend += t.amount;
-        else clawback += t.amount;
+    // Sum the ledger both with and without duplicate lesson rows. A field is
+    // only safe to auto-correct when the RAW sum equals the stored value (proving
+    // it's fully ledger-backed); we then write the DEDUPED sum.
+    const sum = (dedupe: boolean) => {
+      const s = { deposits: 0, studentSpend: 0, coachEarn: 0, clawback: 0, payouts: 0 };
+      const local = new Set<string>();
+      for (const t of txns) {
+        if (dedupe && (t.type === "LESSON_PAYMENT" || t.type === "LESSON_REFUND") && t.lessonRequestId) {
+          const key = `${t.lessonRequestId}:${t.type}:${t.amount < 0 ? "-" : "+"}`;
+          if (local.has(key)) continue;
+          local.add(key);
+        }
+        if (t.type === "DEPOSIT") s.deposits += t.amount;
+        else if (t.type === "PAYOUT") s.payouts += t.amount;
+        else if (t.type === "LESSON_PAYMENT") {
+          if (t.amount < 0) s.studentSpend += t.amount;
+          else s.coachEarn += t.amount;
+        } else if (t.type === "LESSON_REFUND") {
+          if (t.amount > 0) s.studentSpend += t.amount;
+          else s.clawback += t.amount;
+        }
       }
+      return s;
+    };
+    const raw = sum(false);
+    const ded = sum(true);
+
+    const wallet = { raw: raw.deposits + raw.studentSpend, ded: ded.deposits + ded.studentSpend };
+    const pending = { raw: raw.coachEarn + raw.payouts + raw.clawback, ded: ded.coachEarn + ded.payouts + ded.clawback };
+    const totalEarned = { raw: raw.coachEarn + raw.clawback, ded: ded.coachEarn + ded.clawback };
+
+    const writes: Record<string, number> = {};
+    const lines: string[] = [];
+
+    // reservedBalance: always authoritative.
+    if (reserved !== user.reservedBalance) {
+      writes.reservedBalance = reserved;
+      lines.push(`reserved ${fmt(user.reservedBalance)} → ${fmt(reserved)}`);
     }
 
-    const wallet = deposits + studentSpend;
-    const pending = coachEarn + payouts + clawback;
-    const totalEarned = coachEarn + clawback;
+    // Ledger fields: auto-correct only when raw ledger matches stored value.
+    const ledgerField = (
+      name: string,
+      key: "walletBalance" | "pendingEarnings" | "totalEarningsAllTime",
+      stored: number,
+      vals: { raw: number; ded: number },
+    ) => {
+      if (vals.ded === stored) return; // already correct
+      if (vals.raw === stored) {
+        writes[key] = vals.ded;
+        lines.push(`${name} ${fmt(stored)} → ${fmt(vals.ded)} (removed duplicate ledger row)`);
+      } else {
+        lines.push(
+          `${name} ${fmt(stored)} — NOT auto-fixed (ledger reconstructs to ${fmt(vals.ded)}; balance isn't fully ledger-backed, e.g. seeded directly). Adjust manually if needed.`,
+        );
+      }
+    };
+    ledgerField("wallet", "walletBalance", user.walletBalance, wallet);
+    ledgerField("pending", "pendingEarnings", user.pendingEarnings, pending);
+    ledgerField("totalEarned", "totalEarningsAllTime", user.totalEarningsAllTime, totalEarned);
 
-    const changes: string[] = [];
-    if (wallet !== user.walletBalance)
-      changes.push(`wallet ${fmt(user.walletBalance)} → ${fmt(wallet)}`);
-    if (reserved !== user.reservedBalance)
-      changes.push(`reserved ${fmt(user.reservedBalance)} → ${fmt(reserved)}`);
-    if (pending !== user.pendingEarnings)
-      changes.push(`pending ${fmt(user.pendingEarnings)} → ${fmt(pending)}`);
-    if (totalEarned !== user.totalEarningsAllTime)
-      changes.push(`totalEarned ${fmt(user.totalEarningsAllTime)} → ${fmt(totalEarned)}`);
-
-    if (changes.length === 0) continue;
+    if (lines.length === 0) continue;
 
     drifted++;
     console.log(`\n${user.username ?? user.id}:`);
-    for (const c of changes) console.log(`  • ${c}`);
+    for (const l of lines) console.log(`  • ${l}`);
 
-    if (COMMIT) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          walletBalance: wallet,
-          reservedBalance: reserved,
-          pendingEarnings: pending,
-          totalEarningsAllTime: totalEarned,
-        },
-      });
+    if (COMMIT && Object.keys(writes).length > 0) {
+      await prisma.user.update({ where: { id: user.id }, data: writes });
     }
   }
 
