@@ -86,7 +86,7 @@ export default async function WalletPage() {
             <WithdrawForm pendingEarnings={user.pendingEarnings} />
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            ChessCoach keeps a {Math.round(PLATFORM_FEE_PERCENT * 100)}% platform fee on each completed lesson; your earnings shown above are already net of that fee. Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — ChessCoach does not withhold or remit taxes on your behalf.
+            EloChaser keeps a {Math.round(PLATFORM_FEE_PERCENT * 100)}% platform fee on each completed lesson; your earnings shown above are already net of that fee. Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — EloChaser does not withhold or remit taxes on your behalf.
           </p>
         </>
       )}

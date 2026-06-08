@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service - ChessCoach",
+  title: "Terms of Service - EloChaser",
 };
 
 export default function TermsOfServicePage() {
@@ -14,14 +14,14 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mt-6 mb-3">1. Acceptance</h2>
           <p className="leading-relaxed">
-            By using ChessCoach (&quot;the Platform&quot;), you agree to these Terms. If you do not agree, do not use the Platform.
+            By using EloChaser (&quot;the Platform&quot;), you agree to these Terms. If you do not agree, do not use the Platform.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-3">2. What ChessCoach Is</h2>
+          <h2 className="text-xl font-semibold mt-8 mb-3">2. What EloChaser Is</h2>
           <p className="leading-relaxed">
-            ChessCoach connects chess students with chess coaches. Coaches set their own prices, availability, and languages. We facilitate booking, payment, and reviews, but we are not a party to any coaching relationship between users.
+            EloChaser connects chess students with chess coaches. Coaches set their own prices, availability, and languages. We facilitate booking, payment, and reviews, but we are not a party to any coaching relationship between users.
           </p>
         </section>
 
@@ -39,9 +39,9 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">4. Payments and Wallet</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Payments are processed by Stripe. ChessCoach does not store full card details.</li>
+            <li>Payments are processed by Stripe. EloChaser does not store full card details.</li>
             <li>When you book a lesson, the cost is reserved from your wallet. If the coach declines or the request expires, the reserved amount is released back automatically.</li>
-            <li>Wallet deposits are non-refundable except where required by applicable law. Email <a href="mailto:chesscoach.training@gmail.com" className="underline">chesscoach.training@gmail.com</a> for refund requests.</li>
+            <li>Wallet deposits are non-refundable except where required by applicable law. Email <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a> for refund requests.</li>
             <li>Coaches can withdraw any amount of their pending earnings (minimum $5.00) at any time. A fee of $0.40 + 2% applies per withdrawal.</li>
           </ul>
         </section>
@@ -60,14 +60,14 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">6. Coach Verification (optional)</h2>
           <p className="leading-relaxed">
-            Coaches may optionally verify their identity by linking a chess.com account. Verification is reviewed by our admin team and adds a badge to your profile and leaderboard entry. ChessCoach does not guarantee the quality, qualifications, or conduct of any individual coach, verified or otherwise.
+            Coaches may optionally verify their identity by linking a chess.com account. Verification is reviewed by our admin team and adds a badge to your profile and leaderboard entry. EloChaser does not guarantee the quality, qualifications, or conduct of any individual coach, verified or otherwise.
           </p>
         </section>
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">6a. Coach Taxes</h2>
           <p className="leading-relaxed">
-            Coaching earnings paid out through ChessCoach are your responsibility to declare to your local tax authority. ChessCoach does not withhold, remit, or report taxes on your behalf. We may issue payout summaries on request.
+            Coaching earnings paid out through EloChaser are your responsibility to declare to your local tax authority. EloChaser does not withhold, remit, or report taxes on your behalf. We may issue payout summaries on request.
           </p>
         </section>
 
@@ -87,7 +87,7 @@ export default function TermsOfServicePage() {
           <ul className="list-disc pl-6 space-y-2">
             <li>If a student reports a lesson, an admin reviews it before any payment is released.</li>
             <li>Outcomes can include: full refund to student, payment to coach, partial resolution, or account suspension if abuse is found.</li>
-            <li>ChessCoach&apos;s decisions on disputes are final.</li>
+            <li>EloChaser&apos;s decisions on disputes are final.</li>
           </ul>
         </section>
 
@@ -105,14 +105,14 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">10. Suspension</h2>
           <p className="leading-relaxed">
-            ChessCoach may suspend any account that violates these Terms, engages in fraud, or is flagged by our abuse-detection systems. While suspended, an account cannot book lessons, accept lessons, deposit funds, or be discovered in search. Suspended users may still withdraw any remaining coach earnings. Contact <a href="mailto:chesscoach.training@gmail.com" className="underline">chesscoach.training@gmail.com</a> to appeal.
+            EloChaser may suspend any account that violates these Terms, engages in fraud, or is flagged by our abuse-detection systems. While suspended, an account cannot book lessons, accept lessons, deposit funds, or be discovered in search. Suspended users may still withdraw any remaining coach earnings. Contact <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a> to appeal.
           </p>
         </section>
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">11. Limitation of Liability</h2>
           <p className="leading-relaxed">
-            The Platform is provided &quot;as is&quot;. To the fullest extent permitted by law, ChessCoach is not liable for any indirect, incidental, or consequential damages, including lost data, revenue or profits, arising from your use of the Platform.
+            The Platform is provided &quot;as is&quot;. To the fullest extent permitted by law, EloChaser is not liable for any indirect, incidental, or consequential damages, including lost data, revenue or profits, arising from your use of the Platform.
           </p>
         </section>
 
@@ -127,7 +127,7 @@ export default function TermsOfServicePage() {
           <h2 className="text-xl font-semibold mt-8 mb-3">13. Contact</h2>
           <p className="leading-relaxed">
             Questions? Email{" "}
-            <a href="mailto:chesscoach.training@gmail.com" className="underline">chesscoach.training@gmail.com</a>.
+            <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a>.
           </p>
         </section>
       </div>

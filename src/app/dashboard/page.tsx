@@ -166,8 +166,8 @@ export default async function DashboardPage() {
           <p className="text-sm mt-1">
             You cannot book lessons, accept lessons, or deposit funds. You can still withdraw any remaining coach earnings.
             Contact{" "}
-            <a href="mailto:chesscoach.training@gmail.com" className="underline font-medium">
-              chesscoach.training@gmail.com
+            <a href="mailto:support@elochaser.com" className="underline font-medium">
+              support@elochaser.com
             </a>{" "}
             to appeal.
           </p>

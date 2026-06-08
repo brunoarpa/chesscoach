@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChessCoach - Find Your Chess Coach",
+  title: "EloChaser - Find Your Chess Coach",
   description: "Connect with chess coaches and improve your game",
 };
 
@@ -39,13 +39,13 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <footer className="border-t py-6 text-center text-sm text-muted-foreground">
             <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 px-4">
-              <span>&copy; {new Date().getFullYear()} ChessCoach</span>
+              <span>&copy; {new Date().getFullYear()} EloChaser</span>
               <span className="hidden sm:inline">&middot;</span>
               <Link href="/terms" className="hover:underline">Terms of Service</Link>
               <span className="hidden sm:inline">&middot;</span>
               <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
               <span className="hidden sm:inline">&middot;</span>
-              <a href="mailto:chesscoach.training@gmail.com" className="hover:underline">Contact</a>
+              <a href="mailto:support@elochaser.com" className="hover:underline">Contact</a>
             </div>
           </footer>
           <LessonFlowGuide />

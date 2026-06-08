@@ -11,7 +11,7 @@ async function main() {
     update: {},
     create: {
       username: "admin",
-      email: "admin@chesscoach.dev",
+      email: "admin@elochaser.com",
       role: "ADMIN",
       continent: "NORTH_AMERICA",
     },

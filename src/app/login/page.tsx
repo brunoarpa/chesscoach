@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ResendVerification } from "./resend-verification";
 
 export const metadata: Metadata = {
-  title: "Sign in — ChessCoach",
+  title: "Sign in — EloChaser",
   robots: { index: false, follow: false },
 };
 
@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
     <div className="flex items-center justify-center min-h-[80vh] px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome to ChessCoach</CardTitle>
+          <CardTitle className="text-2xl">Welcome to EloChaser</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

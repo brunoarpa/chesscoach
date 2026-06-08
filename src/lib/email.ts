@@ -4,7 +4,7 @@ if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
-const APP_NAME = "ChessCoach";
+const APP_NAME = "EloChaser";
 
 function fromAddress(): string {
   const from = process.env.EMAIL_FROM;
@@ -35,7 +35,7 @@ function wrap(title: string, body: string): string {
     <h1 style="font-size:20px;margin:0 0 16px;">${title}</h1>
     ${body}
     <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
-    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} — chesscoach.training@gmail.com</p>
+    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} — support@elochaser.com</p>
   </div>`;
 }
 

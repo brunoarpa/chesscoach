@@ -46,7 +46,7 @@ export function ChessComVerificationForm() {
               <li>Enter your chess.com username above and submit.</li>
               <li>
                 Send a message on chess.com to{" "}
-                <span className="font-semibold text-foreground">ChessCoachVerification</span>{" "}
+                <span className="font-semibold text-foreground">EloChaserVerification</span>{" "}
                 with your website username so we can confirm you own the account.
               </li>
               <li>An admin will review and verify your account.</li>

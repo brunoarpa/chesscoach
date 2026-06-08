@@ -30,7 +30,7 @@ export default function SetupUsernamePage() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Welcome!</CardTitle>
             <CardDescription>
-              Do you want to teach chess on ChessCoach as well?
+              Do you want to teach chess on EloChaser as well?
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -64,7 +64,7 @@ export default function SetupUsernamePage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Choose your username</CardTitle>
           <CardDescription>
-            Pick a username to use on ChessCoach. This will be visible to other users.
+            Pick a username to use on EloChaser. This will be visible to other users.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ResetForm } from "./reset-form";
 
 export const metadata: Metadata = {
-  title: "Reset password — ChessCoach",
+  title: "Reset password — EloChaser",
   robots: { index: false, follow: false },
 };
 

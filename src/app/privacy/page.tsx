@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - ChessCoach",
+  title: "Privacy Policy - EloChaser",
 };
 
 export default function PrivacyPolicyPage() {
@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
           </ul>
           <p className="leading-relaxed mt-3">
             To exercise these rights, email{" "}
-            <a href="mailto:chesscoach.training@gmail.com" className="underline">chesscoach.training@gmail.com</a>.
+            <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a>.
           </p>
         </section>
 
@@ -103,7 +103,7 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-xl font-semibold mt-8 mb-3">10. Contact</h2>
           <p className="leading-relaxed">
             Privacy questions? Email{" "}
-            <a href="mailto:chesscoach.training@gmail.com" className="underline">chesscoach.training@gmail.com</a>.
+            <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a>.
           </p>
         </section>
       </div>

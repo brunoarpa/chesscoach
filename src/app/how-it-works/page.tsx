@@ -10,7 +10,7 @@ export default async function HowItWorksPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="text-center mb-10 sm:mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-4">How ChessCoach Works</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-4">How EloChaser Works</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
           Find a coach, book a lesson, improve your game. That&apos;s it.
         </p>
@@ -166,7 +166,7 @@ export default async function HowItWorksPage() {
               is based on recent activity and earnings. Both decay over time if you go quiet (roughly a 7-day half-life for activity, 30 days for earnings). No-shows cost 50 ELO each.
             </p>
             <p className="text-xs text-muted-foreground border-t pt-2 mt-2">
-              <strong>Taxes:</strong> Coaching earnings paid via ChessCoach are yours to declare to your local tax authority. We don&apos;t withhold or remit taxes on your behalf.
+              <strong>Taxes:</strong> Coaching earnings paid via EloChaser are yours to declare to your local tax authority. We don&apos;t withhold or remit taxes on your behalf.
             </p>
           </CardContent>
         </Card>
@@ -183,7 +183,7 @@ export default async function HowItWorksPage() {
             <CardContent className="pt-4 pb-4">
               <h3 className="font-semibold mb-1">Do I need a chess.com account?</h3>
               <p className="text-sm text-muted-foreground">
-                No. Neither students nor coaches need one to use ChessCoach. Coaches can optionally verify their chess.com account for a trust badge.
+                No. Neither students nor coaches need one to use EloChaser. Coaches can optionally verify their chess.com account for a trust badge.
               </p>
             </CardContent>
           </Card>

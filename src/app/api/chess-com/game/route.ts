@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       const res = await fetch(`https://www.chess.com/callback/${kind}/game/${gameId}`, {
         headers: {
           Accept: "application/json",
-          "User-Agent": "Mozilla/5.0 (compatible; ChessCoach)",
+          "User-Agent": "Mozilla/5.0 (compatible; EloChaser)",
         },
       });
       if (!res.ok) continue;

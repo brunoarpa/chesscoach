@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { verifyEmail } from "@/lib/actions/password-auth";
 
 export const metadata: Metadata = {
-  title: "Verify your email — ChessCoach",
+  title: "Verify your email — EloChaser",
   robots: { index: false, follow: false },
 };
 

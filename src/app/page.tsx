@@ -9,7 +9,7 @@ export default async function Home() {
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 px-4 pt-12">
       <div className="text-center space-y-4 max-w-2xl">
         <h1 className="text-5xl font-bold tracking-tight">
-          ♝ ChessCoach
+          ♝ EloChaser
         </h1>
         <p className="text-xl text-muted-foreground">
           Find the perfect chess coach, or share your knowledge.

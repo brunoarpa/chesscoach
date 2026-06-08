@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ForgotForm } from "./forgot-form";
 
 export const metadata: Metadata = {
-  title: "Forgot password — ChessCoach",
+  title: "Forgot password — EloChaser",
   robots: { index: false, follow: false },
 };
 

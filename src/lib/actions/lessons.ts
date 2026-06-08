@@ -48,7 +48,7 @@ export async function createLessonRequest(formData: FormData) {
 
   if (!currentUser) return { error: "User not found" };
   if (currentUser.isSuspended) {
-    return { error: "Your account is under review. Contact support at chesscoach.training@gmail.com" };
+    return { error: "Your account is under review. Contact support at support@elochaser.com" };
   }
   if (currentUser.hasActiveDispute) {
     return { error: "You have an active lesson dispute. Please wait for admin resolution before requesting new lessons." };

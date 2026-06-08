@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   });
   if (user?.isSuspended) {
     return NextResponse.json(
-      { error: "Your account is under review. Contact support at chesscoach.training@gmail.com" },
+      { error: "Your account is under review. Contact support at support@elochaser.com" },
       { status: 403 }
     );
   }
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       {
         price_data: {
           currency,
-          product_data: { name: "ChessCoach Wallet Deposit" },
+          product_data: { name: "EloChaser Wallet Deposit" },
           unit_amount: amount,
         },
         quantity: 1,
