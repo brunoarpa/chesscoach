@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { calculateCoachElo } from "@/lib/elo";
 import { coachEarnings } from "@/lib/fees";
 
@@ -664,6 +665,7 @@ export async function purgeExpiredLessonData() {
         message: null,
         disputeReason: null,
         boardPgn: null,
+        boardTree: Prisma.DbNull,
         dataPurgedAt: new Date(),
       },
     }),

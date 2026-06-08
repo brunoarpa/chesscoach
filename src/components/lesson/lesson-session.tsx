@@ -32,6 +32,7 @@ interface Props {
   initialMessages: Message[];
   otherJoined: boolean;
   initialBoardPgn: string;
+  initialBoardTree: unknown;
 }
 
 const GRACE_PERIOD_MS = 5 * 60 * 1000;
@@ -56,6 +57,7 @@ export function LessonSession({
   communicationMethod,
   initialMessages,
   initialBoardPgn,
+  initialBoardTree,
 }: Props) {
   const router = useRouter();
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -306,7 +308,7 @@ export function LessonSession({
         <div className="flex flex-1 min-h-0">
           {/* Board */}
           <div className="flex-1 flex items-start justify-center p-4 overflow-y-auto min-h-0">
-            <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
+            <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} initialBoardTree={initialBoardTree} />
           </div>
 
           {/* Side panel */}
@@ -357,7 +359,7 @@ export function LessonSession({
                 or chat and reset their live state / realtime subscriptions. */}
             <TabsContent forceMount value="board" className="flex-1 overflow-y-auto p-2 m-0 data-[state=inactive]:hidden">
               <div className="flex justify-center">
-                <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} />
+                <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} initialBoardTree={initialBoardTree} />
               </div>
             </TabsContent>
             <TabsContent forceMount value="chat" className="flex-1 min-h-0 m-0 data-[state=inactive]:hidden">

@@ -96,6 +96,7 @@ export default async function LessonPage({
         initialMessages={JSON.parse(JSON.stringify(lesson.chatMessages))}
         otherJoined={isCoach ? !!lesson.studentJoinedAt : !!lesson.coachJoinedAt}
         initialBoardPgn={lesson.boardPgn ?? ""}
+        initialBoardTree={lesson.boardTree ?? null}
       />
     </div>
   );

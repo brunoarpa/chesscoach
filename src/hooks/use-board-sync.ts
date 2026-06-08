@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import type { Channel } from "pusher-js";
 import type { Arrow } from "react-chessboard";
 import { getPusherClient } from "@/lib/pusher-client";
+import { type MoveTree, treeToMainlinePgn } from "@/lib/chess-tree";
 
 interface UseBoardSyncOptions {
   lessonId: string;
@@ -12,10 +13,11 @@ interface UseBoardSyncOptions {
   // Pusher subscription and turn every broadcast into a no-op so the board runs
   // purely on local chess.js state (no realtime, no DB persistence, no API).
   local?: boolean;
-  onRemoteMoves: (moveHistory: string[], currentMoveIndex: number) => void;
-  onRemoteNavigate: (currentMoveIndex: number) => void;
+  onRemoteMoves: (tree: MoveTree, currentNodeId: string) => void;
+  onRemoteNavigate: (currentNodeId: string) => void;
   onRemoteArrows: (arrows: Arrow[]) => void;
   onRemoteHighlights: (highlights: Record<string, React.CSSProperties>) => void;
+  onRemoteHints: (showHints: boolean) => void;
   onRemoteReset: () => void;
 }
 
@@ -27,6 +29,7 @@ export function useBoardSync({
   onRemoteNavigate,
   onRemoteArrows,
   onRemoteHighlights,
+  onRemoteHints,
   onRemoteReset,
 }: UseBoardSyncOptions) {
   const channelRef = useRef<Channel | null>(null);
@@ -40,13 +43,13 @@ export function useBoardSync({
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
     channelRef.current = channel;
 
-    const onMoves = (data: { moveHistory: string[]; currentMoveIndex: number; senderId: string }) => {
+    const onMoves = (data: { tree: MoveTree; currentNodeId: string; senderId: string }) => {
       if (data.senderId === userId) return; // Ignore own events
-      onRemoteMoves(data.moveHistory, data.currentMoveIndex);
+      onRemoteMoves(data.tree, data.currentNodeId);
     };
-    const onNavigate = (data: { currentMoveIndex: number; senderId: string }) => {
+    const onNavigate = (data: { currentNodeId: string; senderId: string }) => {
       if (data.senderId === userId) return;
-      onRemoteNavigate(data.currentMoveIndex);
+      onRemoteNavigate(data.currentNodeId);
     };
     const onArrows = (data: { arrows: Arrow[]; senderId: string }) => {
       if (data.senderId === userId) return;
@@ -55,6 +58,10 @@ export function useBoardSync({
     const onHighlights = (data: { highlights: Record<string, React.CSSProperties>; senderId: string }) => {
       if (data.senderId === userId) return;
       onRemoteHighlights(data.highlights);
+    };
+    const onHints = (data: { showHints: boolean; senderId: string }) => {
+      if (data.senderId === userId) return;
+      onRemoteHints(data.showHints);
     };
     const onReset = (data: { senderId: string }) => {
       if (data.senderId === userId) return;
@@ -65,6 +72,7 @@ export function useBoardSync({
     channel.bind("board:navigate", onNavigate);
     channel.bind("board:arrows", onArrows);
     channel.bind("board:highlights", onHighlights);
+    channel.bind("board:hints", onHints);
     channel.bind("board:reset", onReset);
 
     return () => {
@@ -75,25 +83,26 @@ export function useBoardSync({
       channel.unbind("board:navigate", onNavigate);
       channel.unbind("board:arrows", onArrows);
       channel.unbind("board:highlights", onHighlights);
+      channel.unbind("board:hints", onHints);
       channel.unbind("board:reset", onReset);
       channelRef.current = null;
     };
-  }, [lessonId, userId, local, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteReset]);
+  }, [lessonId, userId, local, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteHints, onRemoteReset]);
 
-  // Broadcast move + persist to DB (debounced DB write)
+  // Broadcast the variation tree + persist to DB (debounced DB write). We persist
+  // the full tree as JSON and the main line as PGN for backward-compatible reads.
   const broadcastMoves = useCallback(
-    (moveHistory: string[], currentMoveIndex: number) => {
+    (tree: MoveTree, currentNodeId: string) => {
       if (local) return; // Practice mode — nothing to sync or persist
-      // Build PGN string from move history for DB persistence
-      const pgn = moveHistory.length > 0 ? buildPgnFromMoves(moveHistory) : "";
+      const boardPgn = treeToMainlinePgn(tree);
 
-      // Debounce the DB persist, but always broadcast immediately via API
+      // Debounce the DB persist; the API also broadcasts via Pusher.
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         fetch(`/api/lesson/${lessonId}/board`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ boardPgn: pgn, moveHistory, currentMoveIndex }),
+          body: JSON.stringify({ boardPgn, boardTree: tree, currentNodeId }),
         }).catch(() => {});
       }, 300);
     },
@@ -114,8 +123,8 @@ export function useBoardSync({
   );
 
   const broadcastNavigate = useCallback(
-    (currentMoveIndex: number) => {
-      broadcastSync("board:navigate", { currentMoveIndex });
+    (currentNodeId: string) => {
+      broadcastSync("board:navigate", { currentNodeId });
     },
     [broadcastSync]
   );
@@ -134,6 +143,13 @@ export function useBoardSync({
     [broadcastSync]
   );
 
+  const broadcastHints = useCallback(
+    (showHints: boolean) => {
+      broadcastSync("board:hints", { showHints });
+    },
+    [broadcastSync]
+  );
+
   const broadcastReset = useCallback(() => {
     broadcastSync("board:reset", {});
   }, [broadcastSync]);
@@ -143,18 +159,8 @@ export function useBoardSync({
     broadcastNavigate,
     broadcastArrows,
     broadcastHighlights,
+    broadcastHints,
     broadcastReset,
     channel: channelRef,
   };
-}
-
-function buildPgnFromMoves(moves: string[]): string {
-  let pgn = "";
-  for (let i = 0; i < moves.length; i++) {
-    if (i % 2 === 0) {
-      pgn += `${Math.floor(i / 2) + 1}. `;
-    }
-    pgn += moves[i] + " ";
-  }
-  return pgn.trim();
 }

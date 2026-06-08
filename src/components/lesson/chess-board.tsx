@@ -8,6 +8,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, type LucideIcon } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
+import {
+  type MoveTree,
+  type MoveNode,
+  createTree,
+  gameAtNode,
+  fenAtNode,
+  addMove,
+  mainlineForward,
+  endOfLine,
+  pgnToTree,
+  promoteVariation,
+  deleteSubtree,
+  sanitizeTree,
+} from "@/lib/chess-tree";
 
 // Move quality classification.
 type MoveClass = "best" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
@@ -70,6 +84,8 @@ interface Props {
   userId: string;
   isCoach: boolean;
   initialBoardPgn?: string;
+  // Persisted variation tree (preferred over the flat PGN when present).
+  initialBoardTree?: unknown;
   // Practice/sandbox mode: one person exploring the board alone. Disables the
   // realtime sync so moves stay local and copy stops referring to a partner.
   local?: boolean;
@@ -84,27 +100,16 @@ function formatLineEval(line: EngineLine): string {
   return "—";
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local = false }: Props) {
-  const [moveHistory, setMoveHistory] = useState<string[]>(() => {
-    if (initialBoardPgn) {
-      try {
-        const g = new Chess();
-        g.loadPgn(initialBoardPgn);
-        return g.history();
-      } catch { return []; }
-    }
-    return [];
-  });
-  const [currentMoveIndex, setCurrentMoveIndex] = useState(() => {
-    if (initialBoardPgn) {
-      try {
-        const g = new Chess();
-        g.loadPgn(initialBoardPgn);
-        return g.history().length - 1;
-      } catch { return -1; }
-    }
-    return -1;
-  });
+// Seed the initial tree + cursor from a persisted tree (preferred) or PGN.
+function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): { tree: MoveTree; nodeId: string } {
+  const fromTree = sanitizeTree(initialBoardTree);
+  const tree = fromTree ?? (initialBoardPgn ? pgnToTree(initialBoardPgn) : createTree());
+  return { tree, nodeId: endOfLine(tree, tree.rootId) };
+}
+
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false }: Props) {
+  const [tree, setTree] = useState<MoveTree>(() => initialTreeState(initialBoardTree, initialBoardPgn).tree);
+  const [currentNodeId, setCurrentNodeId] = useState<string>(() => initialTreeState(initialBoardTree, initialBoardPgn).nodeId);
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
@@ -116,10 +121,15 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
   // Eval cache: best eval (cp, white perspective) keyed by FEN. Populated as the
   // engine analyzes each position the user visits — feeds move classification.
   const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
-  const [showEngineArrows, setShowEngineArrows] = useState(true);
+  // Master engine-hint toggle (the lightbulb): gates the best-move arrows, the
+  // "Best engine moves" list, and the move classifications all together. Shared
+  // across both participants via board sync.
+  const [showHints, setShowHints] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [squareSize, setSquareSize] = useState(0);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string; color: "w" | "b" } | null>(null);
+  // Right-click context menu on a move in the list (promote / delete variation).
+  const [moveMenu, setMoveMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -127,17 +137,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
   const isRemoteUpdateRef = useRef(false);
 
   // ---- Board Sync ----
-  const onRemoteMoves = useCallback((remoteMoves: string[], remoteIndex: number) => {
+  const onRemoteMoves = useCallback((remoteTree: MoveTree, remoteNodeId: string) => {
     isRemoteUpdateRef.current = true;
-    setMoveHistory(remoteMoves);
-    setCurrentMoveIndex(remoteIndex);
+    setTree(remoteTree);
+    setCurrentNodeId(remoteNodeId);
     setSelectedSquare(null);
     isRemoteUpdateRef.current = false;
   }, []);
 
-  const onRemoteNavigate = useCallback((remoteIndex: number) => {
+  const onRemoteNavigate = useCallback((remoteNodeId: string) => {
     isRemoteUpdateRef.current = true;
-    setCurrentMoveIndex(remoteIndex);
+    setCurrentNodeId(remoteNodeId);
     setSelectedSquare(null);
     isRemoteUpdateRef.current = false;
   }, []);
@@ -154,10 +164,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     isRemoteUpdateRef.current = false;
   }, []);
 
+  const onRemoteHints = useCallback((remoteShowHints: boolean) => {
+    isRemoteUpdateRef.current = true;
+    setShowHints(remoteShowHints);
+    isRemoteUpdateRef.current = false;
+  }, []);
+
   const onRemoteReset = useCallback(() => {
     isRemoteUpdateRef.current = true;
-    setMoveHistory([]);
-    setCurrentMoveIndex(-1);
+    const fresh = createTree();
+    setTree(fresh);
+    setCurrentNodeId(fresh.rootId);
     setArrows([]);
     setSelectedSquare(null);
     setHighlightedSquares({});
@@ -169,6 +186,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     broadcastNavigate,
     broadcastArrows,
     broadcastHighlights,
+    broadcastHints,
     broadcastReset,
   } = useBoardSync({
     lessonId,
@@ -178,18 +196,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     onRemoteNavigate,
     onRemoteArrows,
     onRemoteHighlights,
+    onRemoteHints,
     onRemoteReset,
   });
 
-  const getGameAtIndex = useCallback((moves: string[], index: number) => {
-    const g = new Chess();
-    for (let i = 0; i <= index && i < moves.length; i++) {
-      g.move(moves[i]);
-    }
-    return g;
-  }, []);
-
-  const game = getGameAtIndex(moveHistory, currentMoveIndex);
+  const game = useMemo(() => gameAtNode(tree, currentNodeId), [tree, currentNodeId]);
+  const atRoot = currentNodeId === tree.rootId;
+  const hasForward = mainlineForward(tree, currentNodeId) !== null;
+  const hasMoves = Object.keys(tree.nodes).length > 1;
 
   // Game status for the displayed position. chess.js enforces all move legality
   // (castling, en passant, pins, promotion) by rejecting illegal moves; here we
@@ -233,8 +247,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     piece?: string,
     promotion?: "q" | "r" | "b" | "n",
   ) {
-    const currentHistory = moveHistory.slice(0, currentMoveIndex + 1);
-    const gameCopy = getGameAtIndex(currentHistory, currentHistory.length - 1);
+    const gameCopy = gameAtNode(tree, currentNodeId);
 
     const isPromotion =
       !!piece && piece.toLowerCase().includes("p") &&
@@ -252,6 +265,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
       return false;
     }
 
+    let san: string;
     try {
       const moveResult = gameCopy.move({
         from: sourceSquare,
@@ -259,20 +273,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
         promotion: isPromotion ? promotion : undefined,
       });
       if (!moveResult) return false;
+      san = moveResult.san;
     } catch {
       return false;
     }
 
-    const newHistory = [...currentHistory, gameCopy.history().pop()!];
-    const newIndex = newHistory.length - 1;
-    setMoveHistory(newHistory);
-    setCurrentMoveIndex(newIndex);
+    // Append (or re-enter) the move. Making a move from a mid-game position forks
+    // a variation instead of discarding the rest of the line.
+    const { tree: nextTree, nodeId: nextNodeId } = addMove(tree, currentNodeId, san);
+    setTree(nextTree);
+    setCurrentNodeId(nextNodeId);
     setArrows([]);
     setSelectedSquare(null);
     setHighlightedSquares({});
 
     if (!isRemoteUpdateRef.current) {
-      broadcastMoves(newHistory, newIndex);
+      broadcastMoves(nextTree, nextNodeId);
     }
     return true;
   }
@@ -356,44 +372,35 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     if (!isRemoteUpdateRef.current) broadcastArrows(combined);
   }
 
-  const goToStart = useCallback(() => {
-    setCurrentMoveIndex(-1);
+  const navigateTo = useCallback((nodeId: string) => {
+    setCurrentNodeId(nodeId);
     setSelectedSquare(null);
     setHighlightedSquares({});
-    if (!isRemoteUpdateRef.current) broadcastNavigate(-1);
+    if (!isRemoteUpdateRef.current) broadcastNavigate(nodeId);
   }, [broadcastNavigate]);
+
+  const goToStart = useCallback(() => {
+    navigateTo(tree.rootId);
+  }, [navigateTo, tree.rootId]);
 
   const goBack = useCallback(() => {
-    setCurrentMoveIndex((i) => {
-      const newIdx = Math.max(-1, i - 1);
-      if (!isRemoteUpdateRef.current) broadcastNavigate(newIdx);
-      return newIdx;
-    });
-    setSelectedSquare(null);
-    setHighlightedSquares({});
-  }, [broadcastNavigate]);
+    const parentId = tree.nodes[currentNodeId]?.parentId;
+    if (parentId != null) navigateTo(parentId);
+  }, [navigateTo, tree, currentNodeId]);
 
   const goForward = useCallback(() => {
-    setCurrentMoveIndex((i) => {
-      const newIdx = Math.min(moveHistory.length - 1, i + 1);
-      if (!isRemoteUpdateRef.current) broadcastNavigate(newIdx);
-      return newIdx;
-    });
-    setSelectedSquare(null);
-    setHighlightedSquares({});
-  }, [moveHistory.length, broadcastNavigate]);
+    const next = mainlineForward(tree, currentNodeId);
+    if (next) navigateTo(next);
+  }, [navigateTo, tree, currentNodeId]);
 
   const goToEnd = useCallback(() => {
-    const newIdx = moveHistory.length - 1;
-    setCurrentMoveIndex(newIdx);
-    setSelectedSquare(null);
-    setHighlightedSquares({});
-    if (!isRemoteUpdateRef.current) broadcastNavigate(newIdx);
-  }, [moveHistory.length, broadcastNavigate]);
+    navigateTo(endOfLine(tree, currentNodeId));
+  }, [navigateTo, tree, currentNodeId]);
 
   const performReset = useCallback(() => {
-    setMoveHistory([]);
-    setCurrentMoveIndex(-1);
+    const fresh = createTree();
+    setTree(fresh);
+    setCurrentNodeId(fresh.rootId);
     setArrows([]);
     setSelectedSquare(null);
     setHighlightedSquares({});
@@ -402,12 +409,36 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
   }, [broadcastReset]);
 
   const requestReset = useCallback(() => {
-    if (moveHistory.length === 0) {
-      // Nothing to reset
-      return;
-    }
+    if (!hasMoves) return; // Nothing to reset
     setShowResetConfirm(true);
-  }, [moveHistory.length]);
+  }, [hasMoves]);
+
+  const toggleHints = useCallback(() => {
+    setShowHints((v) => {
+      const next = !v;
+      if (!isRemoteUpdateRef.current) broadcastHints(next);
+      return next;
+    });
+  }, [broadcastHints]);
+
+  // ---- Move-list context-menu actions (promote / delete a variation) ----
+  const promoteMoveNode = useCallback((nodeId: string) => {
+    const next = promoteVariation(tree, nodeId);
+    setTree(next);
+    setMoveMenu(null);
+    if (!isRemoteUpdateRef.current) broadcastMoves(next, currentNodeId);
+  }, [tree, currentNodeId, broadcastMoves]);
+
+  const deleteMoveNode = useCallback((nodeId: string) => {
+    const { tree: next, nodeId: fallback } = deleteSubtree(tree, nodeId);
+    // If the displayed node was inside the deleted subtree, fall back to the parent.
+    const stillExists = !!next.nodes[currentNodeId];
+    const newCurrent = stillExists ? currentNodeId : fallback;
+    setTree(next);
+    setCurrentNodeId(newCurrent);
+    setMoveMenu(null);
+    if (!isRemoteUpdateRef.current) broadcastMoves(next, newCurrent);
+  }, [tree, currentNodeId, broadcastMoves]);
 
   // Track board size so the on-board move badge scales with one square.
   useEffect(() => {
@@ -419,6 +450,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Dismiss the move context menu on any outside click.
+  useEffect(() => {
+    if (!moveMenu) return;
+    const close = () => setMoveMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [moveMenu]);
 
   // Keyboard arrow navigation
   useEffect(() => {
@@ -433,6 +472,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goBack, goForward, goToStart, goToEnd]);
 
+  function loadTreeFromPgn(pgn: string) {
+    const nextTree = pgnToTree(pgn);
+    const endId = endOfLine(nextTree, nextTree.rootId);
+    setTree(nextTree);
+    setCurrentNodeId(endId);
+    setShowImport(false);
+    setImportText("");
+    setImportError("");
+    if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, endId);
+  }
+
   function handleImport() {
     const text = importText.trim();
     if (!text) return;
@@ -441,13 +491,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     try {
       const imported = new Chess();
       imported.loadPgn(text);
-      const newHistory = imported.history();
-      if (newHistory.length > 0) {
-        setMoveHistory(newHistory);
-        setCurrentMoveIndex(newHistory.length - 1);
-        setShowImport(false);
-        setImportText("");
-        broadcastMoves(newHistory, newHistory.length - 1);
+      if (imported.history().length > 0) {
+        loadTreeFromPgn(text);
         return;
       }
     } catch {
@@ -472,7 +517,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
         if (res.ok) {
           const data = await res.json();
           if (data.pgn) {
-            loadPgnString(data.pgn);
+            loadTreeFromPgn(data.pgn);
             return;
           }
         }
@@ -485,7 +530,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
         if (res.ok) {
           const data = await res.json();
           if (data.pgn) {
-            loadPgnString(data.pgn);
+            loadTreeFromPgn(data.pgn);
             return;
           }
         }
@@ -496,35 +541,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     } catch {
       setImportError("Failed to fetch game from link.");
     }
-  }
-
-  function loadPgnString(pgn: string) {
-    const imported = new Chess();
-    imported.loadPgn(pgn);
-    const newHistory = imported.history();
-    setMoveHistory(newHistory);
-    setCurrentMoveIndex(newHistory.length - 1);
-    setShowImport(false);
-    setImportText("");
-    setImportError("");
-    broadcastMoves(newHistory, newHistory.length - 1);
-  }
-
-  function handleMoveClick(index: number) {
-    setCurrentMoveIndex(index);
-    setSelectedSquare(null);
-    setHighlightedSquares({});
-    if (!isRemoteUpdateRef.current) broadcastNavigate(index);
-  }
-
-  // Build move pairs (white + black) for the move list
-  const movePairs: Array<{ num: number; white: string; black?: string }> = [];
-  for (let i = 0; i < moveHistory.length; i += 2) {
-    movePairs.push({
-      num: Math.floor(i / 2) + 1,
-      white: moveHistory[i],
-      black: moveHistory[i + 1],
-    });
   }
 
   const handleLines = useCallback((lines: EngineLine[], _depth: number, fen: string) => {
@@ -540,28 +556,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     }
   }, []);
 
-  // FEN at each move index (and -1 for starting position). Used to look up
-  // cached evals when classifying moves.
-  const fenByIndex = useMemo(() => {
-    const map = new Map<number, string>();
-    const g = new Chess();
-    map.set(-1, g.fen());
-    for (let i = 0; i < moveHistory.length; i++) {
-      try {
-        g.move(moveHistory[i]);
-        map.set(i, g.fen());
-      } catch {
-        break;
-      }
-    }
-    return map;
-  }, [moveHistory]);
-
   // Engine arrows for the position currently displayed: bright green for the
   // best move, lighter green for any other line within ~2cp ("excellent").
   const currentFen = game.fen();
   const engineArrows = useMemo<Arrow[]>(() => {
-    if (!showEngineArrows || engineLines.length === 0) return [];
+    if (!showHints || engineLines.length === 0) return [];
     const bestCp = evalToCp(engineLines[0]);
     const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
     const out: Arrow[] = [];
@@ -585,34 +584,31 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
       }
     }
     return out;
-  }, [engineLines, currentFen, showEngineArrows]);
+  }, [engineLines, currentFen, showHints]);
 
-  // Classify a played move based on cached evals (parent best vs child best).
-  function classifyMoveAtIndex(index: number): MoveClass | null {
-    const parentFen = fenByIndex.get(index - 1);
-    const childFen = fenByIndex.get(index);
-    if (!parentFen || !childFen) return null;
+  // Classify a played move based on cached evals (parent best vs node best).
+  const classifyMoveAtNode = useCallback((nodeId: string): MoveClass | null => {
+    const node = tree.nodes[nodeId];
+    if (!node || node.parentId === null) return null;
+    const parentFen = fenAtNode(tree, node.parentId);
+    const childFen = fenAtNode(tree, nodeId);
     const parentBest = evalCache.get(parentFen);
     const childBest = evalCache.get(childFen);
     if (parentBest == null || childBest == null) return null;
     const parentTurn = parentFen.split(" ")[1];
     return classifyMove(parentBest, childBest, parentTurn === "w");
-  }
+  }, [tree, evalCache]);
 
-  // Destination/source squares + classification of the move that produced the
-  // currently displayed position — drives the on-board chess.com-style marker.
+  // Destination/source squares of the move that produced the currently displayed
+  // position — drives the on-board chess.com-style marker.
   const lastMove = useMemo(() => {
-    if (currentMoveIndex < 0) return null;
-    const g = new Chess();
-    for (let i = 0; i <= currentMoveIndex && i < moveHistory.length; i++) {
-      try { g.move(moveHistory[i]); } catch { return null; }
-    }
-    const verbose = g.history({ verbose: true });
+    if (atRoot) return null;
+    const verbose = game.history({ verbose: true });
     const last = verbose[verbose.length - 1];
     return last ? { from: last.from as string, to: last.to as string } : null;
-  }, [moveHistory, currentMoveIndex]);
+  }, [game, atRoot]);
 
-  const currentMoveClass = currentMoveIndex >= 0 ? classifyMoveAtIndex(currentMoveIndex) : null;
+  const currentMoveClass = showHints && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
 
   // Square size in px (board width / 8), so the corner badge scales with the board.
   const renderSquare: SquareRenderer = ({ square, children }) => {
@@ -710,6 +706,67 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
     );
   }
 
+  // ---- Move list with variations (chess.com-style) ----
+  // Renders the line starting at `startId`, following the main continuation
+  // (children[0]); where a node has variation siblings, each is rendered as an
+  // indented, parenthesized sub-line right after the move it diverges from.
+  function renderLine(startId: string, startPly: number): React.ReactNode[] {
+    const out: React.ReactNode[] = [];
+    let cur: string | null = startId;
+    let ply = startPly;
+    let needsNumber = true; // show the move number at the start of a line / after a variation
+
+    while (cur) {
+      const nodeId: string = cur;
+      const node: MoveNode | undefined = tree.nodes[nodeId];
+      if (!node) break;
+      const isWhite = ply % 2 === 1;
+      const moveNum = Math.ceil(ply / 2);
+      const prefix = isWhite ? `${moveNum}.` : needsNumber ? `${moveNum}…` : "";
+      const isActive = nodeId === currentNodeId;
+
+      out.push(
+        <button
+          key={nodeId}
+          type="button"
+          onClick={() => navigateTo(nodeId)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMoveMenu({ nodeId, x: e.clientX, y: e.clientY });
+          }}
+          className={`px-1 rounded ${isActive ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+        >
+          {prefix ? `${prefix} ${node.san}` : node.san}
+        </button>
+      );
+      needsNumber = false;
+
+      // Variation siblings: alternatives to this (mainline) node.
+      const parent = node.parentId ? tree.nodes[node.parentId] : null;
+      if (parent && parent.children[0] === nodeId && parent.children.length > 1) {
+        for (const sibId of parent.children.slice(1)) {
+          out.push(
+            <div
+              key={`var-${sibId}`}
+              className="my-0.5 ml-3 pl-2 border-l border-border text-xs text-muted-foreground"
+            >
+              <span className="mr-0.5">(</span>
+              {renderLine(sibId, ply)}
+              <span className="ml-0.5">)</span>
+            </div>
+          );
+        }
+        needsNumber = true; // the mainline continuation repeats its number after a variation
+      }
+
+      cur = node.children[0] ?? null;
+      ply++;
+    }
+    return out;
+  }
+
+  const mainlineStart = mainlineForward(tree, tree.rootId);
+
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar */}
@@ -753,16 +810,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
 
       {/* Move navigation */}
       <div className="flex items-center gap-1 flex-wrap justify-center">
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToStart} disabled={currentMoveIndex < 0} title="First move">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToStart} disabled={atRoot} title="First move">
           <ChevronsLeft className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goBack} disabled={currentMoveIndex < 0} title="Previous move">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goBack} disabled={atRoot} title="Previous move">
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goForward} disabled={currentMoveIndex >= moveHistory.length - 1} title="Next move">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goForward} disabled={!hasForward} title="Next move">
           <ChevronRight className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToEnd} disabled={currentMoveIndex >= moveHistory.length - 1} title="Latest move">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToEnd} disabled={!hasForward} title="Latest move">
           <ChevronsRight className="h-5 w-5" />
         </Button>
         <div className="w-px h-6 bg-border mx-1" />
@@ -776,11 +833,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
           <Upload className="h-5 w-5" />
         </Button>
         <Button
-          variant={showEngineArrows ? "default" : "ghost"}
+          variant={showHints ? "default" : "ghost"}
           size="icon"
           className="h-9 w-9"
-          onClick={() => setShowEngineArrows((v) => !v)}
-          title={showEngineArrows ? "Hide engine hints" : "Show engine best moves"}
+          onClick={toggleHints}
+          title={showHints ? "Hide engine hints (best moves & move ratings)" : "Show engine hints (best moves & move ratings)"}
         >
           <Lightbulb className="h-5 w-5" />
         </Button>
@@ -805,8 +862,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
         </div>
       )}
 
-      {/* Top engine lines — eval + principal variation for each */}
-      {engineLines.length > 0 && (
+      {/* Top engine lines — eval + principal variation for each (hidden when hints off) */}
+      {showHints && engineLines.length > 0 && (
         <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
           <div className="space-y-1">
@@ -825,38 +882,45 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, local =
         </div>
       )}
 
-      {/* Move list — move classifications are shown on the board, not here */}
-      {movePairs.length > 0 && (
+      {/* Move list — main line plus indented variations; right-click a move for
+          promote / delete. Classifications are shown on the board, not here. */}
+      {mainlineStart && (
         <div className="w-full max-h-[180px] overflow-y-auto rounded border bg-muted/30 p-2">
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm font-mono">
-            {movePairs.map((pair) => {
-              const whiteIdx = (pair.num - 1) * 2;
-              const blackIdx = whiteIdx + 1;
-              return (
-                <span key={pair.num} className="inline-flex items-baseline gap-1">
-                  <span className="text-muted-foreground">{pair.num}.</span>
-                  <button
-                    type="button"
-                    className={`px-1 rounded ${currentMoveIndex === whiteIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                    onClick={() => handleMoveClick(whiteIdx)}
-                  >
-                    {pair.white}
-                  </button>
-                  {pair.black && (
-                    <button
-                      type="button"
-                      className={`px-1 rounded ${currentMoveIndex === blackIdx ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-                      onClick={() => handleMoveClick(blackIdx)}
-                    >
-                      {pair.black}
-                    </button>
-                  )}
-                </span>
-              );
-            })}
+          <div className="text-sm font-mono leading-relaxed [&>button]:mr-1">
+            {renderLine(mainlineStart, 1)}
           </div>
         </div>
       )}
+
+      {/* Move context menu (promote / delete a variation) */}
+      {moveMenu && (() => {
+        const node = tree.nodes[moveMenu.nodeId];
+        const parent = node?.parentId ? tree.nodes[node.parentId] : null;
+        const isVariation = !!parent && parent.children[0] !== moveMenu.nodeId;
+        return (
+          <div
+            className="fixed z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md text-sm"
+            style={{ left: moveMenu.x, top: moveMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              disabled={!isVariation}
+              onClick={() => promoteMoveNode(moveMenu.nodeId)}
+              className="w-full text-left px-2 py-1 rounded hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              Promote to main line
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteMoveNode(moveMenu.nodeId)}
+              className="w-full text-left px-2 py-1 rounded text-destructive hover:bg-muted"
+            >
+              Delete from here
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Import panel — fixed overlay so it doesn't push board around */}
       {showImport && (

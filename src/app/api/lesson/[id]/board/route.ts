@@ -17,7 +17,7 @@ export async function GET(
 
   const lesson = await prisma.lessonRequest.findUnique({
     where: { id },
-    select: { studentId: true, coachId: true, boardPgn: true },
+    select: { studentId: true, coachId: true, boardPgn: true, boardTree: true },
   });
 
   if (!lesson) {
@@ -28,7 +28,7 @@ export async function GET(
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
-  return NextResponse.json({ boardPgn: lesson.boardPgn ?? "" });
+  return NextResponse.json({ boardPgn: lesson.boardPgn ?? "", boardTree: lesson.boardTree ?? null });
 }
 
 // PATCH: Persist board state + broadcast via Pusher
@@ -61,13 +61,13 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { boardPgn, moveHistory, currentMoveIndex } = body;
+  const { boardPgn, boardTree, currentNodeId } = body;
 
-  // Persist PGN to DB
+  // Persist the main-line PGN (backward-compat) and the full variation tree.
   if (typeof boardPgn === "string") {
     await prisma.lessonRequest.update({
       where: { id },
-      data: { boardPgn },
+      data: { boardPgn, boardTree: boardTree ?? null },
     });
   }
 
@@ -75,8 +75,8 @@ export async function PATCH(
   const pusher = getPusherServer();
   if (pusher) {
     await pusher.trigger(`private-lesson-${id}`, "board:moves", {
-      moveHistory,
-      currentMoveIndex,
+      tree: boardTree,
+      currentNodeId,
       senderId: session.user.id,
     });
   }

@@ -35,7 +35,7 @@ export async function POST(
   const body = await request.json();
   const { event, data } = body;
 
-  const allowedEvents = ["board:navigate", "board:arrows", "board:highlights", "board:reset", "call:status", "presence:ping", "presence:leave"];
+  const allowedEvents = ["board:navigate", "board:arrows", "board:highlights", "board:hints", "board:reset", "call:status", "presence:ping", "presence:leave"];
   if (!allowedEvents.includes(event)) {
     return NextResponse.json({ error: "Invalid event" }, { status: 400 });
   }
