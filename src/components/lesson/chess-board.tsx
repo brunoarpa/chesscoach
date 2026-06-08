@@ -124,6 +124,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [highlightedSquares, setHighlightedSquares] = useState<Record<string, React.CSSProperties>>({});
   const [engineLines, setEngineLines] = useState<EngineLine[]>([]);
+  // The FEN the current `engineLines` were computed for. The engine analyzes
+  // asynchronously, so after a move/navigation `engineLines` still describes the
+  // *previous* position until fresh analysis arrives — we tag them with their FEN
+  // and only ever render arrows/the line list when it matches the shown position,
+  // so stale best-move arrows can't linger on the new board.
+  const [engineLinesFen, setEngineLinesFen] = useState<string>("");
   // Eval cache: best eval (cp, white perspective) keyed by FEN. Populated as the
   // engine analyzes each position the user visits — feeds move classification.
   const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
@@ -551,6 +557,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   const handleLines = useCallback((lines: EngineLine[], _depth: number, fen: string) => {
     setEngineLines(lines);
+    setEngineLinesFen(fen);
     if (lines.length > 0) {
       const bestCp = evalToCp(lines[0]);
       setEvalCache((prev) => {
@@ -566,7 +573,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // best move, lighter green for any other line within ~2cp ("excellent").
   const currentFen = game.fen();
   const engineArrows = useMemo<Arrow[]>(() => {
-    if (!showHints || engineLines.length === 0) return [];
+    // Only draw for the position the lines actually belong to — never replay a
+    // previous position's best move onto the current board.
+    if (!showHints || engineLines.length === 0 || engineLinesFen !== currentFen) return [];
     const bestCp = evalToCp(engineLines[0]);
     const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
     const out: Arrow[] = [];
@@ -590,7 +599,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       }
     }
     return out;
-  }, [engineLines, currentFen, showHints]);
+  }, [engineLines, engineLinesFen, currentFen, showHints]);
 
   // Classify a played move based on cached evals (parent best vs node best).
   const classifyMoveAtNode = useCallback((nodeId: string): MoveClass | null => {
@@ -775,9 +784,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
-      {/* Board + Eval Bar */}
+      {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
+          lightbulb gates it alongside the arrows, line list, and classifications —
+          unmounting it also stops the Stockfish worker while hints are off. */}
       <div className="flex gap-1 w-full">
-        <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={squareSize > 0 ? squareSize * 8 : undefined} />
+        {showHints && (
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={squareSize > 0 ? squareSize * 8 : undefined} />
+        )}
         <div ref={boardRef} className="relative flex-1 aspect-square">
           <Chessboard
             options={{
@@ -843,7 +856,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           size="icon"
           className="h-9 w-9"
           onClick={toggleHints}
-          title={showHints ? "Hide engine hints (best moves & move ratings)" : "Show engine hints (best moves & move ratings)"}
+          title={showHints ? "Hide engine hints (eval bar, best moves & move ratings)" : "Show engine hints (eval bar, best moves & move ratings)"}
         >
           <Lightbulb className="h-5 w-5" />
         </Button>
@@ -869,7 +882,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       )}
 
       {/* Top engine lines — eval + principal variation for each (hidden when hints off) */}
-      {showHints && engineLines.length > 0 && (
+      {showHints && engineLines.length > 0 && engineLinesFen === currentFen && (
         <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
           <div className="space-y-1">
