@@ -579,6 +579,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     const bestCp = evalToCp(engineLines[0]);
     const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
     const out: Arrow[] = [];
+    // react-chessboard keys each arrow by start+end square, so two arrows on the
+    // same squares collide and React leaves orphaned arrow DOM that never clears.
+    // Mid-search Stockfish can briefly report the same first move in several
+    // MultiPV slots, so dedupe by square here.
+    const seen = new Set<string>();
     for (let i = 0; i < engineLines.length; i++) {
       const line = engineLines[i];
       if (line.san.length === 0) continue;
@@ -589,6 +594,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         const g = new Chess(currentFen);
         const mv = g.move(line.san[0]);
         if (!mv) continue;
+        const key = `${mv.from}-${mv.to}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         out.push({
           startSquare: mv.from,
           endSquare: mv.to,
@@ -782,6 +790,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   const mainlineStart = mainlineForward(tree, tree.rootId);
 
+  // Engine + manual/remote arrows, deduped by square pair. react-chessboard keys
+  // arrows solely by start+end square; any duplicate (e.g. an engine arrow that
+  // coincides with a drawn one) collides and leaves ghost arrows React can't
+  // reconcile away — so collapse them to one here.
+  const boardArrows = (() => {
+    const seen = new Set<string>();
+    const out: Arrow[] = [];
+    for (const a of [...engineArrows, ...arrows]) {
+      const key = `${a.startSquare}-${a.endSquare}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(a);
+    }
+    return out;
+  })();
+
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
@@ -800,7 +824,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
               onSquareMouseDown: onSquareMouseDown,
               onSquareMouseUp: onSquareMouseUp,
               boardOrientation: boardOrientation,
-              arrows: [...engineArrows, ...arrows],
+              arrows: boardArrows,
               squareStyles: squareStyles,
               squareRenderer: renderSquare,
               animationDurationInMs: 200,
