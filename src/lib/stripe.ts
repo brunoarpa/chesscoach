@@ -1,19 +1,18 @@
-import type Stripe from "stripe";
-
-let cachedCurrency: string | null = null;
-
 /**
- * The currency the platform Stripe account settles in (e.g. "eur", "usd").
+ * The single currency the whole app is denominated in. Every stored amount
+ * (walletBalance, reservedBalance, pendingEarnings, coach prices, …) is in this
+ * currency's minor units (cents), and all Stripe charges and transfers use it.
  *
- * Charges AND transfers must use this currency. Stripe holds your available
- * balance per-currency in the account's settlement currency, so transferring in
- * a different currency (e.g. hardcoded "usd" against a EUR account) fails with
- * `balance_insufficient` even when funds are available. Cached for the process
- * lifetime — an account's default currency never changes.
+ * USD is used because the marketplace is global (US / EU / India / …) and USD is
+ * the universal denominator. The platform Stripe account must hold a balance in
+ * this currency (add it under Settings → Balances → "Add settlement currency"),
+ * otherwise transfers fail with `balance_insufficient`. Coaches in other
+ * countries receive USD into their connected account; Stripe converts to their
+ * local currency only when paying out to their bank, and the coach bears that
+ * conversion — so the platform never takes on FX risk.
+ *
+ * NOTE: do NOT derive this from the account's `default_currency` — that's the
+ * account's home/settlement currency (e.g. EUR for a Spanish account) and is not
+ * the same as the currency the app operates in.
  */
-export async function getPlatformCurrency(stripe: Stripe): Promise<string> {
-  if (cachedCurrency) return cachedCurrency;
-  const account = await stripe.accounts.retrieveCurrent();
-  cachedCurrency = account.default_currency ?? "usd";
-  return cachedCurrency;
-}
+export const APP_CURRENCY = "usd";

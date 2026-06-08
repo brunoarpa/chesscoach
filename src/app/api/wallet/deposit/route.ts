@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { getPlatformCurrency } from "@/lib/stripe";
+import { APP_CURRENCY } from "@/lib/stripe";
 
 const FEE_FLAT_CENTS = 40;      // $0.40
 const FEE_PERCENT = 0.02;       // 2%
@@ -59,9 +59,9 @@ export async function POST(request: Request) {
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
 
-  // Charge in the platform's settlement currency so deposits settle 1:1 (no FX
-  // conversion) and the resulting balance is withdrawable in the same currency.
-  const currency = await getPlatformCurrency(stripeClient);
+  // Charge in the app currency (USD). The platform holds a USD balance, so these
+  // settle as USD and are withdrawable in USD.
+  const currency = APP_CURRENCY;
 
   const checkoutSession = await stripeClient.checkout.sessions.create({
     mode: "payment",

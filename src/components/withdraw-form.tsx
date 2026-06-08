@@ -173,7 +173,8 @@ export function WithdrawForm({ pendingEarnings }: { pendingEarnings: number }) {
                 : "Enter an amount"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Funds are transferred to your connected Stripe account.
+              Amounts are in USD. If your bank uses another currency, Stripe
+              converts it at the current rate when paying out to your account.
             </p>
           </div>
         )}

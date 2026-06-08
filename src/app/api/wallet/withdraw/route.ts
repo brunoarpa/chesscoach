@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { getPlatformCurrency } from "@/lib/stripe";
+import { APP_CURRENCY } from "@/lib/stripe";
 
 const FEE_FLAT_CENTS = 40;      // $0.40
 const FEE_PERCENT = 0.02;       // 2%
@@ -73,9 +73,11 @@ export async function POST(req: NextRequest) {
   const stripe = (await import("stripe")).default;
   const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
 
-  // Transfer in the platform's settlement currency — Stripe holds the available
-  // balance per-currency, so a mismatched currency fails with balance_insufficient.
-  const currency = await getPlatformCurrency(stripeClient);
+  // Transfer in the app currency (USD). Stripe holds the available balance
+  // per-currency; the platform's USD balance funds this. Coaches whose bank is in
+  // another currency receive USD into their connected account and Stripe converts
+  // at their bank payout.
+  const currency = APP_CURRENCY;
 
   const account = await stripeClient.accounts.retrieve(user.stripeConnectAccountId);
   if (!account.payouts_enabled) {
