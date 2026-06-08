@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPusherServer } from "@/lib/pusher";
@@ -48,11 +49,13 @@ export async function POST(
     });
   }
 
-  // If reset, clear persisted PGN too
+  // If reset, clear persisted board state too. Both columns must be cleared:
+  // the board seeds from boardTree in preference to boardPgn, so leaving the tree
+  // behind would resurrect the cleared moves on the next page load.
   if (event === "board:reset") {
     await prisma.lessonRequest.update({
       where: { id },
-      data: { boardPgn: null },
+      data: { boardPgn: null, boardTree: Prisma.DbNull },
     });
   }
 

@@ -108,8 +108,14 @@ function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): 
 }
 
 export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false }: Props) {
-  const [tree, setTree] = useState<MoveTree>(() => initialTreeState(initialBoardTree, initialBoardPgn).tree);
-  const [currentNodeId, setCurrentNodeId] = useState<string>(() => initialTreeState(initialBoardTree, initialBoardPgn).nodeId);
+  // Seed tree + cursor from one shared computation. Computing them in two
+  // separate useState initializers would call initialTreeState twice — and for an
+  // empty/PGN board that means two createTree() calls with *different* random root
+  // ids, leaving currentNodeId pointing at a node absent from `tree`. addMove would
+  // then find no parent and silently drop every move (pieces snap back).
+  const [seed] = useState(() => initialTreeState(initialBoardTree, initialBoardPgn));
+  const [tree, setTree] = useState<MoveTree>(seed.tree);
+  const [currentNodeId, setCurrentNodeId] = useState<string>(seed.nodeId);
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
