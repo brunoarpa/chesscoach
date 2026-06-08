@@ -12,6 +12,8 @@ export interface CallActions {
 interface Props {
   lessonId: string;
   isCoach: boolean;
+  /** Whether the other participant is currently in the call (from presence signaling). */
+  otherInCall?: boolean;
   onCallStatusChange?: (inCall: boolean) => void;
   onAudioChange?: (enabled: boolean) => void;
   callActionsRef?: React.MutableRefObject<CallActions | null>;
@@ -31,7 +33,7 @@ function getIceServers(): RTCIceServer[] {
   return servers;
 }
 
-export function AudioCall({ lessonId, isCoach, onCallStatusChange, onAudioChange, callActionsRef }: Props) {
+export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, onAudioChange, callActionsRef }: Props) {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -220,7 +222,13 @@ export function AudioCall({ lessonId, isCoach, onCallStatusChange, onAudioChange
         <div className={`flex items-center gap-2 px-3 py-2 rounded-full border ${connected ? "border-green-500/50 bg-green-500/10" : connecting ? "border-amber-500/50 bg-amber-500/10" : "border-muted-foreground/30"}`}>
           <Phone className={`h-4 w-4 ${connected ? "text-green-600 dark:text-green-400" : connecting ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`} />
           <span className="text-sm font-medium">
-            {connected ? "Joined" : connecting ? "Connecting…" : "Not in call"}
+            {connected
+              ? "Joined"
+              : connecting
+                ? otherInCall
+                  ? "Connecting…"
+                  : `Waiting for ${otherRole} to join…`
+                : "Not in call"}
           </span>
         </div>
         {connected && (

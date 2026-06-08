@@ -316,6 +316,7 @@ export function LessonSession({
                 <AudioCall
                   lessonId={lessonId}
                   isCoach={isCoach}
+                  otherInCall={remoteInCall}
                   onCallStatusChange={handleCallStatusChange}
                   callActionsRef={callActionsRef}
                 />
@@ -340,6 +341,7 @@ export function LessonSession({
               <AudioCall
                 lessonId={lessonId}
                 isCoach={isCoach}
+                otherInCall={remoteInCall}
                 onCallStatusChange={handleCallStatusChange}
                 callActionsRef={callActionsRef}
               />
