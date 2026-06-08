@@ -18,7 +18,8 @@ async function main() {
   const Stripe = (await import("stripe")).default;
   const stripe = new Stripe(key);
 
-  const account = await stripe.accounts.retrieve();
+  // Pass `null` as the account id to retrieve our own (platform) account.
+  const account = await stripe.accounts.retrieve(null);
   console.log(`Platform account: ${account.id}`);
   console.log(`  country: ${account.country}`);
   console.log(`  default_currency: ${account.default_currency}`);
