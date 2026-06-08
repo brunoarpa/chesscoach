@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { LocalTime } from "@/components/local-time";
 
 export default async function AdminLessonChatPage({
   params,
@@ -42,11 +43,14 @@ export default async function AdminLessonChatPage({
         <p>Student: {lesson.student.username ?? "Unknown"} · Coach: {lesson.coach.username ?? "Unknown"}</p>
         <p>Status: {lesson.status}</p>
         {lesson.scheduledStartAt && (
-          <p>Scheduled: {lesson.scheduledStartAt.toLocaleString()} – {lesson.scheduledEndAt?.toLocaleString()}</p>
+          <p>
+            Scheduled: <LocalTime iso={lesson.scheduledStartAt.toISOString()} />
+            {lesson.scheduledEndAt && <> – <LocalTime iso={lesson.scheduledEndAt.toISOString()} /></>}
+          </p>
         )}
         <p>
-          Coach joined: {lesson.coachJoinedAt?.toLocaleString() ?? "Never"} ·
-          Student joined: {lesson.studentJoinedAt?.toLocaleString() ?? "Never"}
+          Coach joined: {lesson.coachJoinedAt ? <LocalTime iso={lesson.coachJoinedAt.toISOString()} /> : "Never"} ·
+          Student joined: {lesson.studentJoinedAt ? <LocalTime iso={lesson.studentJoinedAt.toISOString()} /> : "Never"}
         </p>
         {lesson.disputeReason && (
           <p className="text-destructive">Dispute reason: {lesson.disputeReason}</p>
@@ -62,7 +66,7 @@ export default async function AdminLessonChatPage({
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-medium">{msg.sender.username ?? "Unknown"}</span>
                 <span className="text-xs text-muted-foreground">
-                  {msg.createdAt.toLocaleString()}
+                  <LocalTime iso={msg.createdAt.toISOString()} />
                 </span>
                 {msg.senderId === lesson.coachId && (
                   <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">Coach</span>

@@ -27,9 +27,10 @@ function formatTime(hour: number, minute: number): string {
 
 interface Props {
   initialTemplates: Array<{ dayOfWeek: number; startHour: number; startMinute: number }>;
+  timezone: string | null;
 }
 
-export function CoachScheduleEditor({ initialTemplates }: Props) {
+export function CoachScheduleEditor({ initialTemplates, timezone }: Props) {
   const [selected, setSelected] = useState<Set<SlotKey>>(() => {
     const set = new Set<SlotKey>();
     for (const t of initialTemplates) {
@@ -119,7 +120,14 @@ export function CoachScheduleEditor({ initialTemplates }: Props) {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tap or drag to set your recurring 15-min availability slots. Times are in your local timezone.
+          Tap or drag to set your recurring 15-min availability slots.{" "}
+          {timezone ? (
+            <>Times are in <span className="font-medium">{timezone}</span> (your profile timezone).</>
+          ) : (
+            <span className="text-amber-700 dark:text-amber-400">
+              Set your timezone in your profile before saving — otherwise slots can&apos;t be scheduled correctly.
+            </span>
+          )}
           <span className="sm:hidden block mt-1 text-xs">Scroll the grid horizontally on small screens.</span>
         </p>
       </CardHeader>

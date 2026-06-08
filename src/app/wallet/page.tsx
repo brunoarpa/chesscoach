@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { DepositForm } from "@/components/deposit-form";
 import { WithdrawForm } from "@/components/withdraw-form";
 import { StripeConnectSetup } from "@/components/stripe-connect-setup";
+import { LocalTime } from "@/components/local-time";
 import { PLATFORM_FEE_PERCENT } from "@/lib/fees";
 
 export default async function WalletPage() {
@@ -117,7 +118,7 @@ export default async function WalletPage() {
                     {tx.type === "PAYOUT" && "Withdrawal"}
                   </span>
                   <div className="text-xs text-muted-foreground">
-                    {new Date(tx.createdAt).toLocaleDateString()}
+                    <LocalTime iso={new Date(tx.createdAt).toISOString()} mode="date" />
                   </div>
                 </div>
                 <span

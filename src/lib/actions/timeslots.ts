@@ -5,6 +5,61 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 /**
+ * Offset (in ms) of an IANA timezone from UTC at a given instant.
+ * Positive when the zone is ahead of UTC. Accounts for DST because the
+ * offset is evaluated at `date` rather than assumed constant.
+ */
+function tzOffsetMs(timeZone: string, date: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(date);
+  const map: Record<string, number> = {};
+  for (const p of parts) {
+    if (p.type !== "literal") map[p.type] = Number(p.value);
+  }
+  // Interpret the wall-clock reading as if it were UTC, then diff against the
+  // real instant — the gap is the zone's offset at that moment.
+  const asUTC = Date.UTC(
+    map.year,
+    map.month - 1,
+    map.day,
+    map.hour % 24,
+    map.minute,
+    map.second
+  );
+  return asUTC - date.getTime();
+}
+
+/**
+ * Convert a wall-clock time in a given IANA timezone to the corresponding UTC
+ * instant. DST-safe: the offset is computed at the target instant (with one
+ * refinement pass for the moment offsets change), not at an approximation.
+ */
+function wallTimeToUtc(
+  year: number,
+  month: number, // 0-indexed
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string
+): Date {
+  const utcGuess = Date.UTC(year, month, day, hour, minute, 0);
+  const offset1 = tzOffsetMs(timeZone, new Date(utcGuess));
+  let ts = utcGuess - offset1;
+  const offset2 = tzOffsetMs(timeZone, new Date(ts));
+  if (offset2 !== offset1) ts = utcGuess - offset2;
+  return new Date(ts);
+}
+
+/**
  * Save a coach's weekly recurring availability template.
  * Replaces all existing templates for the coach.
  * Each slot is { dayOfWeek: 0-6, startHour: 0-23, startMinute: 0|15|30|45 }
@@ -14,6 +69,17 @@ export async function saveWeeklyTemplate(
 ) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
+
+  // A timezone is required: template hours are wall-clock times interpreted in
+  // the coach's timezone. Without it, slots would be generated in UTC and shown
+  // to students at the wrong time.
+  const coach = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { timezone: true },
+  });
+  if (!coach?.timezone) {
+    return { error: "Set your timezone in your profile before saving availability." };
+  }
 
   // Validate inputs
   for (const slot of slots) {
@@ -102,44 +168,35 @@ export async function generateUpcomingSlots(coachId: string) {
     status: "AVAILABLE";
   }> = [];
 
-  // Generate for each day in the next 7 days
+  // Generate for each day in the next 7 days. Work entirely in UTC date math
+  // so the day-of-week match is independent of the server's timezone.
   for (let d = 0; d < daysAhead; d++) {
     const date = new Date(now);
-    date.setDate(date.getDate() + d);
+    date.setUTCDate(date.getUTCDate() + d);
 
     for (const template of templates) {
       if (date.getUTCDay() !== template.dayOfWeek) continue;
 
-      // Build slot start time in UTC
-      // If coach has a timezone, interpret the template hours in that timezone
-      let startTime: Date;
-      if (coach?.timezone) {
-        // Create a date string in the coach's timezone, then convert to UTC
-        const dateStr = date.toISOString().split("T")[0]; // YYYY-MM-DD
-        const timeStr = `${String(template.startHour).padStart(2, "0")}:${String(template.startMinute).padStart(2, "0")}:00`;
-        const localStr = `${dateStr}T${timeStr}`;
-
-        // Parse localStr to get the components, then use Date.UTC
-        // Simpler approach: create date as if UTC, then adjust by timezone offset
-        const tempDate = new Date(`${localStr}Z`); // treat as UTC first
-        const utcStr = tempDate.toLocaleString("en-US", { timeZone: "UTC" });
-        const tzStr = tempDate.toLocaleString("en-US", { timeZone: coach.timezone });
-        const utcDate = new Date(utcStr);
-        const tzDate = new Date(tzStr);
-        const offsetMs = utcDate.getTime() - tzDate.getTime();
-
-        startTime = new Date(tempDate.getTime() + offsetMs);
-      } else {
-        // No timezone set: treat template hours as UTC
-        startTime = new Date(Date.UTC(
-          date.getUTCFullYear(),
-          date.getUTCMonth(),
-          date.getUTCDate(),
-          template.startHour,
-          template.startMinute,
-          0
-        ));
-      }
+      // Interpret the template's wall-clock hours in the coach's timezone and
+      // convert to the corresponding UTC instant. Falls back to UTC only when
+      // the coach has no timezone saved (older records — new saves require it).
+      const startTime = coach?.timezone
+        ? wallTimeToUtc(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            date.getUTCDate(),
+            template.startHour,
+            template.startMinute,
+            coach.timezone
+          )
+        : new Date(Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            date.getUTCDate(),
+            template.startHour,
+            template.startMinute,
+            0
+          ));
 
       const endTime = new Date(startTime.getTime() + 15 * 60 * 1000);
 

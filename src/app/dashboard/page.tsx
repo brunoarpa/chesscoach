@@ -41,7 +41,7 @@ export default async function DashboardPage() {
       activityStatus: "ACTIVE",
       ...(shouldForceUnavailable ? { coachAvailability: "UNAVAILABLE" } : {}),
     },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true },
   });
 
   const isCoach = !!(currentUser.coachChatPrice || currentUser.coachCallPrice);
@@ -227,7 +227,7 @@ export default async function DashboardPage() {
       {isCoach && (
         <section>
           <h2 className="text-xl font-semibold mb-3">Coaching</h2>
-          <CoachScheduleEditor initialTemplates={weeklyTemplates} />
+          <CoachScheduleEditor initialTemplates={weeklyTemplates} timezone={currentUser.timezone} />
         </section>
       )}
     </div>

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { LocalTime } from "@/components/local-time";
 
 const statusVariants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   PENDING: "secondary",
@@ -82,11 +83,13 @@ export default async function DashboardHistoryPage({ searchParams }: PageProps) 
                     <div className="font-medium truncate">{otherUser.username}</div>
                     <div className="text-sm text-muted-foreground">
                       Lesson · {r.durationMinutes}min · {r.isTrial ? "Free" : `$${(r.estimatedCost / 100).toFixed(2)}`}
-                      {r.scheduledStartAt && ` · ${new Date(r.scheduledStartAt).toLocaleString()}`}
+                      {r.scheduledStartAt && (
+                        <> · <LocalTime iso={new Date(r.scheduledStartAt).toISOString()} /></>
+                      )}
                     </div>
                     {!r.scheduledStartAt && (
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(r.createdAt).toLocaleString()}
+                        <LocalTime iso={new Date(r.createdAt).toISOString()} />
                       </div>
                     )}
                   </div>
