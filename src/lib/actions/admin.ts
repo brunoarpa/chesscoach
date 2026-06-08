@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
+import { coachEarnings } from "@/lib/fees";
 
 async function requireAdmin() {
   const session = await auth();
@@ -205,8 +206,8 @@ export async function resolveDispute(
               prisma.user.update({
                 where: { id: lesson.coachId },
                 data: {
-                  pendingEarnings: { decrement: lesson.estimatedCost },
-                  totalEarningsAllTime: { decrement: lesson.estimatedCost },
+                  pendingEarnings: { decrement: coachEarnings(lesson.estimatedCost) },
+                  totalEarningsAllTime: { decrement: coachEarnings(lesson.estimatedCost) },
                 },
               }),
               prisma.transaction.create({
@@ -221,7 +222,7 @@ export async function resolveDispute(
                 data: {
                   userId: lesson.coachId,
                   type: "LESSON_REFUND",
-                  amount: -lesson.estimatedCost,
+                  amount: -coachEarnings(lesson.estimatedCost),
                   lessonRequestId: lessonId,
                 },
               }),
@@ -291,8 +292,8 @@ export async function resolveDispute(
               prisma.user.update({
                 where: { id: lesson.coachId },
                 data: {
-                  pendingEarnings: { increment: lesson.estimatedCost },
-                  totalEarningsAllTime: { increment: lesson.estimatedCost },
+                  pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
+                  totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
                   lessonsGiven: { increment: 1 },
                   // Reverse the ELO penalty applied during no-show detection
                   coachRatingPenalty: { decrement: 50 },
@@ -310,12 +311,12 @@ export async function resolveDispute(
                 data: {
                   userId: lesson.coachId,
                   type: "LESSON_PAYMENT",
-                  amount: lesson.estimatedCost,
+                  amount: coachEarnings(lesson.estimatedCost),
                   lessonRequestId: lessonId,
                 },
               }),
               prisma.earningRecord.create({
-                data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+                data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
               }),
             ]),
         prisma.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } }),
@@ -359,8 +360,8 @@ export async function resolveDispute(
             ...(lesson.isTrial
               ? { lessonsGiven: { increment: 1 } }
               : {
-                  pendingEarnings: { increment: lesson.estimatedCost },
-                  totalEarningsAllTime: { increment: lesson.estimatedCost },
+                  pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
+                  totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
                   lessonsGiven: { increment: 1 },
                 }),
           },
@@ -380,14 +381,14 @@ export async function resolveDispute(
                 data: {
                   userId: lesson.coachId,
                   type: "LESSON_PAYMENT",
-                  amount: lesson.estimatedCost,
+                  amount: coachEarnings(lesson.estimatedCost),
                   lessonRequestId: lessonId,
                 },
               }),
               prisma.earningRecord.create({
                 data: {
                   userId: lesson.coachId,
-                  amount: lesson.estimatedCost,
+                  amount: coachEarnings(lesson.estimatedCost),
                 },
               }),
             ]),

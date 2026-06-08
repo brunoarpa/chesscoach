@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { calculateCoachElo } from "@/lib/elo";
+import { coachEarnings } from "@/lib/fees";
 
 /**
  * Update activity status for all users based on lastActiveAt.
@@ -266,8 +267,8 @@ export async function detectConfirmationDisputes() {
           await tx.user.update({
             where: { id: lesson.coachId },
             data: {
-              pendingEarnings: { increment: lesson.estimatedCost },
-              totalEarningsAllTime: { increment: lesson.estimatedCost },
+              pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
+              totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
               lessonsGiven: { increment: 1 },
             },
           });
@@ -283,12 +284,12 @@ export async function detectConfirmationDisputes() {
             data: {
               userId: lesson.coachId,
               type: "LESSON_PAYMENT",
-              amount: lesson.estimatedCost,
+              amount: coachEarnings(lesson.estimatedCost),
               lessonRequestId: lesson.id,
             },
           });
           await tx.earningRecord.create({
-            data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+            data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
           });
         }
       });
@@ -401,8 +402,8 @@ export async function autoCompleteLessons() {
         await tx.user.update({
           where: { id: lesson.coachId },
           data: {
-            pendingEarnings: { increment: lesson.estimatedCost },
-            totalEarningsAllTime: { increment: lesson.estimatedCost },
+            pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
+            totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
             lessonsGiven: { increment: 1 },
           },
         });
@@ -418,12 +419,12 @@ export async function autoCompleteLessons() {
           data: {
             userId: lesson.coachId,
             type: "LESSON_PAYMENT",
-            amount: lesson.estimatedCost,
+            amount: coachEarnings(lesson.estimatedCost),
             lessonRequestId: lesson.id,
           },
         });
         await tx.earningRecord.create({
-          data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+          data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
         });
       }
 
@@ -578,8 +579,8 @@ export async function detectNoShows() {
           await tx.user.update({
             where: { id: lesson.coachId },
             data: {
-              pendingEarnings: { increment: lesson.estimatedCost },
-              totalEarningsAllTime: { increment: lesson.estimatedCost },
+              pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
+              totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
               lessonsGiven: { increment: 1 },
             },
           });
@@ -595,12 +596,12 @@ export async function detectNoShows() {
             data: {
               userId: lesson.coachId,
               type: "LESSON_PAYMENT",
-              amount: lesson.estimatedCost,
+              amount: coachEarnings(lesson.estimatedCost),
               lessonRequestId: lesson.id,
             },
           });
           await tx.earningRecord.create({
-            data: { userId: lesson.coachId, amount: lesson.estimatedCost },
+            data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
           });
         }
         await tx.abuseFlag.create({

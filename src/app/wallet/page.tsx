@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { DepositForm } from "@/components/deposit-form";
 import { WithdrawForm } from "@/components/withdraw-form";
 import { StripeConnectSetup } from "@/components/stripe-connect-setup";
+import { PLATFORM_FEE_PERCENT } from "@/lib/fees";
 
 export default async function WalletPage() {
   const session = await auth();
@@ -84,7 +85,7 @@ export default async function WalletPage() {
             <WithdrawForm pendingEarnings={user.pendingEarnings} />
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Coaching earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — ChessCoach does not withhold or remit taxes on your behalf.
+            ChessCoach keeps a {Math.round(PLATFORM_FEE_PERCENT * 100)}% platform fee on each completed lesson; your earnings shown above are already net of that fee. Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — ChessCoach does not withhold or remit taxes on your behalf.
           </p>
         </>
       )}

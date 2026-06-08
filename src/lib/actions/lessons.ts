@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getEffectiveAvailability } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
+import { coachEarnings } from "@/lib/fees";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
@@ -564,8 +565,8 @@ export async function reportNoShow(requestId: string) {
         await tx.user.update({
           where: { id: request.coachId },
           data: {
-            pendingEarnings: { increment: request.estimatedCost },
-            totalEarningsAllTime: { increment: request.estimatedCost },
+            pendingEarnings: { increment: coachEarnings(request.estimatedCost) },
+            totalEarningsAllTime: { increment: coachEarnings(request.estimatedCost) },
             lessonsGiven: { increment: 1 },
           },
         });
@@ -581,12 +582,12 @@ export async function reportNoShow(requestId: string) {
           data: {
             userId: request.coachId,
             type: "LESSON_PAYMENT",
-            amount: request.estimatedCost,
+            amount: coachEarnings(request.estimatedCost),
             lessonRequestId: requestId,
           },
         });
         await tx.earningRecord.create({
-          data: { userId: request.coachId, amount: request.estimatedCost },
+          data: { userId: request.coachId, amount: coachEarnings(request.estimatedCost) },
         });
       }
       await tx.abuseFlag.create({
