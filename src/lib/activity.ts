@@ -618,3 +618,54 @@ export async function detectNoShows() {
     }
   }
 }
+
+// Retention window: lesson chat + free-text content is kept this long after the
+// lesson finishes, then permanently deleted. Surfaced to users in the chat UI.
+export const LESSON_DATA_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Purge chat messages and sensitive free-text content (request message, dispute
+ * reason, board PGN) from lessons that finished more than 30 days ago.
+ *
+ * An unresolved dispute freezes the clock: lessons that are DISPUTED or carry an
+ * open AbuseFlag are skipped, so the evidence survives until the dispute is
+ * resolved. `dataPurgedAt` marks a lesson as done so it is never reprocessed.
+ * Structural metadata (timestamps, status, the money ledger) is intentionally
+ * kept for accounting and stats.
+ */
+export async function purgeExpiredLessonData() {
+  const cutoff = new Date(Date.now() - LESSON_DATA_RETENTION_MS);
+
+  const candidates = await prisma.lessonRequest.findMany({
+    where: {
+      dataPurgedAt: null,
+      // Only terminal lessons — never touch ones still pending/active/disputed.
+      status: { in: ["COMPLETED", "DECLINED", "EXPIRED", "CANCELLED", "NO_SHOW"] },
+      // Freeze on any open report against this lesson.
+      abuseFlags: { none: { resolved: false } },
+      OR: [
+        { completedAt: { lt: cutoff } },
+        { completedAt: null, scheduledEndAt: { lt: cutoff } },
+        { completedAt: null, scheduledEndAt: null, createdAt: { lt: cutoff } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (candidates.length === 0) return;
+
+  const ids = candidates.map((l) => l.id);
+
+  await prisma.$transaction([
+    prisma.chatMessage.deleteMany({ where: { lessonRequestId: { in: ids } } }),
+    prisma.lessonRequest.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        message: null,
+        disputeReason: null,
+        boardPgn: null,
+        dataPurgedAt: new Date(),
+      },
+    }),
+  ]);
+}

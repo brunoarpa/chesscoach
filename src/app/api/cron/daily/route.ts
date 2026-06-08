@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { recalculateAllElos } from "@/lib/elo";
-import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes, detectNoShows, autoCompleteLessons } from "@/lib/activity";
+import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes, detectNoShows, autoCompleteLessons, purgeExpiredLessonData } from "@/lib/activity";
 import { refreshAllChessComRatings } from "@/lib/chess-com";
 import { prisma } from "@/lib/prisma";
 import { generateUpcomingSlots } from "@/lib/actions/timeslots";
@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     detectConfirmationDisputes(),
     detectNoShows(),
     autoCompleteLessons(),
+    purgeExpiredLessonData(),
     prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
   ]);
 

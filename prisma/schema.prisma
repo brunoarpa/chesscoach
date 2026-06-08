@@ -278,7 +278,10 @@ model LessonRequest {
   createdAt   DateTime  @default(now())
   respondedAt DateTime?
   completedAt DateTime?
-  
+
+  // 30-day retention: set when chat + free-text content has been purged.
+  dataPurgedAt DateTime?
+
   reviews      Review[]
   transactions Transaction[]
   abuseFlags   AbuseFlag[]

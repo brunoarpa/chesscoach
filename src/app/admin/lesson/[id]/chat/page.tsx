@@ -55,6 +55,12 @@ export default async function AdminLessonChatPage({
         {lesson.disputeReason && (
           <p className="text-destructive">Dispute reason: {lesson.disputeReason}</p>
         )}
+        {lesson.dataPurgedAt && (
+          <p className="text-amber-600">
+            Chat and free-text content were deleted per the 30-day retention policy on{" "}
+            <LocalTime iso={lesson.dataPurgedAt.toISOString()} />.
+          </p>
+        )}
       </div>
 
       <div className="border rounded-lg divide-y">
