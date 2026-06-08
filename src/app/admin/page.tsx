@@ -6,6 +6,7 @@ import { VerificationList } from "@/components/admin/verification-list";
 import { UserList } from "@/components/admin/user-list";
 import { AbuseFlagList } from "@/components/admin/abuse-flag-list";
 import { RecoveryRequestList } from "@/components/admin/recovery-request-list";
+import { LessonList } from "@/components/admin/lesson-list";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -18,7 +19,7 @@ export default async function AdminPage() {
 
   if (user?.role !== "ADMIN") redirect("/");
 
-  const [pendingVerifications, allUsers, abuseFlags, cardFingerprints, recoveryRequests] = await Promise.all([
+  const [pendingVerifications, allUsers, abuseFlags, cardFingerprints, recoveryRequests, lessons] = await Promise.all([
     prisma.user.findMany({
       where: { verificationStatus: "PENDING" },
       orderBy: { updatedAt: "desc" },
@@ -70,6 +71,21 @@ export default async function AdminPage() {
       where: { resolved: false },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.lessonRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        communicationMethod: true,
+        estimatedCost: true,
+        scheduledStartAt: true,
+        createdAt: true,
+        dataPurgedAt: true,
+        student: { select: { username: true } },
+        coach: { select: { username: true } },
+      },
+    }),
   ]);
 
   // Build linked accounts count from card fingerprints
@@ -106,6 +122,7 @@ export default async function AdminPage() {
             Recovery ({recoveryRequests.length})
           </TabsTrigger>
           <TabsTrigger value="users">All Users ({allUsers.length})</TabsTrigger>
+          <TabsTrigger value="lessons">Lessons ({lessons.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flags">
@@ -125,6 +142,10 @@ export default async function AdminPage() {
             users={JSON.parse(JSON.stringify(allUsers))}
             linkedAccountsMap={linkedAccountsMap}
           />
+        </TabsContent>
+
+        <TabsContent value="lessons">
+          <LessonList lessons={JSON.parse(JSON.stringify(lessons))} />
         </TabsContent>
       </Tabs>
     </div>
