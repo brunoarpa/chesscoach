@@ -872,6 +872,15 @@ export async function blockStudent(studentId: string) {
           data: { reservedBalance: { decrement: r.estimatedCost } },
         })
       ),
+    // Release any booked timeslots so they don't stay locked forever.
+    ...pendingRequests
+      .filter((r) => r.timeSlotId)
+      .map((r) =>
+        prisma.timeSlot.update({
+          where: { id: r.timeSlotId! },
+          data: { status: "AVAILABLE" },
+        })
+      ),
   ];
 
   await prisma.$transaction(txOps);
