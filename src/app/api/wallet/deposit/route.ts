@@ -39,7 +39,11 @@ export async function POST(request: Request) {
 
   const { amount } = await request.json();
 
-  if (!amount || amount < MIN_DEPOSIT_CENTS) {
+  if (typeof amount !== "number" || !Number.isInteger(amount)) {
+    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  }
+
+  if (amount < MIN_DEPOSIT_CENTS) {
     return NextResponse.json({ error: "Minimum deposit is $5.00" }, { status: 400 });
   }
 

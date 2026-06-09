@@ -114,6 +114,7 @@ export function CoachDashboard({
   completedTotal,
   otherTotal,
   hasCompletedTrial,
+  hasSchedule = true,
   hidePending = false,
 }: {
   requests: Request[];
@@ -122,6 +123,7 @@ export function CoachDashboard({
   completedTotal: number;
   otherTotal: number;
   hasCompletedTrial: boolean;
+  hasSchedule?: boolean;
   hidePending?: boolean;
 }) {
   const now = useNow();
@@ -188,6 +190,18 @@ export function CoachDashboard({
         <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 text-sm">
           <p className="font-medium text-amber-900 dark:text-amber-200">
             Complete 1 free trial lesson to unlock paid bookings.
+          </p>
+        </div>
+      )}
+
+      {coachAvailability === "AVAILABLE" && !hasSchedule && (
+        <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 text-sm">
+          <p className="font-medium text-amber-900 dark:text-amber-200">
+            You haven&apos;t set up any weekly time slots yet.
+          </p>
+          <p className="text-amber-800 dark:text-amber-300 mt-0.5">
+            Students can only book specific time slots, so you won&apos;t receive any
+            bookings until you add availability under <span className="font-medium">Coaching</span> below.
           </p>
         </div>
       )}

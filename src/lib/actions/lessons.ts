@@ -13,7 +13,8 @@ import { createNotification } from "@/lib/notifications";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
-  timeSlotId: z.string().cuid().optional(),
+  // Every booking must target a specific time slot — there is no instant/unscheduled path.
+  timeSlotId: z.string().cuid({ message: "Please pick a time slot to book." }),
   isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
   communicationMethod: z.enum(["CALL", "CHAT"]).optional(),
   message: z.string().max(500).optional(),

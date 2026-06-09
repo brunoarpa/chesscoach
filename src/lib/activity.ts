@@ -195,17 +195,25 @@ async function detectNonResponsiveCoaches() {
 }
 
 /**
- * Detect confirmation timeouts and one-sided confirmations.
- * Called by daily cron. Checks ACCEPTED lessons where the confirmation
- * window has passed (cooldown + 48 hours).
+ * Detect confirmation timeouts for *instant* (unscheduled) lessons.
+ * Called by daily cron. Checks ACCEPTED instant lessons where the confirmation
+ * window has passed (cooldown + 48 hours) and the lesson never started.
+ *
+ * IMPORTANT: scheduled lessons (those with a scheduledStartAt) are deliberately
+ * excluded — their lifecycle is driven by the scheduled time via detectNoShows
+ * (at the start) and autoCompleteLessons (after the end). Keying off respondedAt
+ * here would otherwise expire a future scheduled lesson ~2 days after the coach
+ * accepted it, before it ever happened.
  */
 export async function detectConfirmationDisputes() {
-  // Find ACCEPTED lessons where respondedAt + duration + 48h < now
-  // Exclude DISPUTED lessons — those are handled by admin
+  // Find ACCEPTED instant lessons where respondedAt + duration + 48h < now.
+  // Reaching IN_PROGRESS requires both parties to join, so an instant lesson
+  // still ACCEPTED past this window means it never started -> expire and refund.
   const acceptedLessons = await prisma.lessonRequest.findMany({
     where: {
       status: "ACCEPTED",
       respondedAt: { not: null },
+      scheduledStartAt: null,
     },
     include: {
       student: { select: { username: true } },
@@ -422,7 +430,14 @@ export function getAutoCompleteAt(lesson: {
 
 /**
  * Auto-complete IN_PROGRESS lessons whose dispute window has elapsed.
- * Student silence = satisfaction: payment transfers to the coach.
+ * Student silence = satisfaction: payment transfers to the coach. There is no
+ * manual "confirm" step — once the room closes and no no-show/dispute flag was
+ * raised, the lesson proceeds to completion on its own.
+ *
+ * Handles both scheduled lessons (window measured from scheduledEndAt) and
+ * instant lessons (window measured from respondedAt + duration), gated per
+ * lesson by getAutoCompleteAt so instant lessons aren't left stuck IN_PROGRESS
+ * with the student's funds locked forever.
  */
 export async function autoCompleteLessons() {
   const now = new Date();
@@ -431,7 +446,12 @@ export async function autoCompleteLessons() {
   const lessons = await prisma.lessonRequest.findMany({
     where: {
       status: "IN_PROGRESS",
-      scheduledEndAt: { not: null, lte: cutoff },
+      OR: [
+        // Scheduled lessons: dispute window runs from the scheduled end.
+        { scheduledEndAt: { not: null, lte: cutoff } },
+        // Instant lessons: no scheduled end — gated by getAutoCompleteAt below.
+        { scheduledEndAt: null },
+      ],
     },
     include: {
       student: { select: { username: true } },
@@ -440,6 +460,12 @@ export async function autoCompleteLessons() {
   });
 
   for (const lesson of lessons) {
+    // Honour each lesson's own auto-complete moment. For scheduled lessons this
+    // matches the query's cutoff; for instant lessons it enforces
+    // respondedAt + duration + dispute window.
+    const autoAt = getAutoCompleteAt(lesson);
+    if (!autoAt || autoAt.getTime() > now.getTime()) continue;
+
     const completed = await prisma.$transaction(async (tx) => {
       // Re-check status under the implicit row state to avoid double-processing.
       const fresh = await tx.lessonRequest.findUnique({

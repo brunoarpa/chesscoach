@@ -233,6 +233,7 @@ export default async function DashboardPage() {
             completedTotal={incomingCompletedTotal}
             otherTotal={incomingOtherTotal}
             hasCompletedTrial={!!incomingHasCompletedTrial}
+            hasSchedule={weeklyTemplates.length > 0}
             hidePending
           />
         </section>

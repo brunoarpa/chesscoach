@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ReviewList } from "@/components/review-list";
-import { LessonRequestForm } from "@/components/lesson-request-form";
 import { SlotPicker } from "@/components/slot-picker";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
 import { fetchChessComRating } from "@/lib/chess-com";
@@ -168,8 +167,7 @@ export default async function ProfilePage({
     isBlocked = !!block;
   }
 
-  // Check coach lesson history: new-coach warning + paid-booking eligibility
-  let hasCompletedPaidLesson = true; // default to true so no warning shows for non-coaches
+  // Check coach lesson history: paid bookings unlock only after a completed trial.
   let hasCompletedTrial = true;      // default to true so non-coaches aren't gated
   const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachChatPrice, user.coachCallPrice);
   const isCoachProfile = !!(user.coachChatPrice || user.coachCallPrice);
@@ -191,17 +189,10 @@ export default async function ProfilePage({
   }
 
   if (isCoachProfile && effectiveAvailability === "AVAILABLE") {
-    const [paidCompleted, trialCompleted] = await Promise.all([
-      prisma.lessonRequest.findFirst({
-        where: { coachId: user.id, status: "COMPLETED", isTrial: false },
-        select: { id: true },
-      }),
-      prisma.lessonRequest.findFirst({
-        where: { coachId: user.id, status: "COMPLETED", isTrial: true },
-        select: { id: true },
-      }),
-    ]);
-    hasCompletedPaidLesson = !!paidCompleted;
+    const trialCompleted = await prisma.lessonRequest.findFirst({
+      where: { coachId: user.id, status: "COMPLETED", isTrial: true },
+      select: { id: true },
+    });
     hasCompletedTrial = !!trialCompleted;
   }
 
@@ -458,35 +449,23 @@ export default async function ProfilePage({
               </Card>
             )}
 
-          {/* Lesson booking for other profiles */}
+          {/* Lesson booking for other profiles — always slot-based. SlotPicker
+              renders its own "no slots available" empty state. */}
           {!isOwnProfile &&
             session?.user &&
             isCoachProfile &&
             effectiveAvailability === "AVAILABLE" &&
             !isBlocked && (
-              availableSlots.length > 0 ? (
-                <SlotPicker
-                  coachId={user.id}
-                  coachChatPrice={user.coachChatPrice}
-                  coachCallPrice={user.coachCallPrice}
-                  coachCommunicationPreference={user.communicationPreference}
-                  availableBalance={studentAvailableBalance ?? 0}
-                  freeTrialsRemaining={freeTrialsRemaining}
-                  slots={availableSlots}
-                  hasCompletedTrial={hasCompletedTrial}
-                />
-              ) : (
-                <LessonRequestForm
-                  coachId={user.id}
-                  coachChatPrice={user.coachChatPrice}
-                  coachCallPrice={user.coachCallPrice}
-                  coachCommunicationPreference={user.communicationPreference}
-                  availableBalance={studentAvailableBalance ?? 0}
-                  freeTrialsRemaining={freeTrialsRemaining}
-                  hasCompletedPaidLesson={hasCompletedPaidLesson}
-                  hasCompletedTrial={hasCompletedTrial}
-                />
-              )
+              <SlotPicker
+                coachId={user.id}
+                coachChatPrice={user.coachChatPrice}
+                coachCallPrice={user.coachCallPrice}
+                coachCommunicationPreference={user.communicationPreference}
+                availableBalance={studentAvailableBalance ?? 0}
+                freeTrialsRemaining={freeTrialsRemaining}
+                slots={availableSlots}
+                hasCompletedTrial={hasCompletedTrial}
+              />
             )}
           {!isOwnProfile && isBlocked && session?.user && (
             <Card>
