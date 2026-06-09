@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,27 @@ const ratingOptions = Array.from({ length: 30 }, (_, i) => (i + 1) * 100); // 10
 
 const languageOptions = LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
+const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+
+// Format a Date as the `YYYY-MM-DDTHH:mm` wall-clock string a datetime-local input expects.
+function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Round up to the next :00/:15/:30/:45 boundary so the picker aligns with bookable slots.
+// All real-world UTC offsets are multiples of 15 min, so rounding the absolute instant
+// keeps the local wall-clock value 15-min aligned too.
+function roundUpTo15(d: Date): Date {
+  return new Date(Math.ceil(d.getTime() / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS);
+}
+
+function paramToLocalInput(raw: string | null): string {
+  if (!raw) return "";
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? "" : toLocalInputValue(d);
+}
+
 interface Props {
   params: Record<string, string | undefined>;
   isLoggedIn?: boolean;
@@ -31,18 +53,72 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Booking window: next 15-min boundary through one week ahead (slots only open that far out).
+  const [bookingBounds] = useState(() => {
+    const now = new Date();
+    const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return { min: toLocalInputValue(roundUpTo15(now)), max: toLocalInputValue(weekAhead) };
+  });
+
+  const availableFromDefault = paramToLocalInput(searchParams.get("availableFrom"));
+  const availableToDefault = paramToLocalInput(searchParams.get("availableTo"));
+
   function applyFilters(formData: FormData) {
     const newParams = new URLSearchParams();
+    // The datetime-local picks are wall-clock in the student's timezone; convert to
+    // absolute UTC instants so the server can match them against stored slot times.
+    let fromIso: string | null = null;
+    let toIso: string | null = null;
     for (const [key, value] of formData.entries()) {
-      if (value && value !== "" && value !== "any") {
-        newParams.append(key, value as string);
+      if (!value || value === "" || value === "any") continue;
+      if (key === "availableFrom" || key === "availableTo") {
+        const d = new Date(value as string);
+        if (Number.isNaN(d.getTime())) continue;
+        if (key === "availableFrom") fromIso = d.toISOString();
+        else toIso = d.toISOString();
+        continue;
       }
+      newParams.append(key, value as string);
     }
+    // Keep the range valid even if the user picks the ends in reverse order.
+    if (fromIso && toIso && fromIso > toIso) {
+      [fromIso, toIso] = [toIso, fromIso];
+    }
+    if (fromIso) newParams.append("availableFrom", fromIso);
+    if (toIso) newParams.append("availableTo", toIso);
     router.push(`/search?${newParams.toString()}`);
   }
 
   return (
     <form action={applyFilters} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Available between</Label>
+        <div className="space-y-2">
+          <Input
+            type="datetime-local"
+            name="availableFrom"
+            step={900}
+            min={bookingBounds.min}
+            max={bookingBounds.max}
+            defaultValue={availableFromDefault}
+            aria-label="Available from"
+          />
+          <Input
+            type="datetime-local"
+            name="availableTo"
+            step={900}
+            min={bookingBounds.min}
+            max={bookingBounds.max}
+            defaultValue={availableToDefault}
+            aria-label="Available until"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Find coaches with an open 15-min slot in this window, shown in your timezone.
+          Leave a field blank for any time before or after. Slots open up to a week ahead.
+        </p>
+      </div>
+
       <div className="space-y-2">
         <Label>Search</Label>
         <Input

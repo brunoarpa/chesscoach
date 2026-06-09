@@ -15,6 +15,8 @@ interface SearchParams {
   communication?: string;
   status?: string;
   availability?: string;
+  availableFrom?: string;
+  availableTo?: string;
   lastSeen?: string;
   favourites?: string;
   languages?: string | string[];
@@ -91,6 +93,28 @@ export default async function SearchPage({
 
   if (params.availability && params.availability !== "all") {
     where.coachAvailability = params.availability as "AVAILABLE" | "UNAVAILABLE";
+  }
+
+  // Booking-time filter: only surface coaches who have a bookable slot starting
+  // within the requested window. availableFrom/availableTo are absolute (UTC) ISO
+  // strings produced from the student's local wall-clock picks. Either bound is
+  // optional ("any time before/after").
+  if (params.availableFrom || params.availableTo) {
+    const now = new Date();
+    const from = params.availableFrom ? new Date(params.availableFrom) : null;
+    const to = params.availableTo ? new Date(params.availableTo) : null;
+
+    const startTime: { gte: Date; lt?: Date } = {
+      // Never surface slots in the past — floor the lower bound at the current time.
+      gte: from && !Number.isNaN(from.getTime()) && from.getTime() > now.getTime() ? from : now,
+    };
+    if (to && !Number.isNaN(to.getTime())) {
+      startTime.lt = to;
+    }
+
+    where.timeSlots = {
+      some: { status: "AVAILABLE", startTime },
+    };
   }
 
   if (params.lastSeen && params.lastSeen !== "any") {

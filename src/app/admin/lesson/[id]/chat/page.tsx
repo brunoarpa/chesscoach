@@ -52,6 +52,12 @@ export default async function AdminLessonChatPage({
           Coach joined: {lesson.coachJoinedAt ? <LocalTime iso={lesson.coachJoinedAt.toISOString()} /> : "Never"} ·
           Student joined: {lesson.studentJoinedAt ? <LocalTime iso={lesson.studentJoinedAt.toISOString()} /> : "Never"}
         </p>
+        {lesson.message && (
+          <p>
+            Request message:{" "}
+            <span className="whitespace-pre-wrap">{lesson.message}</span>
+          </p>
+        )}
         {lesson.disputeReason && (
           <p className="text-destructive">Dispute reason: {lesson.disputeReason}</p>
         )}
