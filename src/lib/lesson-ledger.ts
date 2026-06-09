@@ -1,9 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { coachEarnings } from "@/lib/fees";
 
 // Minimal client shape so this works with both the base client and an
-// interactive transaction client (which lacks $transaction et al.).
-type LedgerClient = Pick<typeof prisma, "user" | "transaction" | "earningRecord">;
+// interactive transaction client. Type-only import keeps this module free of
+// the runtime DB client, so it (and its tests) never open a connection.
+type LedgerClient = Pick<Prisma.TransactionClient, "user" | "transaction" | "earningRecord">;
 
 type LedgerLesson = {
   id: string;
