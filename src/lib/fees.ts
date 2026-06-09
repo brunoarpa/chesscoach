@@ -23,3 +23,16 @@ export function platformCommission(priceCents: number): number {
 export function coachEarnings(priceCents: number): number {
   return priceCents - platformCommission(priceCents);
 }
+
+/**
+ * Payment-processing fee applied to wallet deposits and coach withdrawals, in
+ * cents: a flat amount plus a percentage of the transaction, covering the real
+ * Stripe card/transfer costs. Used by both the deposit and withdraw endpoints
+ * so the two stay in lockstep.
+ */
+export const PROCESSING_FEE_FLAT_CENTS = 40; // $0.40
+export const PROCESSING_FEE_PERCENT = 0.02; // 2%
+
+export function processingFee(amountCents: number): number {
+  return PROCESSING_FEE_FLAT_CENTS + Math.ceil(amountCents * PROCESSING_FEE_PERCENT);
+}

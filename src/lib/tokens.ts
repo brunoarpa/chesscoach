@@ -41,9 +41,12 @@ export async function consumeToken(
   if (entry.usedAt) return { error: "This link has already been used." };
   if (entry.expiresAt < new Date()) return { error: "This link has expired." };
 
-  await prisma.verificationToken.update({
-    where: { id: entry.id },
+  // Atomically claim the token: guard on usedAt:null so two requests racing on
+  // the same link can't both consume it (the second matches 0 rows).
+  const claimed = await prisma.verificationToken.updateMany({
+    where: { id: entry.id, usedAt: null },
     data: { usedAt: new Date() },
   });
+  if (claimed.count === 0) return { error: "This link has already been used." };
   return { userId: entry.userId };
 }

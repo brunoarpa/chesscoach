@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { APP_CURRENCY } from "@/lib/stripe";
+import { APP_CURRENCY, getStripe } from "@/lib/stripe";
+import { processingFee } from "@/lib/fees";
 
-const FEE_FLAT_CENTS = 40;      // $0.40
-const FEE_PERCENT = 0.02;       // 2%
 const MIN_PAYOUT_CENTS = 500;    // $5.00
-
-function calculateFee(amountCents: number): number {
-  return FEE_FLAT_CENTS + Math.ceil(amountCents * FEE_PERCENT);
-}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -36,7 +31,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many withdrawal attempts. Please try again later." }, { status: 429 });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  const stripeClient = await getStripe();
+  if (!stripeClient) {
     return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
   }
 
@@ -70,9 +66,6 @@ export async function POST(req: NextRequest) {
   }
 
   // transfers.create only requires payouts_enabled on the destination account.
-  const stripe = (await import("stripe")).default;
-  const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
-
   // Transfer in the app currency (USD). Stripe holds the available balance
   // per-currency; the platform's USD balance funds this. Coaches whose bank is in
   // another currency receive USD into their connected account and Stripe converts
@@ -84,7 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your payout account is not fully set up" }, { status: 400 });
   }
 
-  const fee = calculateFee(grossAmount);
+  const fee = processingFee(grossAmount);
   const netAmount = grossAmount - fee;
 
   if (netAmount <= 0) {

@@ -2,16 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { APP_CURRENCY } from "@/lib/stripe";
+import { APP_CURRENCY, getStripe } from "@/lib/stripe";
+import { processingFee } from "@/lib/fees";
 
-const FEE_FLAT_CENTS = 40;      // $0.40
-const FEE_PERCENT = 0.02;       // 2%
 const MIN_DEPOSIT_CENTS = 500;   // $5.00
 const MAX_DEPOSIT_CENTS = 2000;  // $20.00
-
-function calculateFee(amountCents: number): number {
-  return FEE_FLAT_CENTS + Math.ceil(amountCents * FEE_PERCENT);
-}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -51,15 +46,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Maximum deposit is $20.00" }, { status: 400 });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  const stripeClient = await getStripe();
+  if (!stripeClient) {
     return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
   }
 
-  const feeCents = calculateFee(amount);
-
-  // Create a Stripe Checkout session
-  const stripe = (await import("stripe")).default;
-  const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
+  const feeCents = processingFee(amount);
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
 

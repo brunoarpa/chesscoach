@@ -8,7 +8,7 @@ import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getEffectiveAvailability } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
-import { coachEarnings } from "@/lib/fees";
+import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
 
 const lessonRequestInputSchema = z.object({
@@ -569,17 +569,17 @@ export async function reportNoShow(requestId: string) {
           relatedUserId: request.studentId,
         },
       });
+      // Recalculate coach ELO inside the transaction so it reflects the penalty
+      // atomically (matches the auto-complete path).
+      const newElo = await calculateCoachElo(request.coachId, tx);
+      await tx.user.update({
+        where: { id: request.coachId },
+        data: { coachElo: newElo },
+      });
       return true;
     });
 
     if (!claimed) return { error: "This lesson has already been processed" };
-
-    // Recalculate coach ELO
-    const newElo = await calculateCoachElo(request.coachId);
-    await prisma.user.update({
-      where: { id: request.coachId },
-      data: { coachElo: newElo },
-    });
 
     await createNotification({
       userId: request.coachId,
@@ -606,44 +606,7 @@ export async function reportNoShow(requestId: string) {
       });
       if (flipped.count === 0) return false;
 
-      if (!request.isTrial) {
-        // Money actually leaves the student's wallet AND releases the hold.
-        await tx.user.update({
-          where: { id: request.studentId },
-          data: {
-            walletBalance: { decrement: request.estimatedCost },
-            reservedBalance: { decrement: request.estimatedCost },
-            lessonsTaken: { increment: 1 },
-          },
-        });
-        await tx.user.update({
-          where: { id: request.coachId },
-          data: {
-            pendingEarnings: { increment: coachEarnings(request.estimatedCost) },
-            totalEarningsAllTime: { increment: coachEarnings(request.estimatedCost) },
-            lessonsGiven: { increment: 1 },
-          },
-        });
-        await tx.transaction.create({
-          data: {
-            userId: request.studentId,
-            type: "LESSON_PAYMENT",
-            amount: -request.estimatedCost,
-            lessonRequestId: requestId,
-          },
-        });
-        await tx.transaction.create({
-          data: {
-            userId: request.coachId,
-            type: "LESSON_PAYMENT",
-            amount: coachEarnings(request.estimatedCost),
-            lessonRequestId: requestId,
-          },
-        });
-        await tx.earningRecord.create({
-          data: { userId: request.coachId, amount: coachEarnings(request.estimatedCost) },
-        });
-      }
+      await payCoachForLesson(tx, request);
       await tx.abuseFlag.create({
         data: {
           userId: request.studentId,
@@ -849,41 +812,40 @@ export async function blockStudent(studentId: string) {
   });
   if (existing) return { error: "Student is already blocked" };
 
-  // Block and cancel any pending requests from this student
+  // Block and decline any pending requests from this student. Each decline is
+  // guarded on the PENDING status so a request the coach accepts (or that
+  // expires) concurrently isn't double-processed: we only refund the reserved
+  // hold and release the booked slot for requests we actually flip here.
   const pendingRequests = await prisma.lessonRequest.findMany({
     where: { coachId: session.user.id, studentId, status: "PENDING" },
   });
 
-  const txOps = [
-    prisma.block.create({
+  await prisma.$transaction(async (tx) => {
+    await tx.block.create({
       data: { coachId: session.user.id, studentId },
-    }),
-    ...pendingRequests.map((r) =>
-      prisma.lessonRequest.update({
-        where: { id: r.id },
+    });
+    for (const r of pendingRequests) {
+      const declined = await tx.lessonRequest.updateMany({
+        where: { id: r.id, status: "PENDING" },
         data: { status: "DECLINED", respondedAt: new Date() },
-      })
-    ),
-    ...pendingRequests
-      .filter((r) => !r.isTrial)
-      .map((r) =>
-        prisma.user.update({
+      });
+      if (declined.count === 0) continue;
+      if (!r.isTrial) {
+        await tx.user.update({
           where: { id: studentId },
           data: { reservedBalance: { decrement: r.estimatedCost } },
-        })
-      ),
-    // Release any booked timeslots so they don't stay locked forever.
-    ...pendingRequests
-      .filter((r) => r.timeSlotId)
-      .map((r) =>
-        prisma.timeSlot.update({
-          where: { id: r.timeSlotId! },
+        });
+      }
+      // Release any booked timeslot so it doesn't stay locked forever.
+      if (r.timeSlotId) {
+        await tx.timeSlot.update({
+          where: { id: r.timeSlotId },
           data: { status: "AVAILABLE" },
-        })
-      ),
-  ];
+        });
+      }
+    }
+  });
 
-  await prisma.$transaction(txOps);
   revalidatePath("/dashboard");
   return { success: true };
 }

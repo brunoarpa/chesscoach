@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { calculateCoachElo } from "@/lib/elo";
-import { coachEarnings } from "@/lib/fees";
+import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
 
 /**
@@ -293,43 +293,7 @@ export async function detectConfirmationDisputes() {
           },
         });
         if (flipped.count === 0) return false;
-        if (!lesson.isTrial) {
-          await tx.user.update({
-            where: { id: lesson.studentId },
-            data: {
-              walletBalance: { decrement: lesson.estimatedCost },
-              reservedBalance: { decrement: lesson.estimatedCost },
-              lessonsTaken: { increment: 1 },
-            },
-          });
-          await tx.user.update({
-            where: { id: lesson.coachId },
-            data: {
-              pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
-              totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
-              lessonsGiven: { increment: 1 },
-            },
-          });
-          await tx.transaction.create({
-            data: {
-              userId: lesson.studentId,
-              type: "LESSON_PAYMENT",
-              amount: -lesson.estimatedCost,
-              lessonRequestId: lesson.id,
-            },
-          });
-          await tx.transaction.create({
-            data: {
-              userId: lesson.coachId,
-              type: "LESSON_PAYMENT",
-              amount: coachEarnings(lesson.estimatedCost),
-              lessonRequestId: lesson.id,
-            },
-          });
-          await tx.earningRecord.create({
-            data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
-          });
-        }
+        await payCoachForLesson(tx, lesson);
         return true;
       });
 
@@ -484,43 +448,7 @@ export async function autoCompleteLessons() {
         },
       });
 
-      if (!lesson.isTrial) {
-        await tx.user.update({
-          where: { id: lesson.studentId },
-          data: {
-            walletBalance: { decrement: lesson.estimatedCost },
-            reservedBalance: { decrement: lesson.estimatedCost },
-            lessonsTaken: { increment: 1 },
-          },
-        });
-        await tx.user.update({
-          where: { id: lesson.coachId },
-          data: {
-            pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
-            totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
-            lessonsGiven: { increment: 1 },
-          },
-        });
-        await tx.transaction.create({
-          data: {
-            userId: lesson.studentId,
-            type: "LESSON_PAYMENT",
-            amount: -lesson.estimatedCost,
-            lessonRequestId: lesson.id,
-          },
-        });
-        await tx.transaction.create({
-          data: {
-            userId: lesson.coachId,
-            type: "LESSON_PAYMENT",
-            amount: coachEarnings(lesson.estimatedCost),
-            lessonRequestId: lesson.id,
-          },
-        });
-        await tx.earningRecord.create({
-          data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
-        });
-      }
+      await payCoachForLesson(tx, lesson);
 
       // Free trials don't count toward playersTaught / lessonsGiven stats.
       const distinctStudents = await tx.lessonRequest.findMany({
@@ -674,15 +602,17 @@ export async function detectNoShows() {
             relatedUserId: lesson.studentId,
           },
         });
+        // Recalculate coach ELO inside the transaction so it reflects the
+        // penalty atomically (matches the auto-complete path).
+        const newElo = await calculateCoachElo(lesson.coachId, tx);
+        await tx.user.update({
+          where: { id: lesson.coachId },
+          data: { coachElo: newElo },
+        });
         return true;
       });
 
       if (claimed) {
-        const newElo = await calculateCoachElo(lesson.coachId);
-        await prisma.user.update({
-          where: { id: lesson.coachId },
-          data: { coachElo: newElo },
-        });
         await createNotification({
           userId: lesson.coachId,
           type: "COACH_NO_SHOW",
@@ -712,44 +642,7 @@ export async function detectNoShows() {
         });
         if (flipped.count === 0) return false;
 
-        if (!lesson.isTrial) {
-          // Money actually leaves the student's wallet AND releases the hold.
-          await tx.user.update({
-            where: { id: lesson.studentId },
-            data: {
-              walletBalance: { decrement: lesson.estimatedCost },
-              reservedBalance: { decrement: lesson.estimatedCost },
-              lessonsTaken: { increment: 1 },
-            },
-          });
-          await tx.user.update({
-            where: { id: lesson.coachId },
-            data: {
-              pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
-              totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
-              lessonsGiven: { increment: 1 },
-            },
-          });
-          await tx.transaction.create({
-            data: {
-              userId: lesson.studentId,
-              type: "LESSON_PAYMENT",
-              amount: -lesson.estimatedCost,
-              lessonRequestId: lesson.id,
-            },
-          });
-          await tx.transaction.create({
-            data: {
-              userId: lesson.coachId,
-              type: "LESSON_PAYMENT",
-              amount: coachEarnings(lesson.estimatedCost),
-              lessonRequestId: lesson.id,
-            },
-          });
-          await tx.earningRecord.create({
-            data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
-          });
-        }
+        await payCoachForLesson(tx, lesson);
         await tx.abuseFlag.create({
           data: {
             userId: lesson.studentId,

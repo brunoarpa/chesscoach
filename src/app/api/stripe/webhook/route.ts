@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
+import { getStripe } from "@/lib/stripe";
 
 export async function POST(request: Request) {
-  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+  const stripeClient = await getStripe();
+  if (!stripeClient || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
   }
-
-  const stripe = (await import("stripe")).default;
-  const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
 
   const body = await request.text();
   const headersList = await headers();

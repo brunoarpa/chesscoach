@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { getStripe } from "@/lib/stripe";
 
 // POST: Create or retrieve a Stripe Connect onboarding link for coaches
 export async function POST() {
@@ -15,7 +16,8 @@ export async function POST() {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  const stripeClient = await getStripe();
+  if (!stripeClient) {
     return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
   }
 
@@ -43,8 +45,6 @@ export async function POST() {
     return NextResponse.json({ error: "Set your coaching prices before setting up payouts" }, { status: 400 });
   }
 
-  const stripe = (await import("stripe")).default;
-  const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
 
   let accountId = user.stripeConnectAccountId;
@@ -92,12 +92,10 @@ export async function GET() {
     select: { stripeConnectAccountId: true },
   });
 
-  if (!user?.stripeConnectAccountId || !process.env.STRIPE_SECRET_KEY) {
+  const stripeClient = await getStripe();
+  if (!user?.stripeConnectAccountId || !stripeClient) {
     return NextResponse.json({ connected: false });
   }
-
-  const stripe = (await import("stripe")).default;
-  const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
 
   try {
     const account = await stripeClient.accounts.retrieve(user.stripeConnectAccountId);

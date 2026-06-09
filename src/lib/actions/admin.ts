@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
 import { coachEarnings } from "@/lib/fees";
+import { payCoachForLesson } from "@/lib/lesson-ledger";
 
 async function requireAdmin() {
   const session = await auth();
@@ -360,55 +361,23 @@ export async function resolveDispute(
             },
           });
           if (claim.count === 0) throw new Error("ALREADY_RESOLVED");
+          // Clear the dispute flag, plus trial stat bumps (trials don't move
+          // money, so payCoachForLesson no-ops on them and we count them here).
           await tx.user.update({
             where: { id: lesson.studentId },
             data: {
               hasActiveDispute: false,
-              ...(lesson.isTrial
-                ? { lessonsTaken: { increment: 1 } }
-                : {
-                    walletBalance: { decrement: lesson.estimatedCost },
-                    reservedBalance: { decrement: lesson.estimatedCost },
-                    lessonsTaken: { increment: 1 },
-                  }),
+              ...(lesson.isTrial ? { lessonsTaken: { increment: 1 } } : {}),
             },
           });
-          await tx.user.update({
-            where: { id: lesson.coachId },
-            data: {
-              ...(lesson.isTrial
-                ? { lessonsGiven: { increment: 1 } }
-                : {
-                    pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
-                    totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
-                    lessonsGiven: { increment: 1 },
-                  }),
-            },
-          });
-          if (!lesson.isTrial) {
-            await tx.transaction.create({
-              data: {
-                userId: lesson.studentId,
-                type: "LESSON_PAYMENT",
-                amount: -lesson.estimatedCost,
-                lessonRequestId: lessonId,
-              },
-            });
-            await tx.transaction.create({
-              data: {
-                userId: lesson.coachId,
-                type: "LESSON_PAYMENT",
-                amount: coachEarnings(lesson.estimatedCost),
-                lessonRequestId: lessonId,
-              },
-            });
-            await tx.earningRecord.create({
-              data: {
-                userId: lesson.coachId,
-                amount: coachEarnings(lesson.estimatedCost),
-              },
+          if (lesson.isTrial) {
+            await tx.user.update({
+              where: { id: lesson.coachId },
+              data: { lessonsGiven: { increment: 1 } },
             });
           }
+          // Non-trial: settle the payment exactly like a normal completion.
+          await payCoachForLesson(tx, lesson);
           await tx.auditLog.create({
             data: {
               adminId,
