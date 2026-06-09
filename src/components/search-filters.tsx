@@ -74,8 +74,11 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       if (key === "availableFrom" || key === "availableTo") {
         const d = new Date(value as string);
         if (Number.isNaN(d.getTime())) continue;
-        if (key === "availableFrom") fromIso = d.toISOString();
-        else toIso = d.toISOString();
+        // Slots always start on 15-min boundaries, so round the pick up to the
+        // next quarter-hour (16:19 -> 16:30). Users needn't enter exact multiples.
+        const iso = roundUpTo15(d).toISOString();
+        if (key === "availableFrom") fromIso = iso;
+        else toIso = iso;
         continue;
       }
       newParams.append(key, value as string);
@@ -97,7 +100,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
           <Input
             type="datetime-local"
             name="availableFrom"
-            step={900}
             min={bookingBounds.min}
             max={bookingBounds.max}
             defaultValue={availableFromDefault}
@@ -106,7 +108,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
           <Input
             type="datetime-local"
             name="availableTo"
-            step={900}
             min={bookingBounds.min}
             max={bookingBounds.max}
             defaultValue={availableToDefault}
@@ -115,7 +116,8 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           Find coaches with an open 15-min slot in this window, shown in your timezone.
-          Leave a field blank for any time before or after. Slots open up to a week ahead.
+          Times round up to the next quarter-hour. Leave a field blank for any time
+          before or after. Slots open up to a week ahead.
         </p>
       </div>
 
