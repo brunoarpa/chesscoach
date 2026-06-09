@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { calculateCoachElo } from "@/lib/elo";
 import { coachEarnings } from "@/lib/fees";
+import { createNotification } from "@/lib/notifications";
 
 /**
  * Update activity status for all users based on lastActiveAt.
@@ -103,16 +104,19 @@ export async function expirePendingRequests() {
         { acceptanceDeadline: { lt: now } },
       ],
     },
+    include: {
+      coach: { select: { username: true } },
+    },
   });
 
   for (const request of expiredRequests) {
     // Atomic PENDING -> EXPIRED transition; only refund if we actually flipped it.
-    await prisma.$transaction(async (tx) => {
-      const expired = await tx.lessonRequest.updateMany({
+    const expired = await prisma.$transaction(async (tx) => {
+      const flipped = await tx.lessonRequest.updateMany({
         where: { id: request.id, status: "PENDING" },
         data: { status: "EXPIRED" },
       });
-      if (expired.count === 0) return;
+      if (flipped.count === 0) return false;
       if (request.isTrial) {
         await tx.user.update({
           where: { id: request.studentId },
@@ -130,7 +134,18 @@ export async function expirePendingRequests() {
           data: { status: "AVAILABLE" },
         });
       }
+      return true;
     });
+
+    if (expired) {
+      await createNotification({
+        userId: request.studentId,
+        type: "LESSON_DECLINED",
+        title: "Request expired",
+        body: `${request.coach.username ?? "The coach"} didn't respond in time, so your request expired and your ${request.isTrial ? "free trial was restored" : "funds were released"}.`,
+        link: "/dashboard",
+      });
+    }
   }
 
   // Check for coach non-responsive pattern: 3+ expired in 7 days
@@ -242,11 +257,25 @@ export async function detectConfirmationDisputes() {
             relatedUserId: lesson.coachId,
           },
         });
+        await createNotification({
+          userId: lesson.studentId,
+          type: "LESSON_CANCELLED",
+          title: "Lesson expired",
+          body: `Neither you nor ${lesson.coach.username ?? "the coach"} confirmed the lesson, so it expired and your funds were returned.`,
+          link: "/dashboard",
+        });
+        await createNotification({
+          userId: lesson.coachId,
+          type: "LESSON_CANCELLED",
+          title: "Lesson expired",
+          body: `Neither you nor ${lesson.student.username ?? "the student"} confirmed the lesson, so it expired with no payment.`,
+          link: "/dashboard",
+        });
       }
     } else if (coachConfirmed && !studentConfirmed) {
       // Coach confirmed but student didn't respond within 48h — auto-complete
       // (student silence = satisfaction)
-      await prisma.$transaction(async (tx) => {
+      const completed = await prisma.$transaction(async (tx) => {
         const flipped = await tx.lessonRequest.updateMany({
           where: { id: lesson.id, status: "ACCEPTED" },
           data: {
@@ -255,7 +284,7 @@ export async function detectConfirmationDisputes() {
             completedAt: new Date(),
           },
         });
-        if (flipped.count === 0) return;
+        if (flipped.count === 0) return false;
         if (!lesson.isTrial) {
           await tx.user.update({
             where: { id: lesson.studentId },
@@ -293,7 +322,27 @@ export async function detectConfirmationDisputes() {
             data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
           });
         }
+        return true;
       });
+
+      if (completed) {
+        await createNotification({
+          userId: lesson.studentId,
+          type: "LESSON_COMPLETED",
+          title: "Lesson completed",
+          body: `You didn't confirm in time, so your lesson with ${lesson.coach.username ?? "your coach"} was auto-completed.`,
+          link: "/dashboard",
+        });
+        await createNotification({
+          userId: lesson.coachId,
+          type: "LESSON_COMPLETED",
+          title: "Lesson completed",
+          body: lesson.isTrial
+            ? `Your free trial with ${lesson.student.username ?? "the student"} was completed.`
+            : `Your lesson with ${lesson.student.username ?? "the student"} was completed and your earnings were released.`,
+          link: "/dashboard",
+        });
+      }
     } else {
       // Student confirmed but coach didn't — expire and refund
       const claimed = await prisma.$transaction(async (tx) => {
@@ -321,6 +370,20 @@ export async function detectConfirmationDisputes() {
             relatedLessonId: lesson.id,
             relatedUserId: lesson.studentId,
           },
+        });
+        await createNotification({
+          userId: lesson.studentId,
+          type: "LESSON_CANCELLED",
+          title: "Lesson expired",
+          body: `${lesson.coach.username ?? "Your coach"} didn't confirm the lesson, so it expired and your funds were returned.`,
+          link: "/dashboard",
+        });
+        await createNotification({
+          userId: lesson.coachId,
+          type: "LESSON_CANCELLED",
+          title: "Lesson expired",
+          body: `You didn't confirm the lesson with ${lesson.student.username ?? "the student"} in time, so it expired with no payment.`,
+          link: "/dashboard",
         });
       }
     }
@@ -370,16 +433,20 @@ export async function autoCompleteLessons() {
       status: "IN_PROGRESS",
       scheduledEndAt: { not: null, lte: cutoff },
     },
+    include: {
+      student: { select: { username: true } },
+      coach: { select: { username: true } },
+    },
   });
 
   for (const lesson of lessons) {
-    await prisma.$transaction(async (tx) => {
+    const completed = await prisma.$transaction(async (tx) => {
       // Re-check status under the implicit row state to avoid double-processing.
       const fresh = await tx.lessonRequest.findUnique({
         where: { id: lesson.id },
         select: { status: true },
       });
-      if (!fresh || fresh.status !== "IN_PROGRESS") return;
+      if (!fresh || fresh.status !== "IN_PROGRESS") return false;
 
       await tx.lessonRequest.update({
         where: { id: lesson.id },
@@ -445,7 +512,27 @@ export async function autoCompleteLessons() {
         where: { id: lesson.coachId },
         data: { coachElo: newElo },
       });
+      return true;
     });
+
+    if (completed) {
+      await createNotification({
+        userId: lesson.studentId,
+        type: "LESSON_COMPLETED",
+        title: "Lesson completed",
+        body: `Your lesson with ${lesson.coach.username ?? "your coach"} was completed.`,
+        link: "/dashboard",
+      });
+      await createNotification({
+        userId: lesson.coachId,
+        type: "LESSON_COMPLETED",
+        title: "Lesson completed",
+        body: lesson.isTrial
+          ? `Your free trial with ${lesson.student.username ?? "the student"} was completed.`
+          : `Your lesson with ${lesson.student.username ?? "the student"} was completed and your earnings were released.`,
+        link: "/dashboard",
+      });
+    }
   }
 }
 
@@ -475,7 +562,7 @@ export async function detectNoShows() {
   for (const lesson of lessons) {
     if (!lesson.coachJoinedAt && !lesson.studentJoinedAt) {
       // Neither joined — expire, make student whole.
-      await prisma.$transaction(async (tx) => {
+      const expired = await prisma.$transaction(async (tx) => {
         // Atomically claim the lesson. If another task (manual report, the
         // confirmation-dispute sweep, or an overlapping cron) already moved it
         // out of ACCEPTED/IN_PROGRESS, bail so we don't double-refund.
@@ -483,7 +570,7 @@ export async function detectNoShows() {
           where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
           data: { status: "EXPIRED" },
         });
-        if (flipped.count === 0) return;
+        if (flipped.count === 0) return false;
 
         if (lesson.isTrial) {
           await tx.user.update({
@@ -502,7 +589,25 @@ export async function detectNoShows() {
             data: { status: "AVAILABLE" },
           });
         }
+        return true;
       });
+
+      if (expired) {
+        await createNotification({
+          userId: lesson.studentId,
+          type: "LESSON_CANCELLED",
+          title: "Lesson expired",
+          body: `Neither you nor ${lesson.coach.username ?? "the coach"} joined the scheduled lesson, so it was cancelled and your ${lesson.isTrial ? "free trial was restored" : "funds were released"}.`,
+          link: "/dashboard",
+        });
+        await createNotification({
+          userId: lesson.coachId,
+          type: "LESSON_CANCELLED",
+          title: "Lesson expired",
+          body: `Neither you nor ${lesson.student.username ?? "the student"} joined the scheduled lesson, so it was cancelled.`,
+          link: "/dashboard",
+        });
+      }
     } else if (!lesson.coachJoinedAt) {
       // Coach didn't join — no-show. Student made whole, coach penalised.
       const claimed = await prisma.$transaction(async (tx) => {
@@ -552,10 +657,24 @@ export async function detectNoShows() {
           where: { id: lesson.coachId },
           data: { coachElo: newElo },
         });
+        await createNotification({
+          userId: lesson.coachId,
+          type: "COACH_NO_SHOW",
+          title: "No-show recorded",
+          body: `You did not join the scheduled lesson with ${lesson.student.username ?? "the student"}. They were refunded and an ELO penalty was applied.`,
+          link: "/dashboard",
+        });
+        await createNotification({
+          userId: lesson.studentId,
+          type: "COACH_NO_SHOW",
+          title: "Coach didn't join",
+          body: `${lesson.coach.username ?? "Your coach"} didn't join the scheduled lesson, so you were ${lesson.isTrial ? "given your free trial back" : "refunded"}.`,
+          link: "/dashboard",
+        });
       }
     } else if (!lesson.studentJoinedAt) {
       // Student didn't join — coach gets paid.
-      await prisma.$transaction(async (tx) => {
+      const charged = await prisma.$transaction(async (tx) => {
         const flipped = await tx.lessonRequest.updateMany({
           where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
           data: {
@@ -565,7 +684,7 @@ export async function detectNoShows() {
             studentConfirmed: true,
           },
         });
-        if (flipped.count === 0) return;
+        if (flipped.count === 0) return false;
 
         if (!lesson.isTrial) {
           // Money actually leaves the student's wallet AND releases the hold.
@@ -615,7 +734,25 @@ export async function detectNoShows() {
             relatedUserId: lesson.coachId,
           },
         });
+        return true;
       });
+
+      if (charged) {
+        await createNotification({
+          userId: lesson.studentId,
+          type: "STUDENT_NO_SHOW",
+          title: "No-show recorded",
+          body: `You didn't join the scheduled lesson with ${lesson.coach.username ?? "your coach"}, so the lesson was charged.`,
+          link: "/dashboard",
+        });
+        await createNotification({
+          userId: lesson.coachId,
+          type: "STUDENT_NO_SHOW",
+          title: "Student didn't join",
+          body: `${lesson.student.username ?? "The student"} didn't join the scheduled lesson.${lesson.isTrial ? "" : " You were paid for it."}`,
+          link: "/dashboard",
+        });
+      }
     }
   }
 }
