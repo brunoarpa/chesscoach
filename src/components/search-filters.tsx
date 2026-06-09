@@ -38,6 +38,10 @@ function roundUpTo15(d: Date): Date {
   return new Date(Math.ceil(d.getTime() / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS);
 }
 
+function roundDownTo15(d: Date): Date {
+  return new Date(Math.floor(d.getTime() / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS);
+}
+
 function paramToLocalInput(raw: string | null): string {
   if (!raw) return "";
   const d = new Date(raw);
@@ -53,11 +57,13 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Booking window: next 15-min boundary through one week ahead (slots only open that far out).
+  // Booking window: now (rounded down) through one week ahead (rounded up). Slots only
+  // open that far out. Picks earlier than the present are clamped up at submit time, so
+  // the loose lower bound never errors the user.
   const [bookingBounds] = useState(() => {
     const now = new Date();
     const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    return { min: toLocalInputValue(roundUpTo15(now)), max: toLocalInputValue(weekAhead) };
+    return { min: toLocalInputValue(roundDownTo15(now)), max: toLocalInputValue(roundUpTo15(weekAhead)) };
   });
 
   const availableFromDefault = paramToLocalInput(searchParams.get("availableFrom"));
@@ -65,6 +71,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
 
   function applyFilters(formData: FormData) {
     const newParams = new URLSearchParams();
+    const now = new Date();
     // The datetime-local picks are wall-clock in the student's timezone; convert to
     // absolute UTC instants so the server can match them against stored slot times.
     let fromIso: string | null = null;
@@ -74,9 +81,11 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       if (key === "availableFrom" || key === "availableTo") {
         const d = new Date(value as string);
         if (Number.isNaN(d.getTime())) continue;
-        // Slots always start on 15-min boundaries, so round the pick up to the
-        // next quarter-hour (16:19 -> 16:30). Users needn't enter exact multiples.
-        const iso = roundUpTo15(d).toISOString();
+        // A pick before now just means "from now"; clamp up instead of erroring.
+        // Slots always start on 15-min boundaries, so round up to the next
+        // quarter-hour (16:19 -> 16:30). Users needn't enter exact multiples.
+        const effective = d.getTime() < now.getTime() ? now : d;
+        const iso = roundUpTo15(effective).toISOString();
         if (key === "availableFrom") fromIso = iso;
         else toIso = iso;
         continue;
@@ -114,11 +123,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
             aria-label="Available until"
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          Find coaches with an open 15-min slot in this window, shown in your timezone.
-          Times round up to the next quarter-hour. Leave a field blank for any time
-          before or after. Slots open up to a week ahead.
-        </p>
       </div>
 
       <div className="space-y-2">
