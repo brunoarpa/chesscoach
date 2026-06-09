@@ -67,7 +67,7 @@ cost of shipping a bug to thousands of users is much higher than to ten.
 
 - [ ] Error tracking wired up (e.g. Sentry) for both server and client.
 - [ ] Alert on **Stripe webhook failures** and on the `CRITICAL:` console errors the withdraw route logs (failed-but-unreconciled payouts).
-- [ ] Uptime check on the homepage and on `/api/cron/daily`.
+- [ ] Uptime check pointed at **`/api/health`** (returns `{status:"ok"}`, or 503 if the DB is unreachable — alert on that).
 - [ ] A way to see logs in prod.
 
 ## 10. Functional smoke test (do this manually before launch)
@@ -93,7 +93,8 @@ Walk every critical path once, end-to-end, on the real (or staging) site:
 ---
 
 ### Automated checks currently in place
-- `npm test` — unit tests for fee math, the lesson-payment ledger invariant, and booking availability.
+- `npm test` — unit tests for fee math, the lesson-payment ledger invariant, the coach-ELO formula, and booking availability.
+- `GET /api/health` — DB-backed liveness probe for uptime monitoring.
 - `npm run lint`, `npx tsc --noEmit` — clean.
 
 These cover pure logic and the money helper, **not** the full DB-transaction flows or the UI — §10's manual walk is still required.
