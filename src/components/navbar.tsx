@@ -7,17 +7,26 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AvailabilityToggle } from "@/components/availability-toggle";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavLink } from "@/components/nav-link";
+import { NotificationBell, type NotificationItem } from "@/components/notification-bell";
+import { getNotifications } from "@/lib/actions/notifications";
 
 export async function Navbar() {
   const session = await auth();
 
   let coachAvailability: string | null = null;
+  let notifications: NotificationItem[] = [];
+  let unreadCount = 0;
   if (session?.user?.id) {
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { coachAvailability: true },
-    });
+    const [user, notifData] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { coachAvailability: true },
+      }),
+      getNotifications(),
+    ]);
     coachAvailability = user?.coachAvailability ?? null;
+    notifications = notifData.notifications;
+    unreadCount = notifData.unreadCount;
   }
 
   const username = session?.user?.username ?? null;
@@ -95,12 +104,26 @@ export async function Navbar() {
               <Button size="sm">Sign in</Button>
             </Link>
           )}
+          {session?.user?.id && (
+            <NotificationBell
+              userId={session.user.id}
+              initialNotifications={notifications}
+              initialUnreadCount={unreadCount}
+            />
+          )}
           {coachAvailability && <AvailabilityToggle initialStatus={coachAvailability} />}
           <ThemeToggle />
         </nav>
 
         {/* Mobile nav */}
         <div className="flex md:hidden items-center gap-2">
+          {session?.user?.id && (
+            <NotificationBell
+              userId={session.user.id}
+              initialNotifications={notifications}
+              initialUnreadCount={unreadCount}
+            />
+          )}
           {coachAvailability && <AvailabilityToggle initialStatus={coachAvailability} />}
           <ThemeToggle />
           <MobileNav

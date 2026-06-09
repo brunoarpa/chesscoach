@@ -125,6 +125,22 @@ export default async function SearchPage({
     { coachElo: "desc" },
   ];
 
+  // Global leaderboard ranks: a coach's rank is the count of qualifying coaches
+  // with a strictly higher coachElo, +1 (ties share a rank). Computed against the
+  // full coach pool so it matches the leaderboard regardless of the active filters.
+  const allCoachElos = await prisma.user.findMany({
+    where: {
+      isSuspended: false,
+      OR: [
+        { coachChatPrice: { not: null } },
+        { coachCallPrice: { not: null } },
+      ],
+    },
+    select: { coachElo: true },
+  });
+  const rankOf = (elo: number) =>
+    allCoachElos.filter((c) => c.coachElo > elo).length + 1;
+
   const coaches = await prisma.user.findMany({
     where,
     orderBy,
@@ -191,6 +207,7 @@ export default async function SearchPage({
                     languages={coach.languages}
                     isFavourited={favouriteCoachIds.includes(coach.id)}
                     showFavourite={!!session?.user}
+                    rank={rankOf(coach.coachElo)}
                   />
                 );
               })}

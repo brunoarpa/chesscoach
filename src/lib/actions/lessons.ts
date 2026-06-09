@@ -9,6 +9,7 @@ import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getEffectiveAvailability } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { coachEarnings } from "@/lib/fees";
+import { createNotification } from "@/lib/notifications";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
@@ -257,6 +258,16 @@ export async function createLessonRequest(formData: FormData) {
     return { error: "Booking failed. Please try again." };
   }
 
+  // Notify the coach that a student wants to book a lesson.
+  const studentName = session.user.username ?? "A student";
+  await createNotification({
+    userId: coachId,
+    type: "LESSON_REQUESTED",
+    title: "New lesson request",
+    body: `${studentName} requested a ${isTrial ? "free trial" : "15-min"} lesson.`,
+    link: "/dashboard",
+  });
+
   revalidatePath("/dashboard");
   return { success: true };
 }
@@ -298,6 +309,13 @@ export async function respondToLessonRequest(
       where: { id: session.user.id },
       data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
     });
+    await createNotification({
+      userId: request.studentId,
+      type: "LESSON_ACCEPTED",
+      title: "Lesson accepted",
+      body: `${request.coach.username ?? "Your coach"} accepted your lesson request.`,
+      link: `/lesson/${requestId}`,
+    });
   } else {
     // Decline: atomically transition status, then release reserved funds.
     // We do NOT restore the free trial count — students forfeit a trial when
@@ -334,6 +352,14 @@ export async function respondToLessonRequest(
       throw err;
     });
 
+    await createNotification({
+      userId: request.studentId,
+      type: "LESSON_DECLINED",
+      title: "Lesson declined",
+      body: `${request.coach.username ?? "The coach"} declined your lesson request.`,
+      link: "/dashboard",
+    });
+
     await checkStudentSpamPattern(request.studentId);
   }
 
@@ -355,7 +381,7 @@ export async function cancelLessonRequest(requestId: string) {
 
   // Atomic status transition + refund + slot release. If the status has already
   // changed (e.g. coach accepted concurrently), we don't refund twice.
-  await prisma.$transaction(async (tx) => {
+  const didCancel = await prisma.$transaction(async (tx) => {
     const cancelled = await tx.lessonRequest.updateMany({
       where: { id: requestId, status: "PENDING" },
       data: { status: "CANCELLED" },
@@ -375,10 +401,21 @@ export async function cancelLessonRequest(requestId: string) {
         data: { status: "AVAILABLE" },
       });
     }
+    return true;
   }).catch((err) => {
-    if (err instanceof Error && err.message === "ALREADY_PROCESSED") return;
+    if (err instanceof Error && err.message === "ALREADY_PROCESSED") return false;
     throw err;
   });
+
+  if (didCancel) {
+    await createNotification({
+      userId: request.coachId,
+      type: "LESSON_CANCELLED",
+      title: "Lesson request cancelled",
+      body: `${session.user.username ?? "A student"} cancelled their pending lesson request.`,
+      link: "/dashboard",
+    });
+  }
 
   await checkStudentSpamPattern(request.studentId);
 
@@ -433,6 +470,14 @@ export async function disputeLesson(requestId: string, reason: string) {
       },
     }),
   ]);
+
+  await createNotification({
+    userId: request.coachId,
+    type: "LESSON_DISPUTED",
+    title: "Lesson disputed",
+    body: `${request.student.username ?? "A student"} opened a dispute on a lesson. Our team will review it.`,
+    link: "/dashboard",
+  });
 
   revalidatePath("/dashboard");
   return { success: true };
@@ -534,6 +579,14 @@ export async function reportNoShow(requestId: string) {
       where: { id: request.coachId },
       data: { coachElo: newElo },
     });
+
+    await createNotification({
+      userId: request.coachId,
+      type: "COACH_NO_SHOW",
+      title: "No-show reported",
+      body: `${request.student.username ?? "A student"} reported that you did not join the scheduled lesson. They were refunded.`,
+      link: "/dashboard",
+    });
   } else {
     // Coach reporting student no-show — coach gets paid
     if (request.studentJoinedAt) {
@@ -604,6 +657,14 @@ export async function reportNoShow(requestId: string) {
     });
 
     if (!claimed) return { error: "This lesson has already been processed" };
+
+    await createNotification({
+      userId: request.studentId,
+      type: "STUDENT_NO_SHOW",
+      title: "No-show recorded",
+      body: `${request.coach.username ?? "Your coach"} reported that you did not join the scheduled lesson. The lesson was charged.`,
+      link: "/dashboard",
+    });
   }
 
   revalidatePath("/dashboard");
@@ -667,6 +728,14 @@ export async function submitReview(formData: FormData) {
     },
   });
 
+  await createNotification({
+    userId: toUserId,
+    type: "REVIEW_RECEIVED",
+    title: "New review",
+    body: `${session.user.username ?? "Someone"} left you a ${rating}★ review.`,
+    link: "/dashboard",
+  });
+
   revalidatePath("/dashboard");
   revalidatePath(`/profile`);
   return { success: true };
@@ -691,7 +760,7 @@ export async function declineAcceptedLesson(requestId: string) {
   const isCoach = request.coachId === session.user.id;
   if (!isStudent && !isCoach) return { error: "Not authorized" };
 
-  await prisma.$transaction(async (tx) => {
+  const didDecline = await prisma.$transaction(async (tx) => {
     const cancelled = await tx.lessonRequest.updateMany({
       where: { id: requestId, status: "ACCEPTED" },
       data: { status: "CANCELLED" },
@@ -715,10 +784,23 @@ export async function declineAcceptedLesson(requestId: string) {
       where: { id: session.user.id },
       data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
     });
+    return true;
   }).catch((err) => {
-    if (err instanceof Error && err.message === "ALREADY_PROCESSED") return;
+    if (err instanceof Error && err.message === "ALREADY_PROCESSED") return false;
     throw err;
   });
+
+  if (didDecline) {
+    // Notify whichever party didn't initiate the cancellation.
+    const otherUserId = isStudent ? request.coachId : request.studentId;
+    await createNotification({
+      userId: otherUserId,
+      type: "LESSON_CANCELLED",
+      title: "Scheduled lesson cancelled",
+      body: `${session.user.username ?? (isStudent ? "The student" : "The coach")} cancelled a scheduled lesson. ${request.isTrial ? "" : "Funds were released."}`.trim(),
+      link: "/dashboard",
+    });
+  }
 
   revalidatePath("/dashboard");
   return { success: true };

@@ -18,6 +18,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
   }
 
+  const pusher = getPusherServer();
+  if (!pusher) {
+    return NextResponse.json({ error: "Real-time not configured" }, { status: 503 });
+  }
+
+  // Personal notification channel — only the user themselves may subscribe.
+  const userMatch = channelName.match(/^private-user-(.+)$/);
+  if (userMatch) {
+    if (userMatch[1] !== session.user.id) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+    return NextResponse.json(pusher.authorizeChannel(socketId, channelName));
+  }
+
   // Validate private-lesson-{lessonId} channel — user must be a participant
   const lessonMatch = channelName.match(/^private-lesson-(.+)$/);
   if (!lessonMatch) {
@@ -38,10 +52,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
-  const pusher = getPusherServer();
-  if (!pusher) {
-    return NextResponse.json({ error: "Real-time not configured" }, { status: 503 });
-  }
   const authResponse = pusher.authorizeChannel(socketId, channelName);
 
   return NextResponse.json(authResponse);

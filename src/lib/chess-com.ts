@@ -15,6 +15,18 @@ interface ChessComProfile {
   username: string; // current username (may differ from stored if renamed)
 }
 
+// chess.com is an external dependency rendered inline during SSR (e.g. the
+// profile page). Cap every request so a slow/hanging response can never block a
+// page render or pile up under traffic.
+const CHESS_COM_TIMEOUT_MS = 3000;
+
+function chessComFetch(url: string) {
+  return fetch(url, {
+    next: { revalidate: 0 },
+    signal: AbortSignal.timeout(CHESS_COM_TIMEOUT_MS),
+  });
+}
+
 /**
  * Fetch a player's chess rating from chess.com.
  * Uses the maximum of rapid and blitz ratings, then falls back to bullet → daily.
@@ -23,9 +35,8 @@ export async function fetchChessComRating(
   chessComUsername: string
 ): Promise<number | null> {
   try {
-    const res = await fetch(
-      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}/stats`,
-      { next: { revalidate: 0 } }
+    const res = await chessComFetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}/stats`
     );
     if (!res.ok) return null;
 
@@ -57,9 +68,8 @@ export async function fetchChessComProfile(
   chessComUsername: string
 ): Promise<{ joined: Date } | null> {
   try {
-    const res = await fetch(
-      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`,
-      { next: { revalidate: 0 } }
+    const res = await chessComFetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`
     );
     if (!res.ok) return null;
 
@@ -79,9 +89,8 @@ export async function chessComUsernameExists(
   chessComUsername: string
 ): Promise<boolean> {
   try {
-    const res = await fetch(
-      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`,
-      { next: { revalidate: 0 } }
+    const res = await chessComFetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`
     );
     return res.ok;
   } catch {
@@ -98,9 +107,8 @@ export async function fetchChessComLocation(
   chessComUsername: string
 ): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`,
-      { next: { revalidate: 0 } }
+    const res = await chessComFetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`
     );
     if (!res.ok) return null;
 
@@ -118,9 +126,8 @@ export async function fetchChessComCurrentUsername(
   chessComUsername: string
 ): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`,
-      { next: { revalidate: 0 } }
+    const res = await chessComFetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`
     );
     if (!res.ok) return null;
 

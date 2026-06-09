@@ -8,6 +8,7 @@ import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
 import { expirePendingRequests, autoCompleteLessons } from "@/lib/activity";
+import { createNotification } from "@/lib/notifications";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -43,6 +44,20 @@ export default async function DashboardPage() {
     },
     select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true },
   });
+
+  // Let the coach know why they were flipped to Unavailable (and how to fix it).
+  if (shouldForceUnavailable) {
+    const noPrice = userCheck?.coachChatPrice === null && userCheck?.coachCallPrice === null;
+    await createNotification({
+      userId: session.user.id,
+      type: "COACH_UNAVAILABLE",
+      title: "You're now set to Unavailable",
+      body: noPrice
+        ? "Set a chat or call lesson price to start accepting students again."
+        : "You were inactive for 24h. Toggle yourself back to Available to accept students.",
+      link: "/dashboard",
+    });
+  }
 
   const isCoach = !!(currentUser.coachChatPrice || currentUser.coachCallPrice);
 

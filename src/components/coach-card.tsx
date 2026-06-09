@@ -14,7 +14,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-import { getActivityDotColor, getEffectiveAvailability } from "@/lib/utils";
+import { getActivityDotColor, getEffectiveAvailability, getRankStyle } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -47,6 +47,7 @@ interface Props {
   languages: string[];
   isFavourited?: boolean;
   showFavourite?: boolean;
+  rank?: number | null;
 }
 
 export function CoachCard(props: Props) {
@@ -63,6 +64,17 @@ export function CoachCard(props: Props) {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold">{props.username}</h3>
+                {props.rank != null && (() => {
+                  const { className, medal } = getRankStyle(props.rank);
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs font-bold tabular-nums ${className}`}
+                      title={`Ranked #${props.rank} on the coach leaderboard`}
+                    >
+                      {medal && <span aria-hidden>{medal}</span>}#{props.rank}
+                    </span>
+                  );
+                })()}
               </div>
               {props.coachElo > 0 && (
                 <Badge variant="outline" className={props.showFavourite ? "mr-6" : ""}>ELO {Math.round(props.coachElo)}</Badge>

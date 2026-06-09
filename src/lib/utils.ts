@@ -47,6 +47,29 @@ export function getEffectiveAvailability(
   return coachAvailability;
 }
 
+/**
+ * Visual styling for a coach's global leaderboard rank.
+ * - #1–3: gold / silver / bronze medal tiers
+ * - top 10: highlighted "primary" tier
+ * - otherwise: muted
+ * Shared by the leaderboard, coach cards, and profile so rank colours stay consistent.
+ */
+export function getRankStyle(rank: number): { className: string; medal: string | null } {
+  if (rank === 1) {
+    return { className: "bg-yellow-400/15 text-yellow-700 dark:text-yellow-400 border-yellow-400/50", medal: "🥇" };
+  }
+  if (rank === 2) {
+    return { className: "bg-slate-300/25 text-slate-600 dark:text-slate-300 border-slate-400/50", medal: "🥈" };
+  }
+  if (rank === 3) {
+    return { className: "bg-amber-600/15 text-amber-700 dark:text-amber-500 border-amber-600/50", medal: "🥉" };
+  }
+  if (rank <= 10) {
+    return { className: "bg-primary/10 text-primary border-primary/30", medal: null };
+  }
+  return { className: "bg-muted text-muted-foreground border-transparent", medal: null };
+}
+
 export function getActivityLabel(lastActiveAt: Date): string {
   const diffMs = Date.now() - lastActiveAt.getTime();
   const hours = diffMs / (1000 * 60 * 60);

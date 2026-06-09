@@ -2,8 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { getActivityDotColor, getEffectiveAvailability } from "@/lib/utils";
+import { getActivityDotColor, getEffectiveAvailability, getRankStyle } from "@/lib/utils";
+
+const PER_PAGE = 10;
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -17,17 +20,39 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString();
 }
 
-export default async function LeaderboardPage() {
+function RankBadge({ rank }: { rank: number }) {
+  const { className, medal } = getRankStyle(rank);
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-bold tabular-nums ${className}`}>
+      {medal && <span aria-hidden>{medal}</span>}#{rank}
+    </span>
+  );
+}
+
+export default async function LeaderboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const where = {
+    isSuspended: false,
+    OR: [
+      { coachChatPrice: { not: null } },
+      { coachCallPrice: { not: null } },
+    ],
+  };
+
+  const total = await prisma.user.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
+  const skip = (page - 1) * PER_PAGE;
+
   const coaches = await prisma.user.findMany({
-    where: {
-      isSuspended: false,
-      OR: [
-        { coachChatPrice: { not: null } },
-        { coachCallPrice: { not: null } },
-      ],
-    },
+    where,
     orderBy: { coachElo: "desc" },
-    take: 100,
+    skip,
+    take: PER_PAGE,
     select: {
       username: true,
       coachElo: true,
@@ -50,7 +75,7 @@ export default async function LeaderboardPage() {
         Rankings based on coach rating.
       </p>
 
-      {coaches.length === 0 ? (
+      {total === 0 ? (
         <p className="text-center text-muted-foreground py-12">
           No coaches on the leaderboard yet.
         </p>
@@ -59,13 +84,14 @@ export default async function LeaderboardPage() {
           {/* Mobile card layout */}
           <div className="md:hidden space-y-3">
             {coaches.map((coach, i) => {
+              const rank = skip + i + 1;
               const availability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice);
               return (
                 <Card key={coach.username}>
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-muted-foreground">#{i + 1}</span>
+                        <RankBadge rank={rank} />
                         <Link href={`/profile/${coach.username}`} className="font-medium hover:underline">
                           {coach.username}
                         </Link>
@@ -111,7 +137,7 @@ export default async function LeaderboardPage() {
           <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">Position</TableHead>
+              <TableHead className="w-20">Rank</TableHead>
               <TableHead>Coach</TableHead>
               <TableHead className="text-right">Coach Rating</TableHead>
               <TableHead className="text-right">Chess Rating</TableHead>
@@ -123,9 +149,13 @@ export default async function LeaderboardPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {coaches.map((coach, i) => (
+            {coaches.map((coach, i) => {
+              const rank = skip + i + 1;
+              return (
               <TableRow key={coach.username}>
-                <TableCell className="font-bold">{i + 1}</TableCell>
+                <TableCell>
+                  <RankBadge rank={rank} />
+                </TableCell>
                 <TableCell>
                   <Link
                     href={`/profile/${coach.username}`}
@@ -169,10 +199,34 @@ export default async function LeaderboardPage() {
                   )}
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-4">
+              {page > 1 ? (
+                <Link href={`/leaderboard?page=${page - 1}`}>
+                  <Button variant="outline" size="sm">Previous</Button>
+                </Link>
+              ) : (
+                <Button variant="outline" size="sm" disabled>Previous</Button>
+              )}
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              {page < totalPages ? (
+                <Link href={`/leaderboard?page=${page + 1}`}>
+                  <Button variant="outline" size="sm">Next</Button>
+                </Link>
+              ) : (
+                <Button variant="outline" size="sm" disabled>Next</Button>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

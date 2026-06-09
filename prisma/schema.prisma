@@ -107,6 +107,19 @@ enum VerificationTokenType {
   PASSWORD_RESET
 }
 
+enum NotificationType {
+  LESSON_REQUESTED
+  LESSON_ACCEPTED
+  LESSON_DECLINED
+  LESSON_CANCELLED
+  LESSON_DISPUTED
+  LESSON_COMPLETED
+  COACH_NO_SHOW
+  STUDENT_NO_SHOW
+  REVIEW_RECEIVED
+  COACH_UNAVAILABLE
+}
+
 model User {
   id            String   @id @default(cuid())
   username      String?  @unique
@@ -193,6 +206,7 @@ model User {
   timeSlots         TimeSlot[]
   chatMessagesSent  ChatMessage[]
   verificationTokens VerificationToken[]
+  notifications     Notification[]
 
   @@index([coachElo(sort: Desc)])
   @@index([activityStatus])
@@ -517,10 +531,29 @@ model ChatMessage {
   
   content         String
   readAt          DateTime?
-  
+
   createdAt       DateTime @default(now())
-  
+
   @@index([lessonRequestId])
   @@index([senderId])
   @@index([createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?  // in-app destination, e.g. "/dashboard" or "/lesson/{id}"
+
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt(sort: Desc)])
 }
