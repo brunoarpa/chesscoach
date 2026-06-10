@@ -3,9 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { APP_CURRENCY, getStripe } from "@/lib/stripe";
-import { processingFee } from "@/lib/fees";
-
-const MIN_PAYOUT_CENTS = 500;    // $5.00
+import { payoutFee, payoutTransferFee, PAYOUT_MONTHLY_FEE_CENTS, MIN_PAYOUT_CENTS } from "@/lib/fees";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -77,7 +75,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your payout account is not fully set up" }, { status: 400 });
   }
 
-  const fee = processingFee(grossAmount);
+  // Stripe bills its $2 monthly active-account fee once per calendar month in
+  // which the coach receives a payout; pass it through only on their first
+  // withdrawal of the month. PENDING counts (an in-flight payout will trigger
+  // it); FAILED payouts never reached Stripe, so they don't.
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const payoutThisMonth = await prisma.payout.findFirst({
+    where: {
+      coachId: session.user.id,
+      status: { in: ["PENDING", "COMPLETED"] },
+      createdAt: { gte: monthStart },
+    },
+    select: { id: true },
+  });
+  const monthlyFeeDue = !payoutThisMonth;
+
+  const fee = payoutFee(grossAmount, monthlyFeeDue);
   const netAmount = grossAmount - fee;
 
   if (netAmount <= 0) {
@@ -156,6 +171,8 @@ export async function POST(req: NextRequest) {
       success: true,
       gross: grossAmount,
       fee,
+      transferFee: payoutTransferFee(grossAmount),
+      monthlyFee: monthlyFeeDue ? PAYOUT_MONTHLY_FEE_CENTS : 0,
       net: netAmount,
     });
   } catch (error) {

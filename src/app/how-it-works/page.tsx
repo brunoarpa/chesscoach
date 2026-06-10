@@ -143,7 +143,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Coach payouts</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              When a lesson completes, earnings move to your pending balance. Withdraw any amount you like (minimum $5.00) — $0.40 + 2% fee per withdrawal.
+              When a lesson completes, earnings move to your pending balance. Withdraw whenever you have $25+ — just a $0.40 + 0.5% transfer fee, plus Stripe&apos;s $2 monthly payout fee on your first withdrawal each month. Bigger, less frequent withdrawals mean lower fees.
             </CardContent>
           </Card>
         </div>

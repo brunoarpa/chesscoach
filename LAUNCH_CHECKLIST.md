@@ -12,7 +12,7 @@ cost of shipping a bug to thousands of users is much higher than to ten.
 - [ ] **Webhook endpoint** registered in the Stripe dashboard → Developers → Webhooks, pointing at `https://<your-domain>/api/stripe/webhook`, subscribed to at least `checkout.session.completed`. Copy its signing secret into `STRIPE_WEBHOOK_SECRET`. **Test it**: trigger a real (small) deposit and confirm the wallet credits and a `Transaction` row appears.
 - [ ] **USD settlement currency added** to the platform Stripe account (Settings → Balances → add USD). The withdraw route fails with `balance_insufficient` without it — see `src/lib/stripe.ts`.
 - [ ] **Stripe Connect (Express) enabled** for the platform; a real coach can complete onboarding and reach `payouts_enabled: true`.
-- [ ] **Full payout dry-run**: one coach earns from a completed lesson, then withdraws ≥ $5.00, and the transfer lands. Confirm fees match (`processingFee` in `src/lib/fees.ts`).
+- [ ] **Full payout dry-run**: one coach earns from a completed lesson, then withdraws ≥ $25.00, and the transfer lands. Confirm fees match (`payoutFee` in `src/lib/fees.ts`: $0.40 + 0.5% transfer fee, plus the $2 Stripe monthly fee on the first withdrawal of the month).
 - [ ] **Refund/clawback path** sanity-checked: resolve one DISPUTED lesson each way in admin and confirm balances move correctly.
 - [ ] Decide and document **merchant of record / who bears chargebacks** and the **refund policy** shown to users.
 
