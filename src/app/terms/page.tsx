@@ -42,7 +42,7 @@ export default function TermsOfServicePage() {
             <li>Payments are processed by Stripe. EloChaser does not store full card details.</li>
             <li>When you book a lesson, the cost is reserved from your wallet. If the coach declines or the request expires, the reserved amount is released back automatically.</li>
             <li>Wallet deposits are non-refundable except where required by applicable law. Email <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a> for refund requests.</li>
-            <li>Coaches can withdraw any amount of their pending earnings (minimum $5.00) at any time. A fee of $0.40 + 2% applies per withdrawal.</li>
+            <li>Coaches can withdraw their pending earnings (minimum $25.00) at any time. A transfer fee of $0.40 + 0.5% applies per withdrawal. Stripe additionally charges a $2.00 monthly payout-account fee, passed through at cost on the first withdrawal of each calendar month.</li>
           </ul>
         </section>
 
