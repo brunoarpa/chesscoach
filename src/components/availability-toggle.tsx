@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { updateCoachAvailability } from "@/lib/actions/auth";
@@ -55,6 +56,12 @@ export function AvailabilityToggle({ initialStatus }: { initialStatus: string })
             )}
           </DropdownMenuItem>
         ))}
+        <DropdownMenuSeparator />
+        <p className="px-2 py-1.5 text-xs text-muted-foreground max-w-[15rem]">
+          You&apos;re set to Unavailable automatically after 24h of inactivity.
+          Open your dashboard or switch back to Available to keep receiving
+          lessons.
+        </p>
       </DropdownMenuContent>
     </DropdownMenu>
   );
