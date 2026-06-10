@@ -185,7 +185,7 @@ export function ProfileEditForm(props: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Available: accepting requests (requires a price). Unavailable: not accepting requests. You are automatically set to unavailable after 24 hours of inactivity.
+              Available: accepting requests (requires a price). Unavailable: not accepting requests. If you&apos;re away from the site for 24h+, students temporarily see you as Unavailable until you return.
             </p>
           </div>
 

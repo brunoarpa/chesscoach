@@ -73,25 +73,20 @@ export async function updateActivityStatuses() {
     data: { activityStatus: "ACTIVE" },
   });
 
-  // Auto-set coaches to UNAVAILABLE if inactive for 24+ hours.
-  // "Coach" = anyone with a price set; chess.com verification is optional.
-  await prisma.user.updateMany({
-    where: {
-      lastActiveAt: { lt: oneDayAgo },
-      coachAvailability: { not: "UNAVAILABLE" },
-      OR: [
-        { coachChatPrice: { not: null } },
-        { coachCallPrice: { not: null } },
-      ],
-    },
-    data: { coachAvailability: "UNAVAILABLE" },
-  });
+  // Note: coachAvailability is deliberately NOT touched here. The stored value
+  // is the coach's manual choice; the 24h-inactivity rule is derived at read
+  // time via getEffectiveAvailability so it self-heals when the coach returns.
 }
 
 /**
- * Expire pending lesson requests older than 3 days
+ * Expire pending lesson requests older than 3 days.
+ *
+ * When `userId` is given (inline dashboard call), only that user's requests
+ * are swept — keeps per-request work bounded instead of scanning the whole
+ * table on every dashboard view. The cron calls it without arguments for the
+ * global sweep.
  */
-export async function expirePendingRequests() {
+export async function expirePendingRequests(userId?: string) {
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
   const now = new Date();
 
@@ -99,9 +94,14 @@ export async function expirePendingRequests() {
   const expiredRequests = await prisma.lessonRequest.findMany({
     where: {
       status: "PENDING",
-      OR: [
-        { createdAt: { lt: threeDaysAgo } },
-        { acceptanceDeadline: { lt: now } },
+      AND: [
+        {
+          OR: [
+            { createdAt: { lt: threeDaysAgo } },
+            { acceptanceDeadline: { lt: now } },
+          ],
+        },
+        ...(userId ? [{ OR: [{ studentId: userId }, { coachId: userId }] }] : []),
       ],
     },
     include: {
@@ -148,8 +148,11 @@ export async function expirePendingRequests() {
     }
   }
 
-  // Check for coach non-responsive pattern: 3+ expired in 7 days
-  await detectNonResponsiveCoaches();
+  // Check for coach non-responsive pattern: 3+ expired in 7 days.
+  // Only in the global (cron) run — it aggregates over the whole table.
+  if (!userId) {
+    await detectNonResponsiveCoaches();
+  }
 }
 
 /**
@@ -402,19 +405,27 @@ export function getAutoCompleteAt(lesson: {
  * instant lessons (window measured from respondedAt + duration), gated per
  * lesson by getAutoCompleteAt so instant lessons aren't left stuck IN_PROGRESS
  * with the student's funds locked forever.
+ *
+ * When `userId` is given (inline dashboard call), only that user's lessons are
+ * swept; the cron calls it without arguments for the global sweep.
  */
-export async function autoCompleteLessons() {
+export async function autoCompleteLessons(userId?: string) {
   const now = new Date();
   const cutoff = new Date(now.getTime() - DISPUTE_WINDOW_MS);
 
   const lessons = await prisma.lessonRequest.findMany({
     where: {
       status: "IN_PROGRESS",
-      OR: [
-        // Scheduled lessons: dispute window runs from the scheduled end.
-        { scheduledEndAt: { not: null, lte: cutoff } },
-        // Instant lessons: no scheduled end — gated by getAutoCompleteAt below.
-        { scheduledEndAt: null },
+      AND: [
+        {
+          OR: [
+            // Scheduled lessons: dispute window runs from the scheduled end.
+            { scheduledEndAt: { not: null, lte: cutoff } },
+            // Instant lessons: no scheduled end — gated by getAutoCompleteAt below.
+            { scheduledEndAt: null },
+          ],
+        },
+        ...(userId ? [{ OR: [{ studentId: userId }, { coachId: userId }] }] : []),
       ],
     },
     include: {

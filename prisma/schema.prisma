@@ -209,6 +209,7 @@ model User {
   notifications     Notification[]
 
   @@index([coachElo(sort: Desc)])
+  @@index([lastActiveAt])
   @@index([activityStatus])
   @@index([verificationStatus])
   @@index([continent])

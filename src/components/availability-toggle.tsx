@@ -58,9 +58,9 @@ export function AvailabilityToggle({ initialStatus }: { initialStatus: string })
         ))}
         <DropdownMenuSeparator />
         <p className="px-2 py-1.5 text-xs text-muted-foreground max-w-[15rem]">
-          You&apos;re set to Unavailable automatically after 24h of inactivity.
-          Open your dashboard or switch back to Available to keep receiving
-          lessons.
+          If you&apos;re away from the site for 24h+, students temporarily see
+          you as Unavailable — visiting any page brings you back. Setting
+          Unavailable here keeps you hidden until you switch back yourself.
         </p>
       </DropdownMenuContent>
     </DropdownMenu>
