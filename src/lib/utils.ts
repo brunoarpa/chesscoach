@@ -30,9 +30,17 @@ export function isCoach(user: { coachChatPrice: number | null; coachCallPrice: n
   return !!(user.coachChatPrice || user.coachCallPrice);
 }
 
+// How long a coach can be away before students see them as Unavailable.
+export const AVAILABILITY_INACTIVITY_MS = 24 * 60 * 60 * 1000;
+
 /**
- * Returns the effective coach availability, overriding the stored value
- * to UNAVAILABLE if the coach hasn't been active in 24+ hours or has no price set.
+ * Returns the effective coach availability — the single source of truth for
+ * what students see and whether a coach can be booked.
+ *
+ * The stored coachAvailability is purely the coach's manual choice and is
+ * never auto-overwritten; this helper derives the rest: a coach appears
+ * UNAVAILABLE while they have no price set or have been inactive for 24+
+ * hours, and automatically appears AVAILABLE again once they return.
  */
 export function getEffectiveAvailability(
   coachAvailability: string,
@@ -42,8 +50,7 @@ export function getEffectiveAvailability(
 ): string {
   const hasPrice = (coachChatPrice != null && coachChatPrice > 0) || (coachCallPrice != null && coachCallPrice > 0);
   if (!hasPrice) return "UNAVAILABLE";
-  const hours = (Date.now() - lastActiveAt.getTime()) / (1000 * 60 * 60);
-  if (hours >= 24 && coachAvailability !== "UNAVAILABLE") return "UNAVAILABLE";
+  if (Date.now() - lastActiveAt.getTime() >= AVAILABILITY_INACTIVITY_MS) return "UNAVAILABLE";
   return coachAvailability;
 }
 

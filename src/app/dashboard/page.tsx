@@ -8,7 +8,6 @@ import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
 import { expirePendingRequests, autoCompleteLessons } from "@/lib/activity";
-import { createNotification } from "@/lib/notifications";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -17,56 +16,36 @@ export default async function DashboardPage() {
   // Redirect Google users (and anyone without a username) to set up their profile first.
   if (session.user.needsUsername) redirect("/setup-username");
 
-  // Run inline so deadlines & auto-completions are accurate, not just at 6am cron.
-  expirePendingRequests().catch(() => {});
-  autoCompleteLessons().catch(() => {});
+  // Run inline so deadlines & auto-completions are accurate, not just at 6am
+  // cron. Scoped to this user — the global sweep is the cron's job.
+  expirePendingRequests(session.user.id).catch(() => {});
+  autoCompleteLessons(session.user.id).catch(() => {});
 
-  // Check if coach needs to be forced UNAVAILABLE (inactive 24h+ or no price)
-  const userCheck = await prisma.user.findUnique({
+  const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { lastActiveAt: true, coachAvailability: true, coachChatPrice: true, coachCallPrice: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true, lastActiveAt: true },
   });
-
-  const wasInactive = userCheck
-    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
-    ? (Date.now() - userCheck.lastActiveAt.getTime()) >= 24 * 60 * 60 * 1000
-    : false;
-  const shouldForceUnavailable = userCheck
-    ? (wasInactive || (userCheck.coachChatPrice === null && userCheck.coachCallPrice === null)) && userCheck.coachAvailability !== "UNAVAILABLE"
-    : false;
-
-  const currentUser = await prisma.user.update({
-    where: { id: session.user.id },
-    data: {
-      lastActiveAt: new Date(),
-      activityStatus: "ACTIVE",
-      ...(shouldForceUnavailable ? { coachAvailability: "UNAVAILABLE" } : {}),
-    },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true },
-  });
-
-  // Let the coach know why they were flipped to Unavailable (and how to fix it).
-  if (shouldForceUnavailable) {
-    const noPrice = userCheck?.coachChatPrice === null && userCheck?.coachCallPrice === null;
-    await createNotification({
-      userId: session.user.id,
-      type: "COACH_UNAVAILABLE",
-      title: "You're now set to Unavailable",
-      body: noPrice
-        ? "Set a chat or call lesson price to start accepting students again."
-        : "You were inactive for 24h. Toggle yourself back to Available to accept students.",
-      link: "/dashboard",
-    });
-  }
+  if (!currentUser) redirect("/login");
 
   const isCoach = !!(currentUser.coachChatPrice || currentUser.coachCallPrice);
 
-  if (isCoach) {
-    const newElo = await calculateCoachElo(session.user.id);
+  // Refresh activity + coach ELO at most once a minute — the dashboard
+  // auto-refreshes, so unthrottled writes here multiply with user count.
+  // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
+  const activityStale = Date.now() - currentUser.lastActiveAt.getTime() > 60 * 1000;
+  if (activityStale) {
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { coachElo: newElo },
+      data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
     });
+    if (isCoach) {
+      // After the activity refresh, so the ELO activity bonus sees it.
+      const newElo = await calculateCoachElo(session.user.id);
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { coachElo: newElo },
+      });
+    }
   }
 
   const ACTIVE_STATUSES = ["PENDING", "ACCEPTED", "IN_PROGRESS", "DISPUTED"] as const;

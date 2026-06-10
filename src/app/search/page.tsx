@@ -4,6 +4,7 @@ import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
 import { auth } from "@/lib/auth";
 import { filterValidLanguages } from "@/lib/languages";
+import { AVAILABILITY_INACTIVITY_MS } from "@/lib/utils";
 
 interface SearchParams {
   q?: string;
@@ -92,7 +93,24 @@ export default async function SearchPage({
   }
 
   if (params.availability && params.availability !== "all") {
-    where.coachAvailability = params.availability as "AVAILABLE" | "UNAVAILABLE";
+    // Mirror getEffectiveAvailability in SQL: a coach only counts as AVAILABLE
+    // if they also were active within the last 24h. Otherwise the filter would
+    // return coaches whose cards then render "Unavailable".
+     
+    const activityCutoff = new Date(Date.now() - AVAILABILITY_INACTIVITY_MS);
+    const availabilityClause: Prisma.UserWhereInput =
+      params.availability === "AVAILABLE"
+        ? { coachAvailability: "AVAILABLE", lastActiveAt: { gte: activityCutoff } }
+        : {
+            OR: [
+              { coachAvailability: "UNAVAILABLE" },
+              { lastActiveAt: { lt: activityCutoff } },
+            ],
+          };
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      availabilityClause,
+    ];
   }
 
   // Booking-time filter: only surface coaches who have a bookable slot starting
@@ -118,7 +136,7 @@ export default async function SearchPage({
   }
 
   if (params.lastSeen && params.lastSeen !== "any") {
-    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
+     
     const now = Date.now();
     const thresholds: Record<string, number> = {
       online: 5 * 60 * 1000,
@@ -149,22 +167,6 @@ export default async function SearchPage({
     { coachElo: "desc" },
   ];
 
-  // Global leaderboard ranks: a coach's rank is the count of qualifying coaches
-  // with a strictly higher coachElo, +1 (ties share a rank). Computed against the
-  // full coach pool so it matches the leaderboard regardless of the active filters.
-  const allCoachElos = await prisma.user.findMany({
-    where: {
-      isSuspended: false,
-      OR: [
-        { coachChatPrice: { not: null } },
-        { coachCallPrice: { not: null } },
-      ],
-    },
-    select: { coachElo: true },
-  });
-  const rankOf = (elo: number) =>
-    allCoachElos.filter((c) => c.coachElo > elo).length + 1;
-
   const coaches = await prisma.user.findMany({
     where,
     orderBy,
@@ -184,9 +186,38 @@ export default async function SearchPage({
       lessonsGiven: true,
       bio: true,
       languages: true,
-      reviewsReceived: { select: { rating: true } },
     },
   });
+
+  const coachIds = coaches.map((c) => c.id);
+
+  // Global leaderboard ranks (ties share a rank, like the leaderboard page) and
+  // review aggregates — both computed in the database for just the 50 shown
+  // coaches, instead of shipping every coach row / review row to the app.
+  const [rankRows, reviewStats] = coachIds.length
+    ? await Promise.all([
+        prisma.$queryRaw<{ id: string; rank: bigint }[]>`
+          SELECT id, rank FROM (
+            SELECT id, RANK() OVER (ORDER BY "coachElo" DESC) AS rank
+            FROM "User"
+            WHERE "isSuspended" = false
+              AND ("coachChatPrice" IS NOT NULL OR "coachCallPrice" IS NOT NULL)
+          ) ranked
+          WHERE id IN (${Prisma.join(coachIds)})
+        `,
+        prisma.review.groupBy({
+          by: ["toUserId"],
+          where: { toUserId: { in: coachIds } },
+          _avg: { rating: true },
+          _count: { rating: true },
+        }),
+      ])
+    : [[], []];
+
+  const rankById = new Map(rankRows.map((r) => [r.id, Number(r.rank)]));
+  const reviewsById = new Map(
+    reviewStats.map((r) => [r.toUserId, { avg: r._avg.rating, count: r._count.rating }]),
+  );
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -205,11 +236,7 @@ export default async function SearchPage({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {coaches.map((coach) => {
-                const avgRating =
-                  coach.reviewsReceived.length > 0
-                    ? coach.reviewsReceived.reduce((s: number, r: { rating: number }) => s + r.rating, 0) /
-                      coach.reviewsReceived.length
-                    : null;
+                const reviews = reviewsById.get(coach.id);
                 return (
                   <CoachCard
                     key={coach.id}
@@ -224,14 +251,14 @@ export default async function SearchPage({
                     activityStatus={coach.activityStatus}
                     coachAvailability={coach.coachAvailability}
                     lastActiveAt={coach.lastActiveAt}
-                    avgRating={avgRating}
-                    reviewCount={coach.reviewsReceived.length}
+                    avgRating={reviews?.avg ?? null}
+                    reviewCount={reviews?.count ?? 0}
                     lessonsGiven={coach.lessonsGiven}
                     bio={coach.bio}
                     languages={coach.languages}
                     isFavourited={favouriteCoachIds.includes(coach.id)}
                     showFavourite={!!session?.user}
-                    rank={rankOf(coach.coachElo)}
+                    rank={rankById.get(coach.id) ?? 0}
                   />
                 );
               })}

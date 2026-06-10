@@ -82,7 +82,7 @@ export async function updateProfile(formData: FormData) {
   // Validate and handle username change
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { username: true },
+    select: { username: true, coachAvailability: true },
   });
   let newUsername = currentUser?.username ?? null;
   if (raw.username && raw.username !== currentUser?.username) {
@@ -105,7 +105,13 @@ export async function updateProfile(formData: FormData) {
   const hasPrice = chatPriceInCents !== null || callPriceInCents !== null;
   const hasLanguages = raw.languages.length > 0;
 
-  if (availability === "AVAILABLE") {
+  // Only enforce coach requirements when the user is actually switching to
+  // AVAILABLE. Every account stores AVAILABLE by default (it's meaningless
+  // without a price — students never see you as bookable), so blocking the
+  // whole profile save for non-coaches would lock them out of editing.
+  const switchingToAvailable =
+    availability === "AVAILABLE" && currentUser?.coachAvailability !== "AVAILABLE";
+  if (switchingToAvailable) {
     if (!hasPrice && !hasLanguages) {
       return { error: "To be available as a coach, set a chat or call price and select at least one language you teach in." };
     }

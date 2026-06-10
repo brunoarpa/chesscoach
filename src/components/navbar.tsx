@@ -20,13 +20,26 @@ export async function Navbar() {
     const [user, notifData] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { coachAvailability: true },
+        select: { coachAvailability: true, coachChatPrice: true, coachCallPrice: true, lastActiveAt: true },
       }),
       getNotifications(),
     ]);
-    coachAvailability = user?.coachAvailability ?? null;
+    // The availability toggle only means something for coaches (price set).
+    const isCoach = !!(user?.coachChatPrice || user?.coachCallPrice);
+    coachAvailability = isCoach ? (user?.coachAvailability ?? null) : null;
     notifications = notifData.notifications;
     unreadCount = notifData.unreadCount;
+
+    // Touch lastActiveAt on any page view, throttled to one write per 5 min.
+    // This keeps effective availability and activity dots honest for users who
+    // browse without opening the dashboard.
+    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
+    if (user && Date.now() - user.lastActiveAt.getTime() > 5 * 60 * 1000) {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+      });
+    }
   }
 
   const username = session?.user?.username ?? null;

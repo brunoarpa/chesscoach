@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const REFRESH_INTERVAL_MS = 10_000; // 10 seconds
+// Each refresh re-runs the whole dashboard page on the server, so this
+// interval is a direct multiplier on database load per parked user.
+const REFRESH_INTERVAL_MS = 30_000; // 30 seconds
 
 export function AutoRefresh() {
   const router = useRouter();

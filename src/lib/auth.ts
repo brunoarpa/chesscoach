@@ -115,20 +115,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return false;
       }
 
-      // Update activity
-      const wasInactive = (Date.now() - dbUser.lastActiveAt.getTime()) >= 24 * 60 * 60 * 1000;
-      const hasPrice = dbUser.coachChatPrice !== null || dbUser.coachCallPrice !== null;
-      const shouldForceUnavailable =
-        (wasInactive || !hasPrice) &&
-        dbUser.coachAvailability !== "UNAVAILABLE";
-
+      // Update activity. coachAvailability stays untouched — the 24h rule is
+      // derived at read time (getEffectiveAvailability), so signing back in
+      // is what makes a coach appear Available again.
       await prisma.user.update({
         where: { id: dbUser.id },
         data: {
           lastActiveAt: new Date(),
           activityStatus: "ACTIVE",
           image: user.image ?? dbUser.image,
-          ...(shouldForceUnavailable ? { coachAvailability: "UNAVAILABLE" } : {}),
         },
       });
 
