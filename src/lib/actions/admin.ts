@@ -361,22 +361,12 @@ export async function resolveDispute(
             },
           });
           if (claim.count === 0) throw new Error("ALREADY_RESOLVED");
-          // Clear the dispute flag, plus trial stat bumps (trials don't move
-          // money, so payCoachForLesson no-ops on them and we count them here).
           await tx.user.update({
             where: { id: lesson.studentId },
-            data: {
-              hasActiveDispute: false,
-              ...(lesson.isTrial ? { lessonsTaken: { increment: 1 } } : {}),
-            },
+            data: { hasActiveDispute: false },
           });
-          if (lesson.isTrial) {
-            await tx.user.update({
-              where: { id: lesson.coachId },
-              data: { lessonsGiven: { increment: 1 } },
-            });
-          }
-          // Non-trial: settle the payment exactly like a normal completion.
+          // Settle exactly like a normal completion. payCoachForLesson also
+          // owns the trial path (stat bumps, $0 earning record, no money).
           await payCoachForLesson(tx, lesson);
           await tx.auditLog.create({
             data: {

@@ -93,12 +93,40 @@ describe("payCoachForLesson — paid lesson", () => {
 });
 
 describe("payCoachForLesson — free trial", () => {
-  it("moves no money at all", async () => {
+  it("moves no money: no balance changes, no ledger rows", async () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), { ...paidLesson, isTrial: true });
 
-    expect(tx.user.update).not.toHaveBeenCalled();
     expect(tx.transaction.create).not.toHaveBeenCalled();
-    expect(tx.earningRecord.create).not.toHaveBeenCalled();
+    for (const call of tx.user.update.mock.calls) {
+      const data = call[0].data as Record<string, unknown>;
+      expect(data).not.toHaveProperty("walletBalance");
+      expect(data).not.toHaveProperty("reservedBalance");
+      expect(data).not.toHaveProperty("pendingEarnings");
+      expect(data).not.toHaveProperty("totalEarningsAllTime");
+    }
+  });
+
+  it("still counts as a lesson for both parties' stats", async () => {
+    const tx = makeFakeTx();
+    await payCoachForLesson(asLedger(tx), { ...paidLesson, isTrial: true });
+
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: "student_1" },
+      data: { lessonsTaken: { increment: 1 } },
+    });
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: "coach_1" },
+      data: { lessonsGiven: { increment: 1 } },
+    });
+  });
+
+  it("writes a $0 earning record so the coach's ELO recency bonus refreshes", async () => {
+    const tx = makeFakeTx();
+    await payCoachForLesson(asLedger(tx), { ...paidLesson, isTrial: true });
+
+    expect(tx.earningRecord.create).toHaveBeenCalledWith({
+      data: { userId: "coach_1", amount: 0 },
+    });
   });
 });

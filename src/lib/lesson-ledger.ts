@@ -24,15 +24,32 @@ type LedgerLesson = {
  * copies. The caller still owns the lesson status transition and any
  * stat/ELO recomputation.
  *
- * No-op for free trials, which never move money. Must be called inside a
- * transaction so the student debit, coach credit, and ledger writes commit
- * atomically.
+ * Free trials never move money, but (for now — growth phase, revisit once the
+ * user base is bigger) they DO count as real lessons: both parties' lesson
+ * stats increment and the coach gets a $0 EarningRecord, which refreshes the
+ * ELO earning-recency bonus without inflating lifetime earnings.
+ *
+ * Must be called inside a transaction so the student debit, coach credit, and
+ * ledger writes commit atomically.
  */
 export async function payCoachForLesson(
   tx: LedgerClient,
   lesson: LedgerLesson,
 ): Promise<void> {
-  if (lesson.isTrial) return;
+  if (lesson.isTrial) {
+    await tx.user.update({
+      where: { id: lesson.studentId },
+      data: { lessonsTaken: { increment: 1 } },
+    });
+    await tx.user.update({
+      where: { id: lesson.coachId },
+      data: { lessonsGiven: { increment: 1 } },
+    });
+    await tx.earningRecord.create({
+      data: { userId: lesson.coachId, amount: 0 },
+    });
+    return;
+  }
 
   const earnings = coachEarnings(lesson.estimatedCost);
 
