@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getEffectiveAvailability } from "@/lib/utils";
+import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
@@ -155,9 +155,10 @@ export async function createLessonRequest(formData: FormData) {
     if (slot.status !== "AVAILABLE") return { error: "This slot is no longer available" };
 
     const now = new Date();
-    // Slot must be in the future
-    if (slot.startTime.getTime() <= now.getTime()) {
-      return { error: "This slot has already started" };
+    // Slot must start far enough out that the coach has a real window to
+    // accept before the acceptance cutoff (start − 15 min).
+    if (slot.startTime.getTime() < now.getTime() + MIN_BOOKING_LEAD_MS) {
+      return { error: "This slot starts too soon. Pick one at least 30 minutes from now so the coach has time to accept." };
     }
     // Max 1 week ahead
     const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
@@ -165,10 +166,11 @@ export async function createLessonRequest(formData: FormData) {
       return { error: "You can only book slots up to 1 week in advance" };
     }
 
-    // Coach must accept before the lesson starts (and within 24h max)
+    // Coach must accept within 24h, and no later than 15 min before the start
+    // so the student always has notice before a lesson can become real.
     const deadline = new Date(Math.min(
       now.getTime() + 24 * 60 * 60 * 1000,
-      slot.startTime.getTime()
+      slot.startTime.getTime() - MIN_ACCEPT_NOTICE_MS
     ));
 
     slotData = {
@@ -300,6 +302,53 @@ export async function respondToLessonRequest(
   }
 
   if (action === "accept") {
+    // Too late to accept: past the deadline, or inside the 15-min notice
+    // window before the start. Don't leave the request dangling PENDING until
+    // a sweep finds it — expire it right here (refund/trial restore, slot
+    // freed, student notified), exactly like the cron would.
+    const nowMs = Date.now();
+    const tooLate =
+      (request.acceptanceDeadline && new Date(request.acceptanceDeadline).getTime() < nowMs) ||
+      (request.scheduledStartAt && new Date(request.scheduledStartAt).getTime() - nowMs < MIN_ACCEPT_NOTICE_MS);
+    if (tooLate) {
+      const expired = await prisma.$transaction(async (tx) => {
+        const flipped = await tx.lessonRequest.updateMany({
+          where: { id: requestId, status: "PENDING" },
+          data: { status: "EXPIRED" },
+        });
+        if (flipped.count === 0) return false;
+        if (request.isTrial) {
+          await tx.user.update({
+            where: { id: request.studentId },
+            data: { freeTrialsRemaining: { increment: 1 } },
+          });
+        } else {
+          await tx.user.update({
+            where: { id: request.studentId },
+            data: { reservedBalance: { decrement: request.estimatedCost } },
+          });
+        }
+        if (request.timeSlotId) {
+          await tx.timeSlot.update({
+            where: { id: request.timeSlotId },
+            data: { status: "AVAILABLE" },
+          });
+        }
+        return true;
+      });
+      if (expired) {
+        await createNotification({
+          userId: request.studentId,
+          type: "LESSON_DECLINED",
+          title: "Request expired",
+          body: `${request.coach.username ?? "The coach"} didn't respond in time, so your request expired and your ${request.isTrial ? "free trial was restored" : "funds were released"}.`,
+          link: "/dashboard",
+        });
+      }
+      revalidatePath("/dashboard");
+      return { error: "Too late to accept — lessons must be accepted at least 15 minutes before they start. The request has expired and the student got their money back." };
+    }
+
     // Atomically transition PENDING -> ACCEPTED so concurrent clicks can't double-accept.
     const accepted = await prisma.lessonRequest.updateMany({
       where: { id: requestId, status: "PENDING" },
