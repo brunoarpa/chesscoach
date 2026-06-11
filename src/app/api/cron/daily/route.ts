@@ -28,6 +28,15 @@ export async function GET(request: Request) {
     autoCompleteLessons(),
     purgeExpiredLessonData(),
     prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
+    // Housekeeping: spent/expired auth tokens are dead weight (consumeToken
+    // treats missing rows as invalid), and notifications older than 90 days
+    // are long past their usefulness.
+    prisma.verificationToken.deleteMany({
+      where: { OR: [{ expiresAt: { lt: new Date() } }, { usedAt: { not: null } }] },
+    }),
+    prisma.notification.deleteMany({
+      where: { createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
+    }),
   ]);
 
   let slotTasks: PromiseSettledResult<unknown>[] = [];

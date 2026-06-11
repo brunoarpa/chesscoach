@@ -82,7 +82,7 @@ export async function updateProfile(formData: FormData) {
   // Validate and handle username change
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { username: true, coachAvailability: true },
+    select: { username: true, coachAvailability: true, coachChatPrice: true, coachCallPrice: true },
   });
   let newUsername = currentUser?.username ?? null;
   if (raw.username && raw.username !== currentUser?.username) {
@@ -140,6 +140,22 @@ export async function updateProfile(formData: FormData) {
     },
   });
 
+  // Onboarding hand-off: someone who just set their first coaching price has
+  // become bookable in principle, but students can only book concrete time
+  // slots — so send them straight to the schedule editor instead of their
+  // profile. Only fires on the no-price -> price transition with no weekly
+  // template yet, so ordinary profile edits keep the normal redirect.
+  const wasCoach = !!(currentUser?.coachChatPrice || currentUser?.coachCallPrice);
+  const isNowCoach = !!(chatPriceInCents || callPriceInCents);
+  if (!wasCoach && isNowCoach) {
+    const templateCount = await prisma.timeSlotTemplate.count({
+      where: { coachId: session.user.id },
+    });
+    if (templateCount === 0) {
+      redirect("/dashboard?setup=schedule");
+    }
+  }
+
   if (newUsername) {
     redirect("/profile/" + newUsername);
   }
@@ -191,7 +207,9 @@ export async function submitChessComUsername(formData: FormData) {
     return { error: "Your account is already verified" };
   }
 
-  const chessComUsername = formData.get("chessComUsername") as string;
+  // chess.com usernames are case-insensitive — store lowercase so the same
+  // account can't be linked to two users under different casings.
+  const chessComUsername = (formData.get("chessComUsername") as string)?.trim().toLowerCase();
   if (!chessComUsername) return { error: "Chess.com username is required" };
 
   const exists = await chessComUsernameExists(chessComUsername);

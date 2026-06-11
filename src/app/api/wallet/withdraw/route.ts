@@ -24,11 +24,6 @@ export async function POST(req: NextRequest) {
     // ignore parse errors — fall back to full balance
   }
 
-  const { success: rlSuccess } = await rateLimit(`withdraw:${session.user.id}`, { maxAttempts: 3, windowMs: 15 * 60 * 1000 });
-  if (!rlSuccess) {
-    return NextResponse.json({ error: "Too many withdrawal attempts. Please try again later." }, { status: 429 });
-  }
-
   const stripeClient = await getStripe();
   if (!stripeClient) {
     return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
@@ -39,11 +34,22 @@ export async function POST(req: NextRequest) {
     select: {
       pendingEarnings: true,
       stripeConnectAccountId: true,
+      isSuspended: true,
     },
   });
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  // Suspension freezes the account's money movement in BOTH directions while
+  // under review — otherwise a flagged coach could drain disputed earnings to
+  // their bank before an admin rules on the dispute.
+  if (user.isSuspended) {
+    return NextResponse.json(
+      { error: "Your account is under review. Withdrawals are paused — contact support at support@elochaser.com" },
+      { status: 403 }
+    );
   }
 
   if (!user.stripeConnectAccountId) {
@@ -61,6 +67,13 @@ export async function POST(req: NextRequest) {
   }
   if (grossAmount < MIN_PAYOUT_CENTS) {
     return NextResponse.json({ error: `Minimum withdrawal is $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
+  }
+
+  // Rate-limit only requests that passed validation, so a typo'd amount or an
+  // unfinished payout setup doesn't burn the small attempt budget.
+  const { success: rlSuccess } = await rateLimit(`withdraw:${session.user.id}`, { maxAttempts: 3, windowMs: 15 * 60 * 1000 });
+  if (!rlSuccess) {
+    return NextResponse.json({ error: "Too many withdrawal attempts. Please try again later." }, { status: 429 });
   }
 
   // transfers.create only requires payouts_enabled on the destination account.

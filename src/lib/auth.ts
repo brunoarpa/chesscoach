@@ -3,12 +3,21 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit";
 
 class InvalidCredentials extends CredentialsSignin {
   code = "invalid_credentials";
 }
 class EmailNotVerified extends CredentialsSignin {
   code = "email_not_verified";
+}
+class TooManyAttempts extends CredentialsSignin {
+  code = "too_many_attempts";
+}
+
+/** Banned = rejected verification + deactivated. Mirrors the signIn() block. */
+function isBanned(user: { verificationStatus: string; activityStatus: string }): boolean {
+  return user.verificationStatus === "REJECTED" && user.activityStatus === "INACTIVE";
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -27,6 +36,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = typeof credentials?.password === "string" ? credentials.password : "";
         if (!email || !password) throw new InvalidCredentials();
 
+        // Throttle password guessing per email. A successful login clears the
+        // bucket below, so only sustained failures lock the account out.
+        const { success: rlOk } = await rateLimit(`login:${email}`, {
+          maxAttempts: 10,
+          windowMs: 15 * 60 * 1000,
+        });
+        if (!rlOk) throw new TooManyAttempts();
+
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.passwordHash) throw new InvalidCredentials();
 
@@ -35,6 +52,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!user.emailVerified) throw new EmailNotVerified();
 
+        await resetRateLimit(`login:${email}`);
         return { id: user.id, email: user.email, image: user.image };
       },
     }),
@@ -48,9 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user.id) return false;
         const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
         if (!dbUser) return false;
-        if (dbUser.verificationStatus === "REJECTED" && dbUser.activityStatus === "INACTIVE") {
-          return false;
-        }
+        if (isBanned(dbUser)) return false;
         await prisma.user.update({
           where: { id: dbUser.id },
           data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
@@ -116,9 +132,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       });
 
       // Block banned users
-      if (dbUser.verificationStatus === "REJECTED" && dbUser.activityStatus === "INACTIVE") {
-        return false;
-      }
+      if (isBanned(dbUser)) return false;
 
       // Update activity. coachAvailability stays untouched — the 24h rule is
       // derived at read time (getEffectiveAvailability), so signing back in
@@ -166,9 +180,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             username: true,
             role: true,
             verificationStatus: true,
+            activityStatus: true,
           },
         });
-        if (dbUser) {
+        // A ban must also kill existing sessions, not just new sign-ins: leave
+        // the session unpopulated (no user id) so every auth check treats the
+        // bearer as logged out for the remainder of their JWT's lifetime.
+        if (dbUser && !isBanned(dbUser)) {
           session.user.id = dbUser.id;
           (session.user as unknown as Record<string, unknown>).username = dbUser.username;
           (session.user as unknown as Record<string, unknown>).role = dbUser.role;

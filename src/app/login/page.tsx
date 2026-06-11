@@ -17,6 +17,7 @@ function errorMessage(code: string | undefined): string | null {
   if (!code) return null;
   if (code === "email_not_verified") return "Please verify your email before signing in. Check your inbox.";
   if (code === "invalid_credentials") return "Incorrect email or password.";
+  if (code === "too_many_attempts") return "Too many sign-in attempts. Please wait 15 minutes and try again.";
   return "Could not sign in. Please try again.";
 }
 
