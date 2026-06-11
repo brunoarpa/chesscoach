@@ -33,39 +33,25 @@ export async function signUpWithPassword(formData: FormData) {
   });
   if (!rlOk) return { error: "Too many attempts. Try again later." };
 
-  const passwordHash = await bcrypt.hash(password, 10);
-
+  // Never let signup touch an existing account. Setting a password on an
+  // account that's already email-verified (e.g. a Google sign-in) would hand
+  // login to whoever submitted this form — an account-takeover vector. An
+  // existing user who wants to add or change a password must prove they own
+  // the inbox via "Forgot password", which sets the password through a token.
   const existing = await prisma.user.findUnique({ where: { email } });
-
-  let userId: string;
-  let alreadyVerified = false;
   if (existing) {
-    if (existing.passwordHash && existing.emailVerified) {
-      // Verified account already exists with a password. Don't leak that
-      // and don't allow overwriting the password from an anonymous form.
-      return { success: true };
-    }
-    // Either no password yet (Google-only link) OR password but never verified.
-    // In both cases it's safe to set the password and (re)send verification —
-    // the real owner is the only one who can act on the email.
-    userId = existing.id;
-    alreadyVerified = !!existing.emailVerified;
-    await prisma.user.update({
-      where: { id: existing.id },
-      data: { passwordHash },
-    });
-  } else {
-    const created = await prisma.user.create({
-      data: { email, passwordHash },
-    });
-    userId = created.id;
+    return {
+      error:
+        "An account with this email already exists. Try signing in, or use “Forgot password” to set a new password.",
+    };
   }
 
-  if (alreadyVerified) {
-    return { success: true, alreadyVerified: true };
-  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  const created = await prisma.user.create({
+    data: { email, passwordHash },
+  });
 
-  const token = await createToken(userId, "EMAIL_VERIFICATION");
+  const token = await createToken(created.id, "EMAIL_VERIFICATION");
   try {
     await sendVerificationEmail(email, token);
   } catch (err) {

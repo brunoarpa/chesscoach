@@ -76,10 +76,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         });
       } else if (!dbUser.emailVerified) {
-        // Existing password account being linked via Google — mark verified.
+        // Existing account was never email-verified, so any passwordHash on it
+        // was set by someone who never proved they own this inbox (e.g. an
+        // attacker who signed up with this email before the real owner). Google
+        // proves ownership for THIS sign-in, but we must not retroactively bless
+        // that unverified password — clear it. The owner can set a fresh one via
+        // "Forgot password", which is gated on the email.
         await prisma.user.update({
           where: { id: dbUser.id },
-          data: { emailVerified: new Date() },
+          data: { emailVerified: new Date(), passwordHash: null },
         });
       }
 
