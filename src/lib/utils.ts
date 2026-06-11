@@ -42,6 +42,12 @@ export const AVAILABILITY_INACTIVITY_MS = 24 * 60 * 60 * 1000;
 export const MIN_BOOKING_LEAD_MS = 30 * 60 * 1000;
 export const MIN_ACCEPT_NOTICE_MS = 15 * 60 * 1000;
 
+// ELO penalty a coach takes for not joining a scheduled lesson. Single source
+// of truth: applied by the no-show sweep and the student's manual report, and
+// reversed by the admin dispute override — all three must move by the same
+// amount or penalties drift.
+export const NO_SHOW_ELO_PENALTY = 150;
+
 /**
  * Returns the effective coach availability — the single source of truth for
  * what students see and whether a coach can be booked.

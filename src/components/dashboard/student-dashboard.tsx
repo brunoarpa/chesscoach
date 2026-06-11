@@ -376,7 +376,9 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             {request.scheduledStartAt && !started && (
               <p className="text-xs text-muted-foreground mt-1.5">
                 ⏰ Set a reminder — missing the lesson counts as a no-show and{" "}
-                {request.isTrial ? "uses up your free trial" : "is still charged in full"}.
+                {request.isTrial
+                  ? "forfeits all your remaining free trials"
+                  : "is still charged in full"}.
               </p>
             )}
             {roomClosed && (

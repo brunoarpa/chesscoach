@@ -93,7 +93,7 @@ export default async function HowItWorksPage() {
               <strong>If the coach doesn&apos;t show up:</strong> the lesson is cancelled and the student is fully refunded. The coach receives an ELO penalty.
             </p>
             <p>
-              <strong>If the student doesn&apos;t show up</strong> (or shows up late) but the coach is ready: the coach is paid in full. Your time matters.
+              <strong>If the student doesn&apos;t show up</strong> (or shows up late) but the coach is ready: the coach is paid in full. On a free trial, the student forfeits all remaining free trials. Your time matters.
             </p>
             <p className="text-muted-foreground">
               Either party can cancel an accepted lesson before it starts and the student is fully refunded.
@@ -114,9 +114,10 @@ export default async function HowItWorksPage() {
             </p>
             <ul className="list-disc list-inside space-y-1 ml-2 text-muted-foreground">
               <li>Same flow as paid lessons. You can leave reviews after a trial.</li>
-              <li>One pending free trial at a time, max one per hour.</li>
+              <li>One pending free trial at a time, max one per hour, and <strong>one free trial per coach</strong>.</li>
               <li>Coaches must successfully complete <strong>at least one free trial</strong> before they can receive paid bookings.</li>
               <li>To prevent spamming or misuse, if a coach <strong>declines</strong> your trial request, the trial is consumed, so pick coaches carefully.</li>
+              <li>Trials are a coach&apos;s real time: <strong>not showing up to a trial forfeits all your remaining free trials</strong>.</li>
             </ul>
           </CardContent>
         </Card>
@@ -163,7 +164,7 @@ export default async function HowItWorksPage() {
             <p className="text-muted-foreground">
               Your <strong>Coach ELO</strong> on the{" "}
               <Link href="/leaderboard" className="underline">leaderboard</Link>{" "}
-              is based on recent activity and earnings. Both decay over time if you go quiet (roughly a 7-day half-life for activity, 30 days for earnings). No-shows cost 50 ELO each.
+              is based on recent activity and earnings. Both decay over time if you go quiet (roughly a 7-day half-life for activity, 30 days for earnings). No-shows cost 150 ELO each.
             </p>
             <p className="text-xs text-muted-foreground border-t pt-2 mt-2">
               <strong>Taxes:</strong> Coaching earnings paid via EloChaser are yours to declare to your local tax authority. We don&apos;t withhold or remit taxes on your behalf.

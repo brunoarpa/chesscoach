@@ -301,7 +301,7 @@ export function SlotPicker({
               <span className="font-medium">⏰ Set yourself a reminder.</span> If you don&apos;t
               join within 10 minutes of the start time, the lesson counts as a no-show —{" "}
               {isTrial
-                ? "you lose this free trial."
+                ? "you forfeit ALL your remaining free trials."
                 : "you're still charged in full and the coach is paid."}
             </div>
 

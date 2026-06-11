@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS } from "@/lib/utils";
+import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
@@ -108,6 +108,21 @@ export async function createLessonRequest(formData: FormData) {
     });
     if (pendingFreeTrial) {
       return { error: "You already have a pending free trial request. Wait for it to be accepted or declined first." };
+    }
+
+    // One free trial per coach. Statuses where the trial never actually
+    // happened don't count: DECLINED/EXPIRED/CANCELLED, and NO_SHOW (the
+    // coach was the absent party — a student no-show ends as COMPLETED).
+    const priorTrialWithCoach = await prisma.lessonRequest.findFirst({
+      where: {
+        studentId: session.user.id,
+        coachId,
+        isTrial: true,
+        status: { notIn: ["DECLINED", "EXPIRED", "CANCELLED", "NO_SHOW"] },
+      },
+    });
+    if (priorTrialWithCoach) {
+      return { error: "You've already used your free trial with this coach. Book a paid lesson to keep learning with them." };
     }
 
     estimatedCost = 0;
@@ -539,7 +554,6 @@ const NO_SHOW_BUFFER_MS = 0; // No grace period — coach must be ready by sched
 // A student, however, gets a grace window before the coach can charge them as a
 // no-show: being a couple of minutes late must not cost the full lesson price.
 const STUDENT_NO_SHOW_GRACE_MS = 10 * 60 * 1000;
-const NO_SHOW_ELO_PENALTY = 50;
 
 export async function reportNoShow(requestId: string) {
   const session = await auth();
@@ -665,12 +679,20 @@ export async function reportNoShow(requestId: string) {
       if (flipped.count === 0) return false;
 
       await payCoachForLesson(tx, request);
+      // Ghosting a free trial forfeits the rest: trials are free for the
+      // student but cost the coach a held slot, so one no-show ends them.
+      if (request.isTrial) {
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: { freeTrialsRemaining: 0 },
+        });
+      }
       await tx.abuseFlag.create({
         data: {
           userId: request.studentId,
           type: "STUDENT_NO_SHOW",
           severity: "MEDIUM",
-          details: `Student "${request.student.username}" did not join lesson with coach "${request.coach.username}". Coach paid for the lesson.`,
+          details: `Student "${request.student.username}" did not join lesson with coach "${request.coach.username}". ${request.isTrial ? "Trial forfeited, remaining free trials revoked." : "Coach paid for the lesson."}`,
           relatedLessonId: requestId,
           relatedUserId: request.coachId,
         },
@@ -684,7 +706,7 @@ export async function reportNoShow(requestId: string) {
       userId: request.studentId,
       type: "STUDENT_NO_SHOW",
       title: "No-show recorded",
-      body: `${request.coach.username ?? "Your coach"} reported that you did not join the scheduled lesson. The lesson was charged.`,
+      body: `${request.coach.username ?? "Your coach"} reported that you did not join the scheduled lesson. ${request.isTrial ? "Your remaining free trials were forfeited." : "The lesson was charged."}`,
       link: "/dashboard",
     });
   }

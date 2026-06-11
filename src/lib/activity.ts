@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
+import { NO_SHOW_ELO_PENALTY } from "@/lib/utils";
 
 /**
  * Update activity status for all users based on lastActiveAt.
@@ -370,7 +371,6 @@ export async function detectConfirmationDisputes() {
 // must be ready on time); the automatic sweep waits so nobody is expired or
 // charged while they're merely a few minutes late.
 const NO_SHOW_BUFFER_MS = 10 * 60 * 1000;
-const NO_SHOW_ELO_PENALTY = 50;
 
 // Window after the lesson's scheduled end during which a student can report
 // the lesson as unsatisfactory. Once this elapses, the lesson auto-completes
@@ -660,12 +660,20 @@ export async function detectNoShows(userId?: string) {
         if (flipped.count === 0) return false;
 
         await payCoachForLesson(tx, lesson);
+        // Ghosting a free trial forfeits the rest: trials are free for the
+        // student but cost the coach a held slot, so one no-show ends them.
+        if (lesson.isTrial) {
+          await tx.user.update({
+            where: { id: lesson.studentId },
+            data: { freeTrialsRemaining: 0 },
+          });
+        }
         await tx.abuseFlag.create({
           data: {
             userId: lesson.studentId,
             type: "STUDENT_NO_SHOW",
             severity: "MEDIUM",
-            details: `Student "${lesson.student.username}" did not join scheduled lesson with coach "${lesson.coach.username}". Auto-detected. Coach paid.`,
+            details: `Student "${lesson.student.username}" did not join scheduled lesson with coach "${lesson.coach.username}". Auto-detected. ${lesson.isTrial ? "Trial forfeited, remaining free trials revoked." : "Coach paid."}`,
             relatedLessonId: lesson.id,
             relatedUserId: lesson.coachId,
           },
@@ -678,7 +686,7 @@ export async function detectNoShows(userId?: string) {
           userId: lesson.studentId,
           type: "STUDENT_NO_SHOW",
           title: "No-show recorded",
-          body: `You didn't join the scheduled lesson with ${lesson.coach.username ?? "your coach"}, so the lesson was charged.`,
+          body: `You didn't join the scheduled lesson with ${lesson.coach.username ?? "your coach"}, so ${lesson.isTrial ? "your remaining free trials were forfeited" : "the lesson was charged"}.`,
           link: "/dashboard",
         });
         await createNotification({

@@ -53,6 +53,8 @@ export default function TermsOfServicePage() {
             <li>Every new student account gets up to 3 free trial lessons. Coaches choose whether to accept them.</li>
             <li>Free trials cost nothing. Coaches must successfully complete at least one free trial lesson before they are eligible to receive paid bookings.</li>
             <li>If a coach <strong>declines</strong> a free trial request, the trial is consumed (not refunded to the student) to deter spam. Trials are restored if the coach simply fails to respond and the request expires.</li>
+            <li>Each student may use at most <strong>one free trial per coach</strong>.</li>
+            <li>Failing to attend a booked free trial without cancelling beforehand forfeits all of the student&apos;s remaining free trials.</li>
             <li>If a free trial is reported as unsatisfactory and an admin agrees, the trial does not count as a successfully delivered lesson for the coach.</li>
             <li>Abusing the free trial system (e.g. multiple accounts) results in suspension.</li>
           </ul>

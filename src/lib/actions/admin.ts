@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
 import { coachEarnings } from "@/lib/fees";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
+import { NO_SHOW_ELO_PENALTY } from "@/lib/utils";
 
 async function requireAdmin() {
   const session = await auth();
@@ -330,7 +331,7 @@ export async function resolveDispute(
                 totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
                 lessonsGiven: { increment: 1 },
                 // Reverse the ELO penalty applied during no-show detection
-                coachRatingPenalty: { decrement: 50 },
+                coachRatingPenalty: { decrement: NO_SHOW_ELO_PENALTY },
               },
             });
             await tx.transaction.create({
