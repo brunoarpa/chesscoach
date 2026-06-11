@@ -448,6 +448,21 @@ model RecoveryRequest {
   @@index([createdAt])
 }
 
+model ContactMessage {
+  id         String    @id @default(cuid())
+  email      String    // email to reply to
+  message    String
+  userId     String?   // set when the sender was logged in
+  username   String?   // snapshot of the sender's username at submit time
+  resolved   Boolean   @default(false)
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([resolved])
+  @@index([createdAt])
+}
+
 model Favourite {
   id      String @id @default(cuid())
   

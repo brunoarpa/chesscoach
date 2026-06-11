@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -164,10 +165,10 @@ export default async function DashboardPage({
           <p className="font-medium">Your account is suspended.</p>
           <p className="text-sm mt-1">
             You cannot book lessons, accept lessons, deposit funds, or withdraw earnings while your account is under review.
-            Contact{" "}
-            <a href="mailto:support@elochaser.com" className="underline font-medium">
-              support@elochaser.com
-            </a>{" "}
+            Use the{" "}
+            <Link href="/contact" className="underline font-medium">
+              contact form
+            </Link>{" "}
             to appeal.
           </p>
         </div>

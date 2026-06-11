@@ -35,7 +35,7 @@ function wrap(title: string, body: string): string {
     <h1 style="font-size:20px;margin:0 0 16px;">${title}</h1>
     ${body}
     <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
-    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} — support@elochaser.com</p>
+    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} — <a href="${baseUrl()}/contact" style="color:#666;">${baseUrl().replace(/^https?:\/\//, "")}/contact</a></p>
   </div>`;
 }
 

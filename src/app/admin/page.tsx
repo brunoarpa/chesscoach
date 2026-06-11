@@ -7,6 +7,7 @@ import { UserList } from "@/components/admin/user-list";
 import { AbuseFlagList } from "@/components/admin/abuse-flag-list";
 import { RecoveryRequestList } from "@/components/admin/recovery-request-list";
 import { LessonList } from "@/components/admin/lesson-list";
+import { ContactMessageList } from "@/components/admin/contact-message-list";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -19,7 +20,7 @@ export default async function AdminPage() {
 
   if (user?.role !== "ADMIN") redirect("/");
 
-  const [pendingVerifications, allUsers, abuseFlags, cardFingerprints, recoveryRequests, lessons] = await Promise.all([
+  const [pendingVerifications, allUsers, abuseFlags, cardFingerprints, recoveryRequests, lessons, contactMessages] = await Promise.all([
     prisma.user.findMany({
       where: { verificationStatus: "PENDING" },
       orderBy: { updatedAt: "desc" },
@@ -86,6 +87,11 @@ export default async function AdminPage() {
         coach: { select: { username: true } },
       },
     }),
+    prisma.contactMessage.findMany({
+      where: { resolved: false },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
   ]);
 
   // Build linked accounts count from card fingerprints
@@ -123,6 +129,7 @@ export default async function AdminPage() {
           </TabsTrigger>
           <TabsTrigger value="users">All Users ({allUsers.length})</TabsTrigger>
           <TabsTrigger value="lessons">Lessons ({lessons.length})</TabsTrigger>
+          <TabsTrigger value="messages">Messages ({contactMessages.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flags">
@@ -146,6 +153,10 @@ export default async function AdminPage() {
 
         <TabsContent value="lessons">
           <LessonList lessons={JSON.parse(JSON.stringify(lessons))} />
+        </TabsContent>
+
+        <TabsContent value="messages">
+          <ContactMessageList messages={JSON.parse(JSON.stringify(contactMessages))} />
         </TabsContent>
       </Tabs>
     </div>

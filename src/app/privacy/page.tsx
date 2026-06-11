@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -73,8 +74,8 @@ export default function PrivacyPolicyPage() {
             <li>Export your data in a portable format.</li>
           </ul>
           <p className="leading-relaxed mt-3">
-            To exercise these rights, email{" "}
-            <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a>.
+            To exercise these rights, reach us through the{" "}
+            <Link href="/contact" className="underline">contact form</Link>.
           </p>
         </section>
 
@@ -102,8 +103,8 @@ export default function PrivacyPolicyPage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">10. Contact</h2>
           <p className="leading-relaxed">
-            Privacy questions? Email{" "}
-            <a href="mailto:support@elochaser.com" className="underline">support@elochaser.com</a>.
+            Privacy questions? Reach us through the{" "}
+            <Link href="/contact" className="underline">contact form</Link>.
           </p>
         </section>
       </div>

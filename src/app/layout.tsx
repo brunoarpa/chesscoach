@@ -45,7 +45,7 @@ export default function RootLayout({
               <span className="hidden sm:inline">&middot;</span>
               <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
               <span className="hidden sm:inline">&middot;</span>
-              <a href="mailto:support@elochaser.com" className="hover:underline">Contact</a>
+              <Link href="/contact" className="hover:underline">Contact</Link>
             </div>
           </footer>
           <LessonFlowGuide />
