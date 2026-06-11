@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY } from "@/lib/utils";
+import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
@@ -50,7 +50,7 @@ export async function createLessonRequest(formData: FormData) {
 
   if (!currentUser) return { error: "User not found" };
   if (currentUser.isSuspended) {
-    return { error: "Your account is under review. Contact support at support@elochaser.com" };
+    return { error: "Your account is under review. Use the contact form at /contact to appeal." };
   }
   if (currentUser.hasActiveDispute) {
     return { error: "You have an active lesson dispute. Please wait for admin resolution before requesting new lessons." };
@@ -127,12 +127,17 @@ export async function createLessonRequest(formData: FormData) {
 
     estimatedCost = 0;
   } else {
-    // Coaches must successfully complete at least one free trial before receiving paid bookings
+    // Coaches must successfully complete at least one free trial before receiving
+    // paid bookings. A student no-show also ends COMPLETED (trial forfeited), but
+    // it must not unlock paid bookings — only a trial where both parties actually
+    // joined the lesson room counts as carried out.
     const completedTrials = await prisma.lessonRequest.count({
       where: {
         coachId,
         isTrial: true,
         status: "COMPLETED",
+        coachJoinedAt: { not: null },
+        studentJoinedAt: { not: null },
       },
     });
     if (completedTrials === 0) {
@@ -810,6 +815,19 @@ export async function declineAcceptedLesson(requestId: string) {
   // The no-show report / auto-detection owns the lesson from this point.
   if (request.scheduledStartAt && Date.now() >= new Date(request.scheduledStartAt).getTime()) {
     return { error: "This lesson has already started. If the other person didn't show up, report a no-show instead." };
+  }
+
+  // Students are locked in shortly before the start: a free last-second
+  // cancellation would let them ghost the coach's committed slot at no cost.
+  // Coaches may still cancel up to the start — that refunds the student in
+  // full, which is strictly better for the student than a coach no-show.
+  if (
+    isStudent &&
+    request.scheduledStartAt &&
+    Date.now() >= new Date(request.scheduledStartAt).getTime() - STUDENT_CANCEL_CUTOFF_MS
+  ) {
+    const cutoffMin = Math.round(STUDENT_CANCEL_CUTOFF_MS / 60000);
+    return { error: `Lessons can no longer be cancelled within ${cutoffMin} minutes of the start time. If your coach doesn't show up, report a no-show for a full refund.` };
   }
 
   const didDecline = await prisma.$transaction(async (tx) => {

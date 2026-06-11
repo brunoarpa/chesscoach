@@ -96,7 +96,7 @@ export default async function HowItWorksPage() {
               <strong>If the student doesn&apos;t show up</strong> (or shows up late) but the coach is ready: the coach is paid in full. On a free trial, the student forfeits all remaining free trials. Your time matters.
             </p>
             <p className="text-muted-foreground">
-              Either party can cancel an accepted lesson before it starts and the student is fully refunded.
+              Students can cancel an accepted lesson up to 30 minutes before it starts for a full refund — closer than that, the booking is committed. Coaches can cancel any time before the start, and the student is fully refunded.
             </p>
           </CardContent>
         </Card>

@@ -42,6 +42,14 @@ export const AVAILABILITY_INACTIVITY_MS = 24 * 60 * 60 * 1000;
 export const MIN_BOOKING_LEAD_MS = 30 * 60 * 1000;
 export const MIN_ACCEPT_NOTICE_MS = 15 * 60 * 1000;
 
+// How close to the scheduled start a student may still cancel an accepted
+// lesson for a full refund. Inside this window the coach has committed the
+// slot, so the student is locked in — if the coach doesn't show, the no-show
+// path still makes the student whole. Coaches are deliberately exempt:
+// a late coach cancellation refunds the student in full, which beats forcing
+// the coach into a no-show the student has to sit through and report.
+export const STUDENT_CANCEL_CUTOFF_MS = 30 * 60 * 1000;
+
 // ELO penalty a coach takes for not joining a scheduled lesson. Single source
 // of truth: applied by the no-show sweep and the student's manual report, and
 // reversed by the admin dispute override — all three must move by the same

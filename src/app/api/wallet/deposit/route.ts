@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   });
   if (user?.isSuspended) {
     return NextResponse.json(
-      { error: "Your account is under review. Contact support at support@elochaser.com" },
+      { error: "Your account is under review. Use the contact form at /contact to appeal." },
       { status: 403 }
     );
   }

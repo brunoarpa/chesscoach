@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   // their bank before an admin rules on the dispute.
   if (user.isSuspended) {
     return NextResponse.json(
-      { error: "Your account is under review. Withdrawals are paused — contact support at support@elochaser.com" },
+      { error: "Your account is under review. Withdrawals are paused — use the contact form at /contact to appeal." },
       { status: 403 }
     );
   }

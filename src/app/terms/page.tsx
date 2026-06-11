@@ -80,7 +80,8 @@ export default function TermsOfServicePage() {
             <li>Lessons can be booked from a few minutes ahead up to 1 week in advance.</li>
             <li>Coaches are expected to be ready at the scheduled start time. If the coach does not join, the lesson expires and the student is fully refunded.</li>
             <li>If the student does not join at the scheduled start time but the coach is ready, the coach is paid in full to compensate for their reserved time.</li>
-            <li>Either party may cancel an accepted lesson before it starts; the student is fully refunded.</li>
+            <li>Students may cancel an accepted lesson up to 30 minutes before it starts and are fully refunded. Within 30 minutes of the start, the booking is committed — a student who does not attend is treated as a no-show.</li>
+            <li>Coaches may cancel an accepted lesson any time before it starts; the student is fully refunded.</li>
             <li>After a lesson, the student has 24 hours to Report Issue. Otherwise, payment auto-transfers to the coach.</li>
           </ul>
         </section>
@@ -108,7 +109,7 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">10. Suspension</h2>
           <p className="leading-relaxed">
-            EloChaser may suspend any account that violates these Terms, engages in fraud, or is flagged by our abuse-detection systems. While suspended, an account cannot book lessons, accept lessons, deposit funds, or be discovered in search. Suspended users may still withdraw any remaining coach earnings. Use the <Link href="/contact" className="underline">contact form</Link> to appeal.
+            EloChaser may suspend any account that violates these Terms, engages in fraud, or is flagged by our abuse-detection systems. While suspended, an account cannot book lessons, accept lessons, deposit funds, withdraw earnings, or be discovered in search — all money movement is paused until the review concludes. Use the <Link href="/contact" className="underline">contact form</Link> to appeal.
           </p>
         </section>
 

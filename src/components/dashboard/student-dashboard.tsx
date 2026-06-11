@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { LessonCountdown } from "@/components/lesson-countdown";
+import { STUDENT_CANCEL_CUTOFF_MS } from "@/lib/utils";
 
 // Room stays open for 5 minutes past the scheduled end. After that the
 // /lesson/[id] page redirects away so the join button is pointless.
@@ -341,9 +342,13 @@ function StudentAcceptedCard({ request }: { request: Request }) {
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
   const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
-  // Declining after the start is server-rejected (no-show dodge), so hide the button.
   const started = request.scheduledStartAt
     ? now >= new Date(request.scheduledStartAt).getTime()
+    : false;
+  // Students can't cancel within the cutoff before the start (server-rejected —
+  // a free last-second cancel would ghost the coach's slot), so hide the button.
+  const cancelClosed = request.scheduledStartAt
+    ? now >= new Date(request.scheduledStartAt).getTime() - STUDENT_CANCEL_CUTOFF_MS
     : false;
 
   async function handleDecline() {
@@ -398,7 +403,7 @@ function StudentAcceptedCard({ request }: { request: Request }) {
                 Join Room
               </Button>
             )}
-            {!started && (
+            {!cancelClosed && (
               <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
                 Decline
               </Button>
