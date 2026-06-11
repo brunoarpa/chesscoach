@@ -33,6 +33,15 @@ export function isCoach(user: { coachChatPrice: number | null; coachCallPrice: n
 // How long a coach can be away before students see them as Unavailable.
 export const AVAILABILITY_INACTIVITY_MS = 24 * 60 * 60 * 1000;
 
+// Booking lead times. A slot must start at least MIN_BOOKING_LEAD_MS in the
+// future to be bookable, and a coach must accept at least MIN_ACCEPT_NOTICE_MS
+// before the start. The 2x gap guarantees every legal booking leaves the coach
+// a real window to respond, and the student always gets at least 15 minutes'
+// notice before a lesson can exist (so a last-second accept can never turn
+// into a chargeable no-show they couldn't have known about).
+export const MIN_BOOKING_LEAD_MS = 30 * 60 * 1000;
+export const MIN_ACCEPT_NOTICE_MS = 15 * 60 * 1000;
+
 /**
  * Returns the effective coach availability — the single source of truth for
  * what students see and whether a coach can be booked.

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { MIN_BOOKING_LEAD_MS } from "@/lib/utils";
 
 /**
  * Offset (in ms) of an IANA timezone from UTC at a given instant.
@@ -277,7 +278,9 @@ export async function getAvailableSlots(coachId: string) {
       coachId,
       status: "AVAILABLE",
       startTime: {
-        gt: now, // any future slot — coach has to confirm anyway
+        // Only slots far enough out to book — must leave the coach time to
+        // accept before the 15-min cutoff (matches createLessonRequest).
+        gt: new Date(now.getTime() + MIN_BOOKING_LEAD_MS),
         lte: weekFromNow,
       },
     },
