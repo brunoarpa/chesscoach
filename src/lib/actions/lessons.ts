@@ -185,11 +185,13 @@ export async function createLessonRequest(formData: FormData) {
   if (isTrial) {
     const h = await headers();
     const ip = getClientIpFromHeaders(h);
-    const { success: rlSuccess } = await rateLimit(`free-trial:${ip}`, {
-      maxAttempts: 3,
-      windowMs: 30 * 60 * 1000,
-    });
-    if (!rlSuccess) {
+    // Limit per IP *and* per account: the IP headers are forgeable on some
+    // hosts, so the account-keyed limit is the one that always holds.
+    const [byIp, byUser] = await Promise.all([
+      rateLimit(`free-trial:${ip}`, { maxAttempts: 3, windowMs: 30 * 60 * 1000 }),
+      rateLimit(`free-trial-user:${session.user.id}`, { maxAttempts: 3, windowMs: 30 * 60 * 1000 }),
+    ]);
+    if (!byIp.success || !byUser.success) {
       return { error: "You've sent 3 free trial requests recently. Please wait a bit before trying another." };
     }
   }
@@ -485,6 +487,9 @@ export async function disputeLesson(requestId: string, reason: string) {
 }
 
 const NO_SHOW_BUFFER_MS = 0; // No grace period — coach must be ready by scheduled start
+// A student, however, gets a grace window before the coach can charge them as a
+// no-show: being a couple of minutes late must not cost the full lesson price.
+const STUDENT_NO_SHOW_GRACE_MS = 10 * 60 * 1000;
 const NO_SHOW_ELO_PENALTY = 50;
 
 export async function reportNoShow(requestId: string) {
@@ -594,6 +599,10 @@ export async function reportNoShow(requestId: string) {
       return { error: "Student has already joined the lesson" };
     }
 
+    if (now < startTime + STUDENT_NO_SHOW_GRACE_MS) {
+      return { error: "Give the student a few more minutes — you can report a no-show 10 minutes after the scheduled start." };
+    }
+
     const claimed = await prisma.$transaction(async (tx) => {
       const flipped = await tx.lessonRequest.updateMany({
         where: { id: requestId, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
@@ -643,7 +652,7 @@ export async function submitReview(formData: FormData) {
   const rating = Number(formData.get("rating"));
   const comment = (formData.get("comment") as string) || null;
 
-  if (!lessonId || !rating || rating < 1 || rating > 5) {
+  if (!lessonId || !Number.isInteger(rating) || rating < 1 || rating > 5) {
     return { error: "Invalid review data" };
   }
   if (comment !== null && comment.length > 500) {
@@ -723,6 +732,14 @@ export async function declineAcceptedLesson(requestId: string) {
   const isStudent = request.studentId === session.user.id;
   const isCoach = request.coachId === session.user.id;
   if (!isStudent && !isCoach) return { error: "Not authorized" };
+
+  // Once the scheduled start has passed, cancellation is no longer an option:
+  // a party who didn't show could otherwise cancel to dodge the no-show
+  // consequences (the coach's ELO penalty, or the student's lesson charge).
+  // The no-show report / auto-detection owns the lesson from this point.
+  if (request.scheduledStartAt && Date.now() >= new Date(request.scheduledStartAt).getTime()) {
+    return { error: "This lesson has already started. If the other person didn't show up, report a no-show instead." };
+  }
 
   const didDecline = await prisma.$transaction(async (tx) => {
     const cancelled = await tx.lessonRequest.updateMany({

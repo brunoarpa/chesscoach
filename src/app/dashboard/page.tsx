@@ -9,9 +9,14 @@ import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
 import { expirePendingRequests, autoCompleteLessons } from "@/lib/activity";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ setup?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+  const { setup } = await searchParams;
 
   // Redirect Google users (and anyone without a username) to set up their profile first.
   if (session.user.needsUsername) redirect("/setup-username");
@@ -158,7 +163,7 @@ export default async function DashboardPage() {
         <div className="mb-6 p-4 rounded-lg border border-destructive bg-destructive/10 text-destructive">
           <p className="font-medium">Your account is suspended.</p>
           <p className="text-sm mt-1">
-            You cannot book lessons, accept lessons, or deposit funds. You can still withdraw any remaining coach earnings.
+            You cannot book lessons, accept lessons, deposit funds, or withdraw earnings while your account is under review.
             Contact{" "}
             <a href="mailto:support@elochaser.com" className="underline font-medium">
               support@elochaser.com
@@ -169,6 +174,21 @@ export default async function DashboardPage() {
       )}
 
       {!currentUser.isSuspended && !isCoach && <CoachInviteBanner />}
+
+      {/* Onboarding hand-off from profile setup: prices are saved, the last
+          step is a weekly schedule so students have slots to book. */}
+      {setup === "schedule" && isCoach && weeklyTemplates.length === 0 && (
+        <div className="mb-6 p-4 rounded-lg border border-primary/40 bg-primary/5">
+          <p className="font-medium">Your coach profile is set up — one last step!</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Students book specific time slots, so pick your weekly availability in the{" "}
+            <a href="#schedule" className="font-medium text-foreground underline underline-offset-2">
+              Coaching schedule
+            </a>{" "}
+            below to start receiving bookings.
+          </p>
+        </div>
+      )}
 
       {/* Top priority: requests waiting for the user to accept/decline */}
       {pendingIncoming.length > 0 && (
@@ -220,7 +240,7 @@ export default async function DashboardPage() {
 
       {/* Coaching schedule — pinned to the bottom */}
       {isCoach && (
-        <section>
+        <section id="schedule" className="scroll-mt-20">
           <h2 className="text-xl font-semibold mb-3">Coaching</h2>
           <CoachScheduleEditor initialTemplates={weeklyTemplates} timezone={currentUser.timezone} />
         </section>

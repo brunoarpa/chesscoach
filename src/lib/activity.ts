@@ -365,7 +365,11 @@ export async function detectConfirmationDisputes() {
   }
 }
 
-const NO_SHOW_BUFFER_MS = 0; // No grace — coach must be ready by scheduled start
+// Grace before the sweep treats an absence as a no-show. A student reporting a
+// missing coach manually is still allowed from the scheduled start (the coach
+// must be ready on time); the automatic sweep waits so nobody is expired or
+// charged while they're merely a few minutes late.
+const NO_SHOW_BUFFER_MS = 10 * 60 * 1000;
 const NO_SHOW_ELO_PENALTY = 50;
 
 // Window after the lesson's scheduled end during which a student can report
@@ -442,15 +446,13 @@ export async function autoCompleteLessons(userId?: string) {
     if (!autoAt || autoAt.getTime() > now.getTime()) continue;
 
     const completed = await prisma.$transaction(async (tx) => {
-      // Re-check status under the implicit row state to avoid double-processing.
-      const fresh = await tx.lessonRequest.findUnique({
-        where: { id: lesson.id },
-        select: { status: true },
-      });
-      if (!fresh || fresh.status !== "IN_PROGRESS") return false;
-
-      await tx.lessonRequest.update({
-        where: { id: lesson.id },
+      // Atomically claim the lesson with a status-guarded updateMany. A plain
+      // read-then-update is not enough here: the dashboard fires this sweep on
+      // every load (for both participants) alongside the cron, and two
+      // concurrent transactions would both read IN_PROGRESS and both pay the
+      // coach.
+      const flipped = await tx.lessonRequest.updateMany({
+        where: { id: lesson.id, status: "IN_PROGRESS" },
         data: {
           status: "COMPLETED",
           completedAt: now,
@@ -458,6 +460,7 @@ export async function autoCompleteLessons(userId?: string) {
           coachConfirmed: true,
         },
       });
+      if (flipped.count === 0) return false;
 
       await payCoachForLesson(tx, lesson);
 
@@ -503,7 +506,7 @@ export async function autoCompleteLessons(userId?: string) {
 
 /**
  * Auto-detect no-shows for ACCEPTED/IN_PROGRESS lessons
- * where the scheduled time + 5 min buffer has passed.
+ * where the scheduled time + grace buffer has passed.
  */
 export async function detectNoShows() {
   const bufferCutoff = new Date(Date.now() - NO_SHOW_BUFFER_MS);

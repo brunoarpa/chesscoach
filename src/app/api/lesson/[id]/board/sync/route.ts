@@ -41,12 +41,22 @@ export async function POST(
     return NextResponse.json({ error: "Invalid event" }, { status: 400 });
   }
 
+  // Ephemeral events are small (arrows, node ids, presence). Cap well below
+  // Pusher's ~10KB event limit so oversized payloads are rejected up front.
+  if (data != null && JSON.stringify(data).length > 8_192) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
   const pusher = getPusherServer();
   if (pusher) {
-    await pusher.trigger(`private-lesson-${id}`, event, {
-      ...data,
-      senderId: session.user.id,
-    });
+    try {
+      await pusher.trigger(`private-lesson-${id}`, event, {
+        ...data,
+        senderId: session.user.id,
+      });
+    } catch (err) {
+      console.error(`${event} broadcast failed`, err);
+    }
   }
 
   // If reset, clear persisted board state too. Both columns must be cleared:

@@ -68,9 +68,31 @@ export default async function ProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
+  // Explicit select: this is a public page, so never pull fields like email,
+  // passwordHash, or Stripe ids into the render path in the first place.
   const user = await prisma.user.findUnique({
     where: { username },
-    include: {
+    select: {
+      id: true,
+      username: true,
+      bio: true,
+      continent: true,
+      languages: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
+      communicationPreference: true,
+      coachAvailability: true,
+      coachElo: true,
+      chessRating: true,
+      chessComUsername: true,
+      chessComAccountAge: true,
+      verificationStatus: true,
+      isSuspended: true,
+      lessonsGiven: true,
+      lessonsTaken: true,
+      playersTaught: true,
+      lastActiveAt: true,
+      createdAt: true,
       reviewsReceived: {
         include: {
           fromUser: { select: { username: true } },

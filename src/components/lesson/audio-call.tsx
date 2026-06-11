@@ -19,18 +19,24 @@ interface Props {
   callActionsRef?: React.MutableRefObject<CallActions | null>;
 }
 
-function getIceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [
+// TURN credentials come from the server (short-lived, per-user) rather than
+// the bundle. STUN-only fallback keeps calls working on most networks if the
+// fetch fails.
+async function getIceServers(): Promise<RTCIceServer[]> {
+  const fallback: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ];
-  const turnUrl = process.env.NEXT_PUBLIC_TURN_URL;
-  const turnUser = process.env.NEXT_PUBLIC_TURN_USERNAME;
-  const turnCred = process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
-  if (turnUrl && turnUser && turnCred) {
-    servers.push({ urls: turnUrl, username: turnUser, credential: turnCred });
+  try {
+    const res = await fetch("/api/turn");
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    return Array.isArray(data?.iceServers) && data.iceServers.length > 0
+      ? data.iceServers
+      : fallback;
+  } catch {
+    return fallback;
   }
-  return servers;
 }
 
 export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, onAudioChange, callActionsRef }: Props) {
@@ -82,10 +88,13 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
       const peerId = `lesson-${lessonId}-${isCoach ? "coach" : "student"}`;
       const otherPeerId = `lesson-${lessonId}-${otherRole}`;
 
+      const iceServers = await getIceServers();
+      if (!mountedRef.current) return;
+
       const peer = new Peer(peerId, {
         debug: 0,
         config: {
-          iceServers: getIceServers(),
+          iceServers,
         },
       });
       peerRef.current = peer;
