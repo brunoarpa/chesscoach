@@ -8,7 +8,7 @@ import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
-import { expirePendingRequests, autoCompleteLessons } from "@/lib/activity";
+import { expirePendingRequests, autoCompleteLessons, detectNoShows } from "@/lib/activity";
 
 export default async function DashboardPage({
   searchParams,
@@ -26,6 +26,7 @@ export default async function DashboardPage({
   // cron. Scoped to this user — the global sweep is the cron's job.
   expirePendingRequests(session.user.id).catch(() => {});
   autoCompleteLessons(session.user.id).catch(() => {});
+  detectNoShows(session.user.id).catch(() => {});
 
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },

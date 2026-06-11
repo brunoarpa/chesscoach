@@ -71,7 +71,10 @@ interface Request {
 
 function StatusBadge({ status, roomClosed = false, inGrace = false }: { status: string; roomClosed?: boolean; inGrace?: boolean }) {
   if (status === "PENDING") return <Badge variant="secondary">Waiting for coach</Badge>;
-  if (status === "ACCEPTED") return <Badge>Awaiting start</Badge>;
+  if (status === "ACCEPTED") {
+    if (roomClosed) return <Badge variant="destructive">Missed</Badge>;
+    return <Badge>Awaiting start</Badge>;
+  }
   if (status === "IN_PROGRESS") {
     if (roomClosed) return <Badge variant="outline">Lesson ended · awaiting confirmation</Badge>;
     if (inGrace) return <Badge className="bg-orange-500 hover:bg-orange-600">Wrapping up</Badge>;
@@ -338,6 +341,10 @@ function StudentAcceptedCard({ request }: { request: Request }) {
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
   const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
+  // Declining after the start is server-rejected (no-show dodge), so hide the button.
+  const started = request.scheduledStartAt
+    ? now >= new Date(request.scheduledStartAt).getTime()
+    : false;
 
   async function handleDecline() {
     setDeclLoading(true);
@@ -366,6 +373,17 @@ function StudentAcceptedCard({ request }: { request: Request }) {
                 />
               </div>
             )}
+            {request.scheduledStartAt && !started && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                ⏰ Set a reminder — missing the lesson counts as a no-show and{" "}
+                {request.isTrial ? "uses up your free trial" : "is still charged in full"}.
+              </p>
+            )}
+            {roomClosed && (
+              <p className="text-xs text-destructive mt-1.5">
+                This lesson ended without being joined — it will be processed as a no-show.
+              </p>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             {!roomClosed && !tooEarly && (
@@ -378,9 +396,11 @@ function StudentAcceptedCard({ request }: { request: Request }) {
                 Join Room
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
-              Decline
-            </Button>
+            {!started && (
+              <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
+                Decline
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

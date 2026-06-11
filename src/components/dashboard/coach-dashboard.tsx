@@ -76,7 +76,10 @@ const availabilityConfig: Record<string, { color: string; label: string }> = {
 
 function StatusBadge({ status, roomClosed = false, inGrace = false }: { status: string; roomClosed?: boolean; inGrace?: boolean }) {
   if (status === "PENDING") return <Badge variant="secondary">Pending</Badge>;
-  if (status === "ACCEPTED") return <Badge>Awaiting start</Badge>;
+  if (status === "ACCEPTED") {
+    if (roomClosed) return <Badge variant="destructive">Missed</Badge>;
+    return <Badge>Awaiting start</Badge>;
+  }
   if (status === "IN_PROGRESS") {
     if (roomClosed) return <Badge variant="outline">Lesson ended · awaiting payout</Badge>;
     if (inGrace) return <Badge className="bg-orange-500 hover:bg-orange-600">Wrapping up</Badge>;
@@ -294,6 +297,13 @@ function PendingRequestCard({ request }: { request: Request }) {
             <span className="font-medium">Message:</span> {request.message}
           </p>
         )}
+        {request.scheduledStartAt && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            ⏰ Accepting commits you to be there — if you don&apos;t join within 10 minutes of
+            the start, the student is refunded and your coach rating takes a penalty. Set a
+            reminder.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -304,6 +314,10 @@ function AcceptedLessonCard({ request }: { request: Request }) {
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
   const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
+  // Declining after the start is server-rejected (no-show dodge), so hide the button.
+  const started = request.scheduledStartAt
+    ? now >= new Date(request.scheduledStartAt).getTime()
+    : false;
 
   async function handleDecline() {
     setDeclLoading(true);
@@ -332,6 +346,17 @@ function AcceptedLessonCard({ request }: { request: Request }) {
                 />
               </div>
             )}
+            {request.scheduledStartAt && !started && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                ⏰ Set a reminder — not joining counts as a no-show and penalizes your coach
+                rating.
+              </p>
+            )}
+            {roomClosed && (
+              <p className="text-xs text-destructive mt-1.5">
+                This lesson ended without being joined — it will be processed as a no-show.
+              </p>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             {!roomClosed && !tooEarly && (
@@ -344,9 +369,11 @@ function AcceptedLessonCard({ request }: { request: Request }) {
                 Join Room
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
-              Decline
-            </Button>
+            {!started && (
+              <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
+                Decline
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

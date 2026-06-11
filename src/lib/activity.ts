@@ -508,8 +508,10 @@ export async function autoCompleteLessons(userId?: string) {
 /**
  * Auto-detect no-shows for ACCEPTED/IN_PROGRESS lessons
  * where the scheduled time + grace buffer has passed.
+ * Pass a userId to scope the sweep to that user's lessons (dashboard load);
+ * omit it to sweep everything (daily cron).
  */
-export async function detectNoShows() {
+export async function detectNoShows(userId?: string) {
   const bufferCutoff = new Date(Date.now() - NO_SHOW_BUFFER_MS);
 
   // Find active lessons past their start time + buffer where someone hasn't joined
@@ -517,9 +519,9 @@ export async function detectNoShows() {
     where: {
       status: { in: ["ACCEPTED", "IN_PROGRESS"] },
       scheduledStartAt: { not: null, lte: bufferCutoff },
-      OR: [
-        { coachJoinedAt: null },
-        { studentJoinedAt: null },
+      AND: [
+        { OR: [{ coachJoinedAt: null }, { studentJoinedAt: null }] },
+        ...(userId ? [{ OR: [{ studentId: userId }, { coachId: userId }] }] : []),
       ],
     },
     include: {

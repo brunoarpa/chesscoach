@@ -185,6 +185,10 @@ export function SlotPicker({
                   </span>
                   .
                 </p>
+                <p className="text-green-800 dark:text-green-300 mt-1">
+                  ⏰ Add it to your calendar now — missed lessons count as no-shows and are
+                  still charged.
+                </p>
               </div>
             </div>
             <Link href="/dashboard" className="block">
@@ -291,6 +295,14 @@ export function SlotPicker({
                   <span className="font-semibold">${(slotPrice / 100).toFixed(2)}</span>
                 ) : null}
               </div>
+            </div>
+
+            <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+              <span className="font-medium">⏰ Set yourself a reminder.</span> If you don&apos;t
+              join within 10 minutes of the start time, the lesson counts as a no-show —{" "}
+              {isTrial
+                ? "you lose this free trial."
+                : "you're still charged in full and the coach is paid."}
             </div>
 
             {!isTrial && !hasCompletedTrial && (
