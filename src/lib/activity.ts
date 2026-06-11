@@ -464,9 +464,10 @@ export async function autoCompleteLessons(userId?: string) {
 
       await payCoachForLesson(tx, lesson);
 
-      // Free trials don't count toward playersTaught / lessonsGiven stats.
+      // Free trials count toward stats for now (growth phase) — see
+      // payCoachForLesson, which handles the lessonsGiven/lessonsTaken bumps.
       const distinctStudents = await tx.lessonRequest.findMany({
-        where: { coachId: lesson.coachId, status: "COMPLETED", isTrial: false },
+        where: { coachId: lesson.coachId, status: "COMPLETED" },
         select: { studentId: true },
         distinct: ["studentId"],
       });
