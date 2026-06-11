@@ -8,7 +8,7 @@ import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
-import { payCoachForLesson } from "@/lib/lesson-ledger";
+import { payCoachForLesson, carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
 
 const lessonRequestInputSchema = z.object({
@@ -127,18 +127,10 @@ export async function createLessonRequest(formData: FormData) {
 
     estimatedCost = 0;
   } else {
-    // Coaches must successfully complete at least one free trial before receiving
-    // paid bookings. A student no-show also ends COMPLETED (trial forfeited), but
-    // it must not unlock paid bookings — only a trial where both parties actually
-    // joined the lesson room counts as carried out.
+    // Coaches must actually carry out at least one free trial before receiving
+    // paid bookings (see carriedOutTrialWhere for why COMPLETED alone isn't enough).
     const completedTrials = await prisma.lessonRequest.count({
-      where: {
-        coachId,
-        isTrial: true,
-        status: "COMPLETED",
-        coachJoinedAt: { not: null },
-        studentJoinedAt: { not: null },
-      },
+      where: { coachId, ...carriedOutTrialWhere },
     });
     if (completedTrials === 0) {
       return { error: "This coach hasn't completed a free trial yet. Book a free trial first to try them out." };

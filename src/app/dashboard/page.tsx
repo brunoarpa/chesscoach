@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calculateCoachElo } from "@/lib/elo";
+import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { CoachDashboard, PendingRequestCard } from "@/components/dashboard/coach-dashboard";
 import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
@@ -99,8 +100,9 @@ export default async function DashboardPage({
       where: { coachId: session.user.id },
       _count: { _all: true },
     }),
+    // Mirrors the paid-booking gate in createLessonRequest.
     prisma.lessonRequest.findFirst({
-      where: { coachId: session.user.id, status: "COMPLETED", isTrial: true },
+      where: { coachId: session.user.id, ...carriedOutTrialWhere },
       select: { id: true },
     }),
     // Student outgoing — active

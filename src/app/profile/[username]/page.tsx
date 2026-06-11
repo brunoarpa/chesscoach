@@ -9,6 +9,7 @@ import { SlotPicker } from "@/components/slot-picker";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
 import { fetchChessComRating } from "@/lib/chess-com";
 import { getAvailableSlots } from "@/lib/actions/timeslots";
+import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { FavouriteButton } from "@/components/favourite-button";
 import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
@@ -211,8 +212,9 @@ export default async function ProfilePage({
   }
 
   if (isCoachProfile && effectiveAvailability === "AVAILABLE") {
+    // Mirrors the paid-booking gate in createLessonRequest.
     const trialCompleted = await prisma.lessonRequest.findFirst({
-      where: { coachId: user.id, status: "COMPLETED", isTrial: true },
+      where: { coachId: user.id, ...carriedOutTrialWhere },
       select: { id: true },
     });
     hasCompletedTrial = !!trialCompleted;

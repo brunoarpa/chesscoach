@@ -15,6 +15,20 @@ type LedgerLesson = {
 };
 
 /**
+ * Where-fragment matching a free trial that was actually carried out: both
+ * parties joined the lesson room. A student no-show also ends COMPLETED (the
+ * coach is credited and the trial forfeited), but it must not count as a
+ * delivered trial. Single source of truth for the paid-booking gate in
+ * createLessonRequest and the UI that mirrors it (profile, coach dashboard).
+ */
+export const carriedOutTrialWhere = {
+  status: "COMPLETED",
+  isTrial: true,
+  coachJoinedAt: { not: null },
+  studentJoinedAt: { not: null },
+} as const;
+
+/**
  * Settle a completed lesson's payment: charge the student and pay the coach
  * their share, writing both ledger entries and the coach's earning record.
  *
