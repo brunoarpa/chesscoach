@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
+import { LessonCountdown } from "@/components/lesson-countdown";
 
 const ROOM_GRACE_MS = 5 * 60 * 1000;
 // Room opens 5 minutes before the scheduled start. Before that the
@@ -323,6 +324,14 @@ function AcceptedLessonCard({ request }: { request: Request }) {
               {request.isTrial && <Badge variant="outline">Free trial</Badge>}
             </div>
             <RequestMeta request={request} />
+            {request.scheduledStartAt && (
+              <div className="mt-1.5">
+                <LessonCountdown
+                  scheduledStartAt={request.scheduledStartAt}
+                  scheduledEndAt={request.scheduledEndAt}
+                />
+              </div>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             {!roomClosed && !tooEarly && (
