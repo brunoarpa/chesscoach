@@ -7,7 +7,6 @@ import { DepositForm } from "@/components/deposit-form";
 import { WithdrawForm } from "@/components/withdraw-form";
 import { StripeConnectSetup } from "@/components/stripe-connect-setup";
 import { LocalTime } from "@/components/local-time";
-import { PLATFORM_FEE_PERCENT } from "@/lib/fees";
 
 export default async function WalletPage() {
   const session = await auth();
@@ -106,7 +105,7 @@ export default async function WalletPage() {
             <WithdrawForm pendingEarnings={user.pendingEarnings} monthlyFeeDue={monthlyFeeDue} />
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            EloChaser keeps a {Math.round(PLATFORM_FEE_PERCENT * 100)}% platform fee on each completed lesson; your earnings shown above are already net of that fee. Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — EloChaser does not withhold or remit taxes on your behalf.
+            Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — EloChaser does not withhold or remit taxes on your behalf.
           </p>
         </>
       )}
