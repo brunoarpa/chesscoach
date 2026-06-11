@@ -14,6 +14,10 @@ export function register() {
   Sentry.init({
     dsn,
     tracesSampleRate: 0.1,
+    // Node runtime warnings (emitted on every serverless cold start) get
+    // picked up by the console capture below — they're platform noise, not
+    // app errors, and would otherwise burn alert attention and event quota.
+    ignoreErrors: [/ExperimentalWarning/, /DeprecationWarning/],
     integrations:
       process.env.NEXT_RUNTIME === "nodejs"
         ? [Sentry.captureConsoleIntegration({ levels: ["error"] })]
