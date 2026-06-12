@@ -53,7 +53,7 @@ export default async function HowItWorksPage() {
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">5</span>
             <p className="font-semibold">Auto-completion</p>
             <p className="text-sm text-muted-foreground">
-              24 hours after the scheduled end, payment moves to the coach automatically. If the student hits Report Issue in that window, the payment is frozen until an admin reviews it, no matter how much time passes.
+              After the lesson, the student can hit Confirm to release payment to the coach immediately. Otherwise it moves automatically 24 hours after the scheduled end. If the student hits Report Issue in that window instead, the payment is frozen until an admin reviews it, no matter how much time passes.
             </p>
           </li>
           <li className="pl-8">

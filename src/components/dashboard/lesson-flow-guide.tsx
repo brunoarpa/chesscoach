@@ -29,8 +29,8 @@ const steps = [
   },
   {
     number: 5,
-    title: "Lesson Auto-Completes",
-    description: "24 hours after the scheduled end, payment transfers to the coach automatically. If the lesson was unsatisfactory, the student can Report Issue during that window for admin review.",
+    title: "Lesson Completes",
+    description: "After the lesson ends, the student can Confirm to release payment to the coach right away — otherwise it transfers automatically 24 hours after the scheduled end. If the lesson was unsatisfactory, the student can Report Issue during that window for admin review.",
   },
   {
     number: 6,

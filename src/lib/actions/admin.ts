@@ -123,6 +123,30 @@ export async function unsuspendUser(userId: string) {
   revalidatePath("/admin");
 }
 
+/**
+ * Admin override of the free-trial gate: lets a vouched-for coach receive
+ * paid bookings without having carried out a free trial first.
+ */
+export async function setPaidBookingsApproval(userId: string, approved: boolean) {
+  const adminId = await requireAdmin();
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { paidBookingsApproved: approved },
+    }),
+    prisma.auditLog.create({
+      data: {
+        adminId,
+        action: approved ? "APPROVE_PAID_BOOKINGS" : "REVOKE_PAID_BOOKINGS",
+        targetId: userId,
+      },
+    }),
+  ]);
+
+  revalidatePath("/admin");
+}
+
 export async function resolveAbuseFlag(flagId: string) {
   const adminId = await requireAdmin();
 

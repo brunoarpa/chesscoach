@@ -9,6 +9,7 @@ import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson, carriedOutTrialWhere } from "@/lib/lesson-ledger";
+import { completeInProgressLesson } from "@/lib/activity";
 import { createNotification } from "@/lib/notifications";
 
 const lessonRequestInputSchema = z.object({
@@ -67,6 +68,7 @@ export async function createLessonRequest(formData: FormData) {
       coachAvailability: true,
       lastActiveAt: true,
       communicationPreference: true,
+      paidBookingsApproved: true,
     },
   });
 
@@ -128,12 +130,15 @@ export async function createLessonRequest(formData: FormData) {
     estimatedCost = 0;
   } else {
     // Coaches must actually carry out at least one free trial before receiving
-    // paid bookings (see carriedOutTrialWhere for why COMPLETED alone isn't enough).
-    const completedTrials = await prisma.lessonRequest.count({
-      where: { coachId, ...carriedOutTrialWhere },
-    });
-    if (completedTrials === 0) {
-      return { error: "This coach hasn't completed a free trial yet. Book a free trial first to try them out." };
+    // paid bookings (see carriedOutTrialWhere for why COMPLETED alone isn't
+    // enough) — unless an admin explicitly approved them for paid bookings.
+    if (!coach.paidBookingsApproved) {
+      const completedTrials = await prisma.lessonRequest.count({
+        where: { coachId, ...carriedOutTrialWhere },
+      });
+      if (completedTrials === 0) {
+        return { error: "This coach hasn't completed a free trial yet. Book a free trial first to try them out." };
+      }
     }
 
     // Determine price based on communication method
@@ -706,6 +711,47 @@ export async function reportNoShow(requestId: string) {
       body: `${request.coach.username ?? "Your coach"} reported that you did not join the scheduled lesson. ${request.isTrial ? "Your remaining free trials were forfeited." : "The lesson was charged."}`,
       link: "/dashboard",
     });
+  }
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/**
+ * Student confirms a finished lesson was satisfactory, releasing payment to
+ * the coach immediately instead of waiting out the 24h dispute window.
+ * Voluntary and strictly student-initiated: the coach gets paid either way
+ * once the window lapses, so this only ever accelerates, never changes, the
+ * outcome.
+ */
+export async function confirmLessonCompletion(requestId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  const request = await prisma.lessonRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      student: { select: { username: true } },
+      coach: { select: { username: true } },
+    },
+  });
+
+  if (!request) return { error: "Request not found" };
+  if (request.studentId !== session.user.id) {
+    return { error: "Only the student can confirm a lesson" };
+  }
+  if (request.status !== "IN_PROGRESS") {
+    return { error: "This lesson can't be confirmed right now" };
+  }
+  // Only after the scheduled end — during the lesson the room is still live,
+  // and before IN_PROGRESS the no-show flows own the lesson.
+  if (!request.scheduledEndAt || Date.now() < new Date(request.scheduledEndAt).getTime()) {
+    return { error: "You can confirm once the lesson has ended" };
+  }
+
+  const completed = await completeInProgressLesson(request);
+  if (!completed) {
+    return { error: "This lesson has already been processed" };
   }
 
   revalidatePath("/dashboard");

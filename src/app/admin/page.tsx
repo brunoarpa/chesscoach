@@ -42,6 +42,7 @@ export default async function AdminPage() {
         verificationStatus: true,
         activityStatus: true,
         isSuspended: true,
+        paidBookingsApproved: true,
         walletBalance: true,
         totalEarningsAllTime: true,
         createdAt: true,

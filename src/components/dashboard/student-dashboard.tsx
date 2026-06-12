@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cancelLessonRequest, declineAcceptedLesson, submitReview, disputeLesson } from "@/lib/actions/lessons";
+import { cancelLessonRequest, declineAcceptedLesson, submitReview, disputeLesson, confirmLessonCompletion } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -220,7 +220,7 @@ function RecentlyEndedList({ requests }: { requests: Request[] }) {
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
       <p className="text-sm font-medium text-muted-foreground">
-        Recently ended ({requests.length}) — auto-completes within 24h
+        Recently ended ({requests.length}) — confirm now, or it auto-completes within 24h
       </p>
       {shown.map((r) => (
         <RecentlyEndedItem key={r.id} request={r} />
@@ -242,6 +242,14 @@ function RecentlyEndedItem({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
+
+  async function handleConfirm() {
+    setLoading(true);
+    const result = await confirmLessonCompletion(request.id);
+    setLoading(false);
+    if (result.error) toast.error(result.error);
+    else toast.success("Lesson confirmed. Thanks!");
+  }
 
   async function handleDispute() {
     if (disputeReason.trim().length < 30) {
@@ -266,13 +274,18 @@ function RecentlyEndedItem({ request }: { request: Request }) {
             </span>
           )}
         </span>
-        <button
-          type="button"
-          onClick={() => setShowDispute((v) => !v)}
-          className="text-xs text-destructive underline"
-        >
-          Report issue
-        </button>
+        <span className="flex items-center gap-3">
+          <Button size="sm" onClick={handleConfirm} disabled={loading}>
+            Confirm lesson
+          </Button>
+          <button
+            type="button"
+            onClick={() => setShowDispute((v) => !v)}
+            className="text-xs text-destructive underline"
+          >
+            Report issue
+          </button>
+        </span>
       </div>
       {showDispute && (
         <div className="space-y-2">

@@ -399,6 +399,83 @@ export function getAutoCompleteAt(lesson: {
   return null;
 }
 
+type CompletableLesson = {
+  id: string;
+  studentId: string;
+  coachId: string;
+  estimatedCost: number;
+  isTrial: boolean;
+  student: { username: string | null };
+  coach: { username: string | null };
+};
+
+/**
+ * Atomically complete an IN_PROGRESS lesson: settle payment, refresh the
+ * coach's stats and ELO, and notify both parties. Returns false when another
+ * path (a concurrent sweep, a no-show report, a dispute) already claimed the
+ * lesson — callers must treat that as "nothing happened".
+ *
+ * Shared by the auto-complete sweep and the student's manual "confirm lesson"
+ * action so the money invariants live in exactly one place.
+ */
+export async function completeInProgressLesson(lesson: CompletableLesson): Promise<boolean> {
+  const completed = await prisma.$transaction(async (tx) => {
+    // Status-guarded claim — see autoCompleteLessons for why a plain
+    // read-then-update would double-pay under concurrency.
+    const flipped = await tx.lessonRequest.updateMany({
+      where: { id: lesson.id, status: "IN_PROGRESS" },
+      data: {
+        status: "COMPLETED",
+        completedAt: new Date(),
+        studentConfirmed: true,
+        coachConfirmed: true,
+      },
+    });
+    if (flipped.count === 0) return false;
+
+    await payCoachForLesson(tx, lesson);
+
+    // Free trials count toward stats for now (growth phase) — see
+    // payCoachForLesson, which handles the lessonsGiven/lessonsTaken bumps.
+    const distinctStudents = await tx.lessonRequest.findMany({
+      where: { coachId: lesson.coachId, status: "COMPLETED" },
+      select: { studentId: true },
+      distinct: ["studentId"],
+    });
+    await tx.user.update({
+      where: { id: lesson.coachId },
+      data: { playersTaught: distinctStudents.length },
+    });
+
+    const newElo = await calculateCoachElo(lesson.coachId, tx);
+    await tx.user.update({
+      where: { id: lesson.coachId },
+      data: { coachElo: newElo },
+    });
+    return true;
+  });
+
+  if (completed) {
+    await createNotification({
+      userId: lesson.studentId,
+      type: "LESSON_COMPLETED",
+      title: "Lesson completed",
+      body: `Your lesson with ${lesson.coach.username ?? "your coach"} was completed.`,
+      link: "/dashboard",
+    });
+    await createNotification({
+      userId: lesson.coachId,
+      type: "LESSON_COMPLETED",
+      title: "Lesson completed",
+      body: lesson.isTrial
+        ? `Your free trial with ${lesson.student.username ?? "the student"} was completed.`
+        : `Your lesson with ${lesson.student.username ?? "the student"} was completed and your earnings were released.`,
+      link: "/dashboard",
+    });
+  }
+  return completed;
+}
+
 /**
  * Auto-complete IN_PROGRESS lessons whose dispute window has elapsed.
  * Student silence = satisfaction: payment transfers to the coach. There is no
@@ -445,63 +522,7 @@ export async function autoCompleteLessons(userId?: string) {
     const autoAt = getAutoCompleteAt(lesson);
     if (!autoAt || autoAt.getTime() > now.getTime()) continue;
 
-    const completed = await prisma.$transaction(async (tx) => {
-      // Atomically claim the lesson with a status-guarded updateMany. A plain
-      // read-then-update is not enough here: the dashboard fires this sweep on
-      // every load (for both participants) alongside the cron, and two
-      // concurrent transactions would both read IN_PROGRESS and both pay the
-      // coach.
-      const flipped = await tx.lessonRequest.updateMany({
-        where: { id: lesson.id, status: "IN_PROGRESS" },
-        data: {
-          status: "COMPLETED",
-          completedAt: now,
-          studentConfirmed: true,
-          coachConfirmed: true,
-        },
-      });
-      if (flipped.count === 0) return false;
-
-      await payCoachForLesson(tx, lesson);
-
-      // Free trials count toward stats for now (growth phase) — see
-      // payCoachForLesson, which handles the lessonsGiven/lessonsTaken bumps.
-      const distinctStudents = await tx.lessonRequest.findMany({
-        where: { coachId: lesson.coachId, status: "COMPLETED" },
-        select: { studentId: true },
-        distinct: ["studentId"],
-      });
-      await tx.user.update({
-        where: { id: lesson.coachId },
-        data: { playersTaught: distinctStudents.length },
-      });
-
-      const newElo = await calculateCoachElo(lesson.coachId, tx);
-      await tx.user.update({
-        where: { id: lesson.coachId },
-        data: { coachElo: newElo },
-      });
-      return true;
-    });
-
-    if (completed) {
-      await createNotification({
-        userId: lesson.studentId,
-        type: "LESSON_COMPLETED",
-        title: "Lesson completed",
-        body: `Your lesson with ${lesson.coach.username ?? "your coach"} was completed.`,
-        link: "/dashboard",
-      });
-      await createNotification({
-        userId: lesson.coachId,
-        type: "LESSON_COMPLETED",
-        title: "Lesson completed",
-        body: lesson.isTrial
-          ? `Your free trial with ${lesson.student.username ?? "the student"} was completed.`
-          : `Your lesson with ${lesson.student.username ?? "the student"} was completed and your earnings were released.`,
-        link: "/dashboard",
-      });
-    }
+    await completeInProgressLesson(lesson);
   }
 }
 

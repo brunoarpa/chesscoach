@@ -89,6 +89,7 @@ export default async function ProfilePage({
       chessComAccountAge: true,
       verificationStatus: true,
       isSuspended: true,
+      paidBookingsApproved: true,
       lessonsGiven: true,
       lessonsTaken: true,
       playersTaught: true,
@@ -213,10 +214,12 @@ export default async function ProfilePage({
 
   if (isCoachProfile && effectiveAvailability === "AVAILABLE") {
     // Mirrors the paid-booking gate in createLessonRequest.
-    const trialCompleted = await prisma.lessonRequest.findFirst({
-      where: { coachId: user.id, ...carriedOutTrialWhere },
-      select: { id: true },
-    });
+    const trialCompleted = user.paidBookingsApproved
+      ? { id: "admin-approved" }
+      : await prisma.lessonRequest.findFirst({
+          where: { coachId: user.id, ...carriedOutTrialWhere },
+          select: { id: true },
+        });
     hasCompletedTrial = !!trialCompleted;
   }
 

@@ -82,7 +82,7 @@ export default function TermsOfServicePage() {
             <li>If the student does not join at the scheduled start time but the coach is ready, the coach is paid in full to compensate for their reserved time.</li>
             <li>Students may cancel an accepted lesson up to 30 minutes before it starts and are fully refunded. Within 30 minutes of the start, the booking is committed — a student who does not attend is treated as a no-show.</li>
             <li>Coaches may cancel an accepted lesson any time before it starts; the student is fully refunded.</li>
-            <li>After a lesson, the student has 24 hours to Report Issue. Otherwise, payment auto-transfers to the coach.</li>
+            <li>After a lesson, the student has 24 hours to Report Issue. They may also confirm the lesson early to release payment immediately. Otherwise, payment auto-transfers to the coach when the 24 hours elapse.</li>
           </ul>
         </section>
 

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { setUserRole, suspendUser, unsuspendUser } from "@/lib/actions/admin";
+import { setUserRole, suspendUser, unsuspendUser, setPaidBookingsApproval } from "@/lib/actions/admin";
 import { toast } from "sonner";
 
 interface User {
@@ -14,6 +14,7 @@ interface User {
   verificationStatus: string;
   activityStatus: string;
   isSuspended: boolean;
+  paidBookingsApproved: boolean;
   walletBalance: number;
   totalEarningsAllTime: number;
   createdAt: string;
@@ -27,6 +28,19 @@ export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAc
     try {
       await setUserRole(userId, currentRole === "ADMIN" ? "USER" : "ADMIN");
       toast.success("Role updated");
+    } catch {
+      toast.error("Failed");
+    }
+  }
+
+  async function handleTogglePaidApproval(userId: string, approved: boolean) {
+    const action = approved
+      ? "revoke this coach's paid-booking approval"
+      : "approve this coach for paid bookings (skips the free-trial requirement)";
+    if (!confirm(`Are you sure you want to ${action}?`)) return;
+    try {
+      await setPaidBookingsApproval(userId, !approved);
+      toast.success(approved ? "Paid-booking approval revoked" : "Coach approved for paid bookings");
     } catch {
       toast.error("Failed");
     }
@@ -90,6 +104,9 @@ export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAc
                 {user.isSuspended && (
                   <Badge variant="destructive">SUSPENDED</Badge>
                 )}
+                {user.paidBookingsApproved && (
+                  <Badge variant="default">PAID OK</Badge>
+                )}
               </div>
             </TableCell>
             <TableCell>
@@ -136,6 +153,13 @@ export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAc
                   onClick={() => handleToggleSuspend(user.id, user.isSuspended)}
                 >
                   {user.isSuspended ? "Unsuspend" : "Suspend"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleTogglePaidApproval(user.id, user.paidBookingsApproved)}
+                >
+                  {user.paidBookingsApproved ? "Revoke paid" : "Approve paid"}
                 </Button>
               </div>
             </TableCell>

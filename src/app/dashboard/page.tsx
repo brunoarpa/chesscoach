@@ -9,7 +9,7 @@ import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
-import { expirePendingRequests, autoCompleteLessons, detectNoShows } from "@/lib/activity";
+import { expirePendingRequests, autoCompleteLessons, detectNoShows, DISPUTE_WINDOW_MS } from "@/lib/activity";
 
 export default async function DashboardPage({
   searchParams,
@@ -31,7 +31,7 @@ export default async function DashboardPage({
 
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true, lastActiveAt: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true, lastActiveAt: true, paidBookingsApproved: true },
   });
   if (!currentUser) redirect("/login");
 
@@ -64,6 +64,7 @@ export default async function DashboardPage({
     incomingCompletedRecent,
     incomingStatusCounts,
     incomingHasCompletedTrial,
+    incomingPendingTrial,
     outgoingActive,
     outgoingCompletedRecent,
     outgoingStatusCounts,
@@ -104,6 +105,19 @@ export default async function DashboardPage({
     prisma.lessonRequest.findFirst({
       where: { coachId: session.user.id, ...carriedOutTrialWhere },
       select: { id: true },
+    }),
+    // A trial both parties carried out that is still inside its dispute
+    // window — shown to the coach as "waiting for the student to confirm".
+    prisma.lessonRequest.findFirst({
+      where: {
+        coachId: session.user.id,
+        isTrial: true,
+        status: "IN_PROGRESS",
+        coachJoinedAt: { not: null },
+        studentJoinedAt: { not: null },
+      },
+      select: { scheduledEndAt: true },
+      orderBy: { scheduledStartAt: "desc" },
     }),
     // Student outgoing — active
     prisma.lessonRequest.findMany({
@@ -235,7 +249,12 @@ export default async function DashboardPage({
             isCoach={isCoach}
             completedTotal={incomingCompletedTotal}
             otherTotal={incomingOtherTotal}
-            hasCompletedTrial={!!incomingHasCompletedTrial}
+            hasCompletedTrial={!!incomingHasCompletedTrial || currentUser.paidBookingsApproved}
+            pendingTrialAutoCompletesAt={
+              incomingPendingTrial?.scheduledEndAt
+                ? new Date(incomingPendingTrial.scheduledEndAt.getTime() + DISPUTE_WINDOW_MS).toISOString()
+                : null
+            }
             hasSchedule={weeklyTemplates.length > 0}
             hidePending
           />

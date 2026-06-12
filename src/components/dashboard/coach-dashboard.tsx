@@ -118,6 +118,7 @@ export function CoachDashboard({
   completedTotal,
   otherTotal,
   hasCompletedTrial,
+  pendingTrialAutoCompletesAt = null,
   hasSchedule = true,
   hidePending = false,
 }: {
@@ -127,6 +128,7 @@ export function CoachDashboard({
   completedTotal: number;
   otherTotal: number;
   hasCompletedTrial: boolean;
+  pendingTrialAutoCompletesAt?: string | null;
   hasSchedule?: boolean;
   hidePending?: boolean;
 }) {
@@ -191,11 +193,26 @@ export function CoachDashboard({
       </div>
 
       {showTrialNotice && (
-        <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 text-sm">
-          <p className="font-medium text-amber-900 dark:text-amber-200">
-            Complete 1 free trial lesson to unlock paid bookings.
-          </p>
-        </div>
+        pendingTrialAutoCompletesAt ? (
+          <div className="p-3 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30 text-sm">
+            <p className="font-medium text-blue-900 dark:text-blue-200">
+              Free trial done — waiting for the student to confirm.
+            </p>
+            <p className="text-blue-800 dark:text-blue-300 mt-0.5">
+              Paid bookings unlock as soon as they confirm, or automatically by{" "}
+              {new Date(pendingTrialAutoCompletesAt).toLocaleString([], {
+                month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+              })}{" "}
+              if no issue is reported.
+            </p>
+          </div>
+        ) : (
+          <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 text-sm">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
+              Complete 1 free trial lesson to unlock paid bookings.
+            </p>
+          </div>
+        )
       )}
 
       {coachAvailability === "AVAILABLE" && !hasSchedule && (
