@@ -84,18 +84,35 @@ export async function PATCH(
   }
 
   // Broadcast move update via Pusher. Best-effort: the DB row is the source of
-  // truth, so a failed broadcast (e.g. a tree past Pusher's event size limit)
-  // must not fail the request after the state was already persisted.
+  // truth, so a failed broadcast must not fail the request after the state was
+  // already persisted.
   const pusher = getPusherServer();
   if (pusher) {
+    const payload = {
+      tree: boardTree,
+      currentNodeId,
+      senderId: session.user.id,
+    };
+    const refetchPing = { currentNodeId, senderId: session.user.id };
+    // Pusher rejects events over 10KB (HTTP 413), and a real lesson's
+    // variation tree blows past that well before our DB size caps. Past the
+    // threshold, broadcast a tiny "refetch" ping instead — the other client
+    // pulls the persisted tree from GET, which has no such limit.
+    const PUSHER_SAFE_BYTES = 9_000;
     try {
-      await pusher.trigger(`private-lesson-${id}`, "board:moves", {
-        tree: boardTree,
-        currentNodeId,
-        senderId: session.user.id,
-      });
+      if (JSON.stringify(payload).length > PUSHER_SAFE_BYTES) {
+        await pusher.trigger(`private-lesson-${id}`, "board:refetch", refetchPing);
+      } else {
+        await pusher.trigger(`private-lesson-${id}`, "board:moves", payload);
+      }
     } catch (err) {
-      console.error("board:moves broadcast failed", err);
+      // Whatever the reason the full payload was rejected, the tiny ping
+      // should still go through and keep the boards in sync.
+      try {
+        await pusher.trigger(`private-lesson-${id}`, "board:refetch", refetchPing);
+      } catch {
+        console.error("board sync broadcast failed", err);
+      }
     }
   }
 

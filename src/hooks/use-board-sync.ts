@@ -67,8 +67,22 @@ export function useBoardSync({
       if (data.senderId === userId) return;
       onRemoteReset();
     };
+    // Sent instead of board:moves when the tree is too large for Pusher's
+    // 10KB event limit — pull the persisted state from the API instead.
+    const onRefetch = async (data: { currentNodeId: string; senderId: string }) => {
+      if (data.senderId === userId) return;
+      try {
+        const res = await fetch(`/api/lesson/${lessonId}/board`);
+        if (!res.ok) return;
+        const body = await res.json();
+        if (body.boardTree) onRemoteMoves(body.boardTree as MoveTree, data.currentNodeId);
+      } catch {
+        // Transient — the next move broadcast (or refetch) resyncs the board.
+      }
+    };
 
     channel.bind("board:moves", onMoves);
+    channel.bind("board:refetch", onRefetch);
     channel.bind("board:navigate", onNavigate);
     channel.bind("board:arrows", onArrows);
     channel.bind("board:highlights", onHighlights);
@@ -80,6 +94,7 @@ export function useBoardSync({
       // chat, presence, and call:status share this same channel, so tearing it
       // down here would silently break their realtime sync.
       channel.unbind("board:moves", onMoves);
+      channel.unbind("board:refetch", onRefetch);
       channel.unbind("board:navigate", onNavigate);
       channel.unbind("board:arrows", onArrows);
       channel.unbind("board:highlights", onHighlights);
