@@ -595,6 +595,13 @@ export async function reportNoShow(requestId: string) {
     if (request.coachJoinedAt) {
       return { error: "Coach has already joined the lesson" };
     }
+    // The reporter must have shown up themselves. If neither party joined,
+    // the auto-sweep expires the lesson with a full refund and no ELO
+    // penalty — letting an absent student report would pin an unfair
+    // penalty on an equally absent coach.
+    if (!request.studentJoinedAt) {
+      return { error: "Join the lesson room first — if the coach doesn't show up, report it from there. If neither of you joins, the lesson expires on its own with a full refund." };
+    }
 
     const claimed = await prisma.$transaction(async (tx) => {
       // Atomically claim the lesson so a concurrent cron sweep or the coach's
@@ -662,6 +669,12 @@ export async function reportNoShow(requestId: string) {
     // Coach reporting student no-show — coach gets paid
     if (request.studentJoinedAt) {
       return { error: "Student has already joined the lesson" };
+    }
+    // The reporter must have shown up themselves — a coach who also skipped
+    // the lesson must not be able to charge the student for it. The
+    // auto-sweep handles the neither-joined case as a no-payment expiry.
+    if (!request.coachJoinedAt) {
+      return { error: "Join the lesson room first — a no-show can only be reported by the party who showed up. If neither of you joins, the lesson expires with no payment." };
     }
 
     if (now < startTime + STUDENT_NO_SHOW_GRACE_MS) {
