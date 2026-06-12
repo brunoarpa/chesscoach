@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation } from "@/lib/chess-com";
 import { filterValidLanguages } from "@/lib/languages";
+import { generateUpcomingSlots } from "@/lib/actions/timeslots";
 import crypto from "crypto";
 
 export async function setUsername(formData: FormData) {
@@ -50,6 +51,15 @@ export async function updateProfile(formData: FormData) {
   if (rawTimezone && rawTimezone.length > 64) {
     return { error: "Invalid timezone." };
   }
+  // Must be a real IANA zone — slot generation feeds it to Intl.DateTimeFormat,
+  // which throws on unknown zones and would break the coach's schedule later.
+  if (rawTimezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: rawTimezone });
+    } catch {
+      return { error: "Invalid timezone." };
+    }
+  }
 
   const raw = {
     username: (formData.get("username") as string)?.trim() || undefined,
@@ -82,7 +92,7 @@ export async function updateProfile(formData: FormData) {
   // Validate and handle username change
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { username: true, coachAvailability: true, coachChatPrice: true, coachCallPrice: true },
+    select: { username: true, coachAvailability: true, coachChatPrice: true, coachCallPrice: true, timezone: true },
   });
   let newUsername = currentUser?.username ?? null;
   if (raw.username && raw.username !== currentUser?.username) {
@@ -139,6 +149,32 @@ export async function updateProfile(formData: FormData) {
       activityStatus: "ACTIVE",
     },
   });
+
+  // A timezone change invalidates every future template-generated slot: the
+  // stored TimeSlots are UTC instants materialized under the OLD timezone, so
+  // they no longer match the wall-clock hours the coach picked. Drop the
+  // regenerable ones and rebuild under the new timezone. Booked slots stay —
+  // both parties committed to those exact instants.
+  const timezoneChanged = (raw.timezone ?? null) !== (currentUser?.timezone ?? null);
+  if (timezoneChanged) {
+    const nowTs = new Date();
+    await prisma.timeSlot.deleteMany({
+      where: {
+        coachId: session.user.id,
+        startTime: { gt: nowTs },
+        status: { in: ["AVAILABLE", "UNAVAILABLE"] },
+        lessonRequests: { none: {} },
+      },
+    });
+    // Stale slots referenced by old (declined/expired) requests can't be
+    // deleted; hide them so students can't book times that no longer match
+    // the coach's schedule.
+    await prisma.timeSlot.updateMany({
+      where: { coachId: session.user.id, startTime: { gt: nowTs }, status: "AVAILABLE" },
+      data: { status: "UNAVAILABLE" },
+    });
+    await generateUpcomingSlots(session.user.id);
+  }
 
   // Onboarding hand-off: someone who just set their first coaching price has
   // become bookable in principle, but students can only book concrete time

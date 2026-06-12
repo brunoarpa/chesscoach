@@ -119,9 +119,33 @@ export async function saveWeeklyTemplate(
 
   await prisma.$transaction([
     ...(toDelete.length > 0
-      ? [prisma.timeSlotTemplate.deleteMany({
-          where: { id: { in: toDelete.map((t) => t.id) } },
-        })]
+      ? [
+          // Removing a weekly slot must also remove the concrete future slots
+          // already generated from it — otherwise students could keep booking
+          // times the coach just deleted (template deletion alone would only
+          // null out templateId and leave the slots AVAILABLE). Booked slots
+          // stay; slots referenced by old requests can't be deleted, so they
+          // are hidden instead.
+          prisma.timeSlot.deleteMany({
+            where: {
+              templateId: { in: toDelete.map((t) => t.id) },
+              startTime: { gt: new Date() },
+              status: { in: ["AVAILABLE", "UNAVAILABLE"] },
+              lessonRequests: { none: {} },
+            },
+          }),
+          prisma.timeSlot.updateMany({
+            where: {
+              templateId: { in: toDelete.map((t) => t.id) },
+              startTime: { gt: new Date() },
+              status: "AVAILABLE",
+            },
+            data: { status: "UNAVAILABLE" },
+          }),
+          prisma.timeSlotTemplate.deleteMany({
+            where: { id: { in: toDelete.map((t) => t.id) } },
+          }),
+        ]
       : []),
     ...(toCreate.length > 0
       ? [prisma.timeSlotTemplate.createMany({
