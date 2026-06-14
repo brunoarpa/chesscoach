@@ -8,6 +8,17 @@ if (dsn) {
   Sentry.init({
     dsn,
     tracesSampleRate: 0.1,
+    // Transient client-side fetch failures — dropped wifi, a backgrounded
+    // tab, or navigating away mid-request. The app already tolerates these
+    // (board/chat fetches are best-effort), so they're noise, not bugs.
+    ignoreErrors: [
+      "TypeError: network error",
+      "TypeError: Failed to fetch",
+      "TypeError: Load failed",
+      "TypeError: cancelled",
+      "NetworkError when attempting to fetch resource",
+      "AbortError",
+    ],
   });
 }
 
