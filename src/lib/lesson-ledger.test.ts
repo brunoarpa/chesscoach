@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
-import { coachEarnings } from "@/lib/fees";
 
 // A fake transaction client that records the writes payCoachForLesson makes,
 // so we can assert the exact money movements without a database.
@@ -40,16 +39,15 @@ describe("payCoachForLesson — paid lesson", () => {
     });
   });
 
-  it("credits the coach with earnings (price minus commission)", async () => {
+  it("credits the coach the full gross price (commission is taken at withdrawal)", async () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), paidLesson);
 
-    const earnings = coachEarnings(1500); // 1350
     expect(tx.user.update).toHaveBeenCalledWith({
       where: { id: "coach_1" },
       data: {
-        pendingEarnings: { increment: earnings },
-        totalEarningsAllTime: { increment: earnings },
+        pendingEarnings: { increment: 1500 },
+        totalEarningsAllTime: { increment: 1500 },
         lessonsGiven: { increment: 1 },
       },
     });
@@ -59,25 +57,24 @@ describe("payCoachForLesson — paid lesson", () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), paidLesson);
 
-    const earnings = coachEarnings(1500);
     expect(tx.transaction.create).toHaveBeenCalledWith({
       data: { userId: "student_1", type: "LESSON_PAYMENT", amount: -1500, lessonRequestId: "lesson_1" },
     });
     expect(tx.transaction.create).toHaveBeenCalledWith({
-      data: { userId: "coach_1", type: "LESSON_PAYMENT", amount: earnings, lessonRequestId: "lesson_1" },
+      data: { userId: "coach_1", type: "LESSON_PAYMENT", amount: 1500, lessonRequestId: "lesson_1" },
     });
     expect(tx.transaction.create).toHaveBeenCalledTimes(2);
   });
 
-  it("records the coach's earning for ELO/stat purposes", async () => {
+  it("records the coach's gross earning for ELO/stat purposes", async () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), paidLesson);
     expect(tx.earningRecord.create).toHaveBeenCalledWith({
-      data: { userId: "coach_1", amount: coachEarnings(1500) },
+      data: { userId: "coach_1", amount: 1500 },
     });
   });
 
-  it("conserves money: the student debit equals the coach credit plus commission", async () => {
+  it("conserves money: the gross debit to the student equals the gross credit to the coach", async () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), paidLesson);
 
@@ -86,9 +83,10 @@ describe("payCoachForLesson — paid lesson", () => {
     const studentRow = rows.find((d) => d.userId === "student_1")!;
     const coachRow = rows.find((d) => d.userId === "coach_1")!;
 
-    // Student pays 1500; coach receives earnings; the difference is platform margin.
+    // Wallet shows gross: student pays 1500, coach is credited the same 1500.
+    // The platform's commission is realised later, at withdrawal.
     expect(-studentRow.amount).toBe(paidLesson.estimatedCost);
-    expect(coachRow.amount).toBeLessThanOrEqual(paidLesson.estimatedCost);
+    expect(coachRow.amount).toBe(paidLesson.estimatedCost);
   });
 });
 

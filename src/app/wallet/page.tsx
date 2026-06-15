@@ -44,25 +44,7 @@ export default async function WalletPage() {
 
   const available = user.walletBalance - user.reservedBalance;
 
-  // Whether Stripe's $2 monthly active-account fee would apply to a withdrawal
-  // right now (i.e. no payout yet this calendar month). Mirrors the check in
-  // the withdraw API route.
   const isCoach = !!(user.coachChatPrice || user.coachCallPrice);
-  let monthlyFeeDue = true;
-  if (isCoach) {
-    const monthStart = new Date();
-    monthStart.setUTCDate(1);
-    monthStart.setUTCHours(0, 0, 0, 0);
-    const payoutThisMonth = await prisma.payout.findFirst({
-      where: {
-        coachId: session.user.id,
-        status: { in: ["PENDING", "COMPLETED"] },
-        createdAt: { gte: monthStart },
-      },
-      select: { id: true },
-    });
-    monthlyFeeDue = !payoutThisMonth;
-  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -102,7 +84,7 @@ export default async function WalletPage() {
           <Separator className="my-8" />
           <StripeConnectSetup />
           <div className="mt-4">
-            <WithdrawForm pendingEarnings={user.pendingEarnings} monthlyFeeDue={monthlyFeeDue} />
+            <WithdrawForm pendingEarnings={user.pendingEarnings} />
           </div>
           <p className="text-xs text-muted-foreground mt-3">
             Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — EloChaser does not withhold or remit taxes on your behalf.

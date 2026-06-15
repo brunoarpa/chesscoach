@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { APP_CURRENCY, getStripe } from "@/lib/stripe";
-import { payoutFee, payoutTransferFee, PAYOUT_MONTHLY_FEE_CENTS, MIN_PAYOUT_CENTS } from "@/lib/fees";
+import { payoutFee, payoutCommission, PAYOUT_BASE_FEE_CENTS, MIN_PAYOUT_CENTS } from "@/lib/fees";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -88,24 +88,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your payout account is not fully set up" }, { status: 400 });
   }
 
-  // Stripe bills its $2 monthly active-account fee once per calendar month in
-  // which the coach receives a payout; pass it through only on their first
-  // withdrawal of the month. PENDING counts (an in-flight payout will trigger
-  // it); FAILED payouts never reached Stripe, so they don't.
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
-  const payoutThisMonth = await prisma.payout.findFirst({
-    where: {
-      coachId: session.user.id,
-      status: { in: ["PENDING", "COMPLETED"] },
-      createdAt: { gte: monthStart },
-    },
-    select: { id: true },
-  });
-  const monthlyFeeDue = !payoutThisMonth;
-
-  const fee = payoutFee(grossAmount, monthlyFeeDue);
+  // The wallet shows gross earnings; all deductions happen here, at withdrawal:
+  // a flat base fee (pass-through of Stripe's payout costs) plus the platform
+  // commission. The flat base is charged on every withdrawal, not month-gated.
+  const fee = payoutFee(grossAmount);
   const netAmount = grossAmount - fee;
 
   if (netAmount <= 0) {
@@ -184,8 +170,8 @@ export async function POST(req: NextRequest) {
       success: true,
       gross: grossAmount,
       fee,
-      transferFee: payoutTransferFee(grossAmount),
-      monthlyFee: monthlyFeeDue ? PAYOUT_MONTHLY_FEE_CENTS : 0,
+      commission: payoutCommission(grossAmount),
+      baseFee: PAYOUT_BASE_FEE_CENTS,
       net: netAmount,
     });
   } catch (error) {

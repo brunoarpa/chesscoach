@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
-import { coachEarnings } from "@/lib/fees";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { NO_SHOW_ELO_PENALTY } from "@/lib/utils";
 
@@ -259,8 +258,8 @@ export async function resolveDispute(
             await tx.user.update({
               where: { id: lesson.coachId },
               data: {
-                pendingEarnings: { decrement: coachEarnings(lesson.estimatedCost) },
-                totalEarningsAllTime: { decrement: coachEarnings(lesson.estimatedCost) },
+                pendingEarnings: { decrement: lesson.estimatedCost },
+                totalEarningsAllTime: { decrement: lesson.estimatedCost },
               },
             });
             await tx.transaction.create({
@@ -275,7 +274,7 @@ export async function resolveDispute(
               data: {
                 userId: lesson.coachId,
                 type: "LESSON_REFUND",
-                amount: -coachEarnings(lesson.estimatedCost),
+                amount: -lesson.estimatedCost,
                 lessonRequestId: lessonId,
               },
             });
@@ -351,8 +350,8 @@ export async function resolveDispute(
             await tx.user.update({
               where: { id: lesson.coachId },
               data: {
-                pendingEarnings: { increment: coachEarnings(lesson.estimatedCost) },
-                totalEarningsAllTime: { increment: coachEarnings(lesson.estimatedCost) },
+                pendingEarnings: { increment: lesson.estimatedCost },
+                totalEarningsAllTime: { increment: lesson.estimatedCost },
                 lessonsGiven: { increment: 1 },
                 // Reverse the ELO penalty applied during no-show detection
                 coachRatingPenalty: { decrement: NO_SHOW_ELO_PENALTY },
@@ -370,12 +369,12 @@ export async function resolveDispute(
               data: {
                 userId: lesson.coachId,
                 type: "LESSON_PAYMENT",
-                amount: coachEarnings(lesson.estimatedCost),
+                amount: lesson.estimatedCost,
                 lessonRequestId: lessonId,
               },
             });
             await tx.earningRecord.create({
-              data: { userId: lesson.coachId, amount: coachEarnings(lesson.estimatedCost) },
+              data: { userId: lesson.coachId, amount: lesson.estimatedCost },
             });
           }
           await tx.user.update({ where: { id: lesson.studentId }, data: { hasActiveDispute: false } });

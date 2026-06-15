@@ -8,18 +8,16 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   MIN_PAYOUT_CENTS,
-  PAYOUT_MONTHLY_FEE_CENTS,
-  payoutTransferFee,
+  PAYOUT_BASE_FEE_CENTS,
+  PLATFORM_FEE_PERCENT,
+  payoutCommission,
   payoutFee,
 } from "@/lib/fees";
 
 export function WithdrawForm({
   pendingEarnings,
-  monthlyFeeDue,
 }: {
   pendingEarnings: number;
-  /** True when this would be the coach's first payout this calendar month, so Stripe's $2 monthly fee applies. */
-  monthlyFeeDue: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [amountStr, setAmountStr] = useState("");
@@ -43,8 +41,8 @@ export function WithdrawForm({
   const parsedAmount = Number(amountStr);
   const amountCents = Number.isFinite(parsedAmount) ? Math.round(parsedAmount * 100) : 0;
   const validAmount = amountCents >= MIN_PAYOUT_CENTS && amountCents <= pendingEarnings;
-  const transferFeeCents = validAmount ? payoutTransferFee(amountCents) : 0;
-  const feeCents = validAmount ? payoutFee(amountCents, monthlyFeeDue) : 0;
+  const commissionCents = validAmount ? payoutCommission(amountCents) : 0;
+  const feeCents = validAmount ? payoutFee(amountCents) : 0;
   const netCents = validAmount ? amountCents - feeCents : 0;
 
   function handleMax() {
@@ -157,20 +155,13 @@ export function WithdrawForm({
                   <span>${(amountCents / 100).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Transfer fee ($0.40 + 0.5%)</span>
-                  <span>-${(transferFeeCents / 100).toFixed(2)}</span>
+                  <span className="text-muted-foreground">Platform commission ({(PLATFORM_FEE_PERCENT * 100).toFixed(0)}%)</span>
+                  <span>-${(commissionCents / 100).toFixed(2)}</span>
                 </div>
-                {monthlyFeeDue ? (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Stripe monthly payout fee</span>
-                    <span>-${(PAYOUT_MONTHLY_FEE_CENTS / 100).toFixed(2)}</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Stripe monthly payout fee</span>
-                    <span className="text-green-600">covered this month ✓</span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stripe payout fee</span>
+                  <span>-${(PAYOUT_BASE_FEE_CENTS / 100).toFixed(2)}</span>
+                </div>
                 <div className="flex justify-between font-medium border-t pt-1">
                   <span>You receive</span>
                   <span className="text-green-600">${(netCents / 100).toFixed(2)}</span>
@@ -190,10 +181,11 @@ export function WithdrawForm({
                 : "Enter an amount"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Stripe charges the $2 fee once per calendar month with a payout,
-              not per withdrawal — withdrawing larger amounts less often keeps
-              your fees low. Amounts are in USD; if your bank uses another
-              currency, Stripe converts at the current rate when paying out.
+              The ${(PAYOUT_BASE_FEE_CENTS / 100).toFixed(2)} payout fee is what Stripe charges us to
+              send money to your bank — it&apos;s a flat fee per withdrawal, so
+              withdrawing larger amounts less often keeps your fees low. Amounts
+              are in USD; if your bank uses another currency, Stripe converts at
+              the current rate when paying out.
             </p>
           </div>
         )}

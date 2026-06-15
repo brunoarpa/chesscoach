@@ -1,27 +1,18 @@
 /**
- * Platform commission on completed lessons.
+ * Platform commission, taken at withdrawal.
  *
- * The coach absorbs the fee: the student pays the full lesson price, the coach
- * receives `price − commission`, and the commission stays in the platform's
- * Stripe balance as revenue. A lesson payment is an internal ledger move (no
- * Stripe processing fee), so this commission is pure margin.
+ * The wallet shows GROSS earnings — a completed lesson credits the coach the
+ * full price the student paid, and nothing is deducted until the coach cashes
+ * out. The platform's cut is then realised as a percentage of the amount
+ * withdrawn, and stays in the platform's Stripe balance as revenue.
  *
  * Change PLATFORM_FEE_PERCENT to adjust the rate everywhere.
  */
-export const PLATFORM_FEE_PERCENT = 0.1; // 10%
+export const PLATFORM_FEE_PERCENT = 0.05; // 5%
 
-/** The platform's cut of a lesson price, in cents (rounded). */
-export function platformCommission(priceCents: number): number {
-  return Math.round(priceCents * PLATFORM_FEE_PERCENT);
-}
-
-/**
- * What the coach actually earns from a lesson, in cents: the price minus the
- * platform commission. Defined as the remainder so coachEarnings + commission
- * always sums back to the exact price (no rounding leakage).
- */
-export function coachEarnings(priceCents: number): number {
-  return priceCents - platformCommission(priceCents);
+/** The platform's commission on a withdrawal, in cents (rounded). This is our margin. */
+export function payoutCommission(amountCents: number): number {
+  return Math.round(amountCents * PLATFORM_FEE_PERCENT);
 }
 
 /**
@@ -38,33 +29,29 @@ export function processingFee(amountCents: number): number {
 }
 
 /**
- * Coach withdrawal fees: a transparent pass-through of Stripe's real costs,
- * with no platform markup beyond a small rounding cushion.
+ * Coach withdrawal fees. Both parts are taken at withdrawal — the wallet shows
+ * gross, so this is the only place money is deducted.
  *
- * Stripe bills the platform two things for Express payouts:
- * - $2 per "monthly active account" — once per calendar month, only in months
- *   the coach receives at least one payout. Passed through on the coach's
- *   FIRST withdrawal of each month (`PAYOUT_MONTHLY_FEE_CENTS`); later
- *   withdrawals that month skip it.
- * - ~0.25% + $0.25 per transfer — covered by `payoutTransferFee` ($0.40 +
- *   0.5%).
+ * 1. A flat base fee per withdrawal (`PAYOUT_BASE_FEE_CENTS`). This is a
+ *    pass-through of Stripe's payout costs — its $2/month active-account fee
+ *    plus its ~$0.25 + 0.25% per-transfer fee — bundled into one flat charge
+ *    the coach sees as a "Stripe payout fee". Charged on every withdrawal (not
+ *    month-gated): a flat base means the platform always covers Stripe no
+ *    matter how small the withdrawal, which is what lets the minimum stay low.
+ *    Withdrawing larger amounts less often spreads it thinner.
+ * 2. The platform commission (`payoutCommission`) — our actual margin.
  *
- * Because the cost is mostly fixed, the effective fee percentage falls the
- * more a coach withdraws at once — the intended incentive to batch payouts.
+ * The effective percentage therefore falls the more a coach withdraws at once,
+ * the intended incentive to batch payouts.
  */
-// High enough that a payout always carries more commission than its Stripe
-// costs, low enough that a new coach reaches it within a handful of lessons.
-export const MIN_PAYOUT_CENTS = 2500; // $25.00
+// Covers Stripe's $2/month active-account fee + its ~$0.25 + 0.25% per transfer.
+export const PAYOUT_BASE_FEE_CENTS = 250; // $2.50
 
-export const PAYOUT_MONTHLY_FEE_CENTS = 200; // $2.00, Stripe's monthly active-account fee
-export const PAYOUT_TRANSFER_FEE_FLAT_CENTS = 40; // $0.40
-export const PAYOUT_TRANSFER_FEE_PERCENT = 0.005; // 0.5%
+// Low on purpose: the flat base fee already covers Stripe at any size, so the
+// minimum only exists to stop the fee from exceeding a tiny withdrawal.
+export const MIN_PAYOUT_CENTS = 500; // $5.00
 
-export function payoutTransferFee(amountCents: number): number {
-  return PAYOUT_TRANSFER_FEE_FLAT_CENTS + Math.ceil(amountCents * PAYOUT_TRANSFER_FEE_PERCENT);
-}
-
-/** Total withdrawal fee. `monthlyFeeDue` = no other payout yet this calendar month. */
-export function payoutFee(amountCents: number, monthlyFeeDue: boolean): number {
-  return payoutTransferFee(amountCents) + (monthlyFeeDue ? PAYOUT_MONTHLY_FEE_CENTS : 0);
+/** Total amount deducted from a withdrawal: the flat Stripe base fee + the platform commission. */
+export function payoutFee(amountCents: number): number {
+  return PAYOUT_BASE_FEE_CENTS + payoutCommission(amountCents);
 }
