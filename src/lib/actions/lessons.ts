@@ -19,6 +19,10 @@ const lessonRequestInputSchema = z.object({
   isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
   communicationMethod: z.enum(["CALL", "CHAT"]).optional(),
   message: z.string().max(500).optional(),
+  // The price (cents) the student was shown when they clicked Book. If the
+  // coach changed their price since the page loaded, the server rejects the
+  // booking rather than silently charging the new amount.
+  expectedPrice: z.coerce.number().int().nonnegative().optional(),
 });
 
 export async function createLessonRequest(formData: FormData) {
@@ -31,13 +35,14 @@ export async function createLessonRequest(formData: FormData) {
     isTrial: formData.get("isTrial") ?? "false",
     communicationMethod: formData.get("communicationMethod") || undefined,
     message: formData.get("message") || undefined,
+    expectedPrice: formData.get("expectedPrice") || undefined,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { coachId, timeSlotId, isTrial, communicationMethod, message } = parsed.data;
+  const { coachId, timeSlotId, isTrial, communicationMethod, message, expectedPrice } = parsed.data;
 
   if (coachId === session.user.id) {
     return { error: "You cannot request a lesson from yourself" };
@@ -150,6 +155,17 @@ export async function createLessonRequest(formData: FormData) {
       if (!coach.coachChatPrice) return { error: "Coach doesn't offer chat lessons" };
       slotPrice = coach.coachChatPrice;
     }
+
+    // Guard against a price change between page load and booking: if the
+    // coach raised (or lowered) their price after the student saw it, refuse
+    // rather than charge a number the student never agreed to. The student's
+    // dashboard/profile reload will show the new price for a fresh decision.
+    if (expectedPrice !== undefined && expectedPrice !== slotPrice) {
+      return {
+        error: `This coach's price changed to $${(slotPrice / 100).toFixed(2)} since you opened this page. Refresh and book again if that works for you.`,
+      };
+    }
+
     estimatedCost = slotPrice; // 1 slot = 15 min
   }
 

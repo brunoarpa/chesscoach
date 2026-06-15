@@ -100,6 +100,9 @@ export function SlotPicker({
     } else {
       formData.set("isTrial", "false");
       if (commMethod) formData.set("communicationMethod", commMethod);
+      // The price the student is looking at right now — the server rejects the
+      // booking if the coach has since changed it.
+      formData.set("expectedPrice", String(slotPrice));
     }
     if (message.trim()) formData.set("message", message.trim());
 
