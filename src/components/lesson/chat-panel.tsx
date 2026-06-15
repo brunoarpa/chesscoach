@@ -204,7 +204,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages, local 
       </div>
       {!local && (
         <p className="px-3 pb-2 text-[11px] text-muted-foreground">
-          Chat is kept for 30 days for dispute resolution, then deleted. Calls aren&apos;t recorded.
+          Chat is kept for 30 days for dispute resolution, then deleted.
         </p>
       )}
     </div>
