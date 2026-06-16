@@ -15,11 +15,6 @@ class TooManyAttempts extends CredentialsSignin {
   code = "too_many_attempts";
 }
 
-/** Banned = rejected verification + deactivated. Mirrors the signIn() block. */
-function isBanned(user: { verificationStatus: string; activityStatus: string }): boolean {
-  return user.verificationStatus === "REJECTED" && user.activityStatus === "INACTIVE";
-}
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
@@ -66,7 +61,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user.id) return false;
         const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
         if (!dbUser) return false;
-        if (isBanned(dbUser)) return false;
         await prisma.user.update({
           where: { id: dbUser.id },
           data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
@@ -131,9 +125,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       });
 
-      // Block banned users
-      if (isBanned(dbUser)) return false;
-
       // Update activity. coachAvailability stays untouched — the 24h rule is
       // derived at read time (getEffectiveAvailability), so signing back in
       // is what makes a coach appear Available again.
@@ -180,13 +171,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             username: true,
             role: true,
             verificationStatus: true,
-            activityStatus: true,
           },
         });
-        // A ban must also kill existing sessions, not just new sign-ins: leave
-        // the session unpopulated (no user id) so every auth check treats the
-        // bearer as logged out for the remainder of their JWT's lifetime.
-        if (dbUser && !isBanned(dbUser)) {
+        if (dbUser) {
           session.user.id = dbUser.id;
           (session.user as unknown as Record<string, unknown>).username = dbUser.username;
           (session.user as unknown as Record<string, unknown>).role = dbUser.role;
