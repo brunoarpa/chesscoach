@@ -159,7 +159,7 @@ export function WithdrawForm({
                   <span>-${(commissionCents / 100).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Stripe payout fee</span>
+                  <span className="text-muted-foreground">Stripe payout fee (constant)</span>
                   <span>-${(PAYOUT_BASE_FEE_CENTS / 100).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-medium border-t pt-1">
@@ -180,13 +180,6 @@ export function WithdrawForm({
                 ? `Withdraw $${(amountCents / 100).toFixed(2)}`
                 : "Enter an amount"}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">
-              The ${(PAYOUT_BASE_FEE_CENTS / 100).toFixed(2)} payout fee is what Stripe charges us to
-              send money to your bank — it&apos;s a flat fee per withdrawal, so
-              withdrawing larger amounts less often keeps your fees low. Amounts
-              are in USD; if your bank uses another currency, Stripe converts at
-              the current rate when paying out.
-            </p>
           </div>
         )}
       </CardContent>
