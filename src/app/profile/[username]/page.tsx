@@ -141,21 +141,6 @@ export default async function ProfilePage({
       ? studentReviews.reduce((sum, r) => sum + r.rating, 0) / studentReviews.length
       : null;
 
-  // Calculate total paid by each student reviewing (for coach reviews)
-  const studentTotals: Record<string, number> = {};
-  if (coachReviews.length > 0) {
-    const completedLessons = await prisma.lessonRequest.findMany({
-      where: {
-        coachId: user.id,
-        status: "COMPLETED",
-      },
-      select: { studentId: true, estimatedCost: true },
-    });
-    for (const lesson of completedLessons) {
-      studentTotals[lesson.studentId] = (studentTotals[lesson.studentId] || 0) + lesson.estimatedCost;
-    }
-  }
-
   // Fetch student wallet balance and free trials for lesson request form
   let studentAvailableBalance: number | null = null;
   let freeTrialsRemaining: number = 0;
@@ -400,13 +385,7 @@ export default async function ProfilePage({
                 </TabsList>
               </div>
               <TabsContent value="coach-reviews">
-                <ReviewList
-                  reviews={coachReviews.map((r) => ({
-                    ...r,
-                    totalPaid: studentTotals[r.fromUserId] || 0,
-                  }))}
-                  showTotalPaid
-                />
+                <ReviewList reviews={coachReviews} />
               </TabsContent>
               <TabsContent value="student-reviews">
                 <ReviewList reviews={studentReviews} />

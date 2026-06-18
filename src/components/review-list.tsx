@@ -8,15 +8,13 @@ interface Review {
   comment: string | null;
   createdAt: Date;
   fromUser: { username: string | null };
-  totalPaid?: number; // cents
 }
 
 interface Props {
   reviews: Review[];
-  showTotalPaid?: boolean;
 }
 
-export function ReviewList({ reviews, showTotalPaid }: Props) {
+export function ReviewList({ reviews }: Props) {
   if (reviews.length === 0) {
     return <p className="text-muted-foreground text-sm">No reviews yet.</p>;
   }
@@ -31,11 +29,6 @@ export function ReviewList({ reviews, showTotalPaid }: Props) {
                 <span className="font-medium text-sm">
                   {review.fromUser.username ?? "Unknown"}
                 </span>
-                {showTotalPaid && review.totalPaid != null && review.totalPaid > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    · ${(review.totalPaid / 100).toFixed(2)} total paid
-                  </span>
-                )}
               </div>
               <div className="text-sm">
                 {"★".repeat(review.rating)}
