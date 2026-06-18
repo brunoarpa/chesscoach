@@ -38,12 +38,16 @@ const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?
   blunder:     { label: "Blunder",    symbol: "??",                 badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
 };
 
-// Vertical space (px) kept below the board for the move controls and a minimum
-// info area (engine lines + move list). The board is sized from the column's
-// height minus this reserve — a *stable* number — so the board never resizes
-// when the engine-lines box appears/disappears or the move list grows. The info
-// area itself scrolls to absorb that changing content.
-const BOTTOM_RESERVE = 210;
+// The board is sized to fill the column's *visible* height (a stable number, so
+// it never resizes as the content below changes) minus these reserves, then
+// capped by width. The move controls stay on-screen with the board; the move
+// list and best-engine-moves box flow below and the column scrolls to reach
+// them. MIN_BOARD keeps the board usable on very short windows (it overflows
+// and the column scrolls rather than collapsing).
+const BOARD_BOTTOM_RESERVE = 64; // move controls + gap kept under the board
+const COLUMN_PADDING = 32; // p-4 (16px top + bottom) on the board column
+const EVAL_BAR_RESERVE = 32; // eval bar (~28px) + gap, only when hints are on
+const MIN_BOARD = 200;
 
 // Promotion picker piece options, queen-first (nearest the promotion square).
 const PROMOTION_PIECES: Array<{ type: "q" | "r" | "b" | "n"; key: string }> = [
@@ -463,24 +467,24 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!isRemoteUpdateRef.current) broadcastMoves(next, newCurrent);
   }, [tree, currentNodeId, broadcastMoves]);
 
-  // Size the board to the largest square that fits the column: its full width
-  // (minus the eval bar) and its height minus a fixed bottom reserve. Measuring
-  // the *column* (a stable box) rather than the leftover flex space means the
-  // board keeps its size when the engine-lines box or move list change height —
-  // those live in a scrolling area below, so the board no longer zooms in/out
-  // on every move.
+  // Size the board to the largest square that fits the column's *visible* area:
+  // its width (minus the eval bar) and its visible height (minus the move
+  // controls we keep on-screen). We measure the scroll column itself — a box
+  // whose size depends only on the window, not on the content inside it — so
+  // the board keeps its size when the move list grows or the best-moves box
+  // appears/disappears. Those flow below and the column scrolls to reach them.
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const root = containerRef.current;
+    const col = root?.parentElement;
+    if (!root || !col) return;
     const update = () => {
-      const reserve = showHints ? 32 : 0; // eval bar (~28px) + gap
-      const w = el.clientWidth - reserve;
-      const h = el.clientHeight - BOTTOM_RESERVE;
-      setBoardPx(Math.max(0, Math.floor(Math.min(w, h))));
+      const w = root.clientWidth - (showHints ? EVAL_BAR_RESERVE : 0);
+      const h = col.clientHeight - COLUMN_PADDING - BOARD_BOTTOM_RESERVE;
+      setBoardPx(Math.max(MIN_BOARD, Math.floor(Math.min(w, h))));
     };
     update();
     const ro = new ResizeObserver(update);
-    ro.observe(el);
+    ro.observe(col);
     return () => ro.disconnect();
   }, [showHints]);
 
@@ -828,7 +832,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   })();
 
   return (
-    <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px] h-full min-h-0" tabIndex={-1}>
+    <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
           lightbulb gates it alongside the arrows, line list, and classifications —
           unmounting it also stops the Stockfish worker while hints are off.
@@ -929,13 +933,21 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
-      {/* Info area — engine lines + move list. This region takes the remaining
-          height and scrolls, so the engine-lines box appearing/disappearing or
-          the move list growing changes only what scrolls here, never the board. */}
-      <div className="w-full flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
+      {/* Move list — main line plus indented variations; right-click a move for
+          promote / delete. Past moves sit above the engine's best moves. These
+          flow normally and the board column scrolls to reach them, so they
+          never change the board's size. */}
+      {mainlineStart && (
+        <div className="w-full rounded border bg-muted/30 p-2">
+          <div className="text-sm font-mono leading-relaxed [&>button]:mr-1">
+            {renderLine(mainlineStart, 1)}
+          </div>
+        </div>
+      )}
+
       {/* Top engine lines — eval + principal variation for each (hidden when hints off) */}
       {showHints && engineLines.length > 0 && engineLinesFen === currentFen && (
-        <div className="w-full shrink-0 rounded border bg-muted/30 p-2 space-y-1.5">
+        <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
           <div className="space-y-1">
             {engineLines.map((line) => (
@@ -952,17 +964,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           </div>
         </div>
       )}
-
-      {/* Move list — main line plus indented variations; right-click a move for
-          promote / delete. Classifications are shown on the board, not here. */}
-      {mainlineStart && (
-        <div className="w-full shrink-0 rounded border bg-muted/30 p-2">
-          <div className="text-sm font-mono leading-relaxed [&>button]:mr-1">
-            {renderLine(mainlineStart, 1)}
-          </div>
-        </div>
-      )}
-      </div>
 
       {/* Move context menu (promote / delete a variation) */}
       {moveMenu && (() => {
