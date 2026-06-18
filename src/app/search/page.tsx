@@ -4,7 +4,6 @@ import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
 import { auth } from "@/lib/auth";
 import { filterValidLanguages } from "@/lib/languages";
-import { AVAILABILITY_INACTIVITY_MS } from "@/lib/utils";
 
 interface SearchParams {
   q?: string;
@@ -93,24 +92,11 @@ export default async function SearchPage({
   }
 
   if (params.availability && params.availability !== "all") {
-    // Mirror getEffectiveAvailability in SQL: a coach only counts as AVAILABLE
-    // if they also were active within the last 24h. Otherwise the filter would
-    // return coaches whose cards then render "Unavailable".
-     
-    const activityCutoff = new Date(Date.now() - AVAILABILITY_INACTIVITY_MS);
-    const availabilityClause: Prisma.UserWhereInput =
-      params.availability === "AVAILABLE"
-        ? { coachAvailability: "AVAILABLE", lastActiveAt: { gte: activityCutoff } }
-        : {
-            OR: [
-              { coachAvailability: "UNAVAILABLE" },
-              { lastActiveAt: { lt: activityCutoff } },
-            ],
-          };
-    where.AND = [
-      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-      availabilityClause,
-    ];
+    // Bookability is purely the coach's manual toggle now — presence no longer
+    // gates it (see getEffectiveAvailability). A coach with no price is treated
+    // as Unavailable, matching the helper.
+    where.coachAvailability =
+      params.availability === "AVAILABLE" ? "AVAILABLE" : "UNAVAILABLE";
   }
 
   // Booking-time filter: only surface coaches who have a bookable slot starting

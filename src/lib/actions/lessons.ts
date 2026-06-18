@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS } from "@/lib/utils";
+import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS, INSTANT_REQUEST_TTL_MS, MAX_CONCURRENT_PENDING_REQUESTS, PAID_REQUEST_RATE_MAX, PAID_REQUEST_RATE_WINDOW_MS } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson, carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { completeInProgressLesson } from "@/lib/activity";
@@ -69,9 +69,7 @@ export async function createLessonRequest(formData: FormData) {
       coachChatPrice: true,
       coachCallPrice: true,
       verificationStatus: true,
-      activityStatus: true,
       coachAvailability: true,
-      lastActiveAt: true,
       communicationPreference: true,
       paidBookingsApproved: true,
     },
@@ -79,7 +77,7 @@ export async function createLessonRequest(formData: FormData) {
 
   if (!coach) return { error: "Coach not found" };
   // chess.com verification is optional — anyone with prices set and AVAILABLE can be booked.
-  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice);
+  const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice);
   if (effectiveAvailability !== "AVAILABLE") {
     return { error: "This coach is not currently accepting students" };
   }
@@ -212,6 +210,13 @@ export async function createLessonRequest(formData: FormData) {
       scheduledEndAt: slot.endTime,
       acceptanceDeadline: deadline,
     };
+  } else {
+    // Instant (no-slot) request: no future start to anchor a deadline to, so
+    // give it a short fixed fuse. expirePendingRequests refunds the student
+    // once acceptanceDeadline passes, instead of letting it sit for 3 days.
+    slotData = {
+      acceptanceDeadline: new Date(Date.now() + INSTANT_REQUEST_TTL_MS),
+    };
   }
 
   // Rate-limit free trials: at most 3 trial requests per 30 minutes per IP.
@@ -228,6 +233,28 @@ export async function createLessonRequest(formData: FormData) {
     ]);
     if (!byIp.success || !byUser.success) {
       return { error: "You've sent 3 free trial requests recently. Please wait a bit before trying another." };
+    }
+  } else {
+    // Paid requests: cap how many can be pending at once (each reserves funds)
+    // and rate-limit bursts so a student can't spam-book across many coaches.
+    // Done AFTER all validation so failed requests don't count.
+    const pendingPaid = await prisma.lessonRequest.count({
+      where: { studentId: session.user.id, isTrial: false, status: "PENDING" },
+    });
+    if (pendingPaid >= MAX_CONCURRENT_PENDING_REQUESTS) {
+      return {
+        error: `You already have ${MAX_CONCURRENT_PENDING_REQUESTS} requests waiting for a response. Wait for some to be answered or cancel one before sending more.`,
+      };
+    }
+
+    const h = await headers();
+    const ip = getClientIpFromHeaders(h);
+    const [byIp, byUser] = await Promise.all([
+      rateLimit(`lesson-request:${ip}`, { maxAttempts: PAID_REQUEST_RATE_MAX, windowMs: PAID_REQUEST_RATE_WINDOW_MS }),
+      rateLimit(`lesson-request-user:${session.user.id}`, { maxAttempts: PAID_REQUEST_RATE_MAX, windowMs: PAID_REQUEST_RATE_WINDOW_MS }),
+    ]);
+    if (!byIp.success || !byUser.success) {
+      return { error: "You've sent a lot of requests recently. Please wait a bit before sending more." };
     }
   }
 
@@ -302,8 +329,9 @@ export async function createLessonRequest(formData: FormData) {
     userId: coachId,
     type: "LESSON_REQUESTED",
     title: "New lesson request",
-    body: `${studentName} requested a ${isTrial ? "free trial" : "15-min"} lesson.`,
+    body: `${studentName} requested a ${isTrial ? "free trial" : "15-min"} lesson. Accept or decline it from your dashboard.`,
     link: "/dashboard",
+    email: { cta: "Review request" },
   });
 
   revalidatePath("/dashboard");
@@ -400,6 +428,7 @@ export async function respondToLessonRequest(
       title: "Lesson accepted",
       body: `${request.coach.username ?? "Your coach"} accepted your lesson request.`,
       link: `/lesson/${requestId}`,
+      email: { cta: "View lesson" },
     });
   } else {
     // Decline: atomically transition status, then release reserved funds.
@@ -441,8 +470,9 @@ export async function respondToLessonRequest(
       userId: request.studentId,
       type: "LESSON_DECLINED",
       title: "Lesson declined",
-      body: `${request.coach.username ?? "The coach"} declined your lesson request.`,
+      body: `${request.coach.username ?? "The coach"} declined your lesson request.${request.isTrial ? "" : " Your funds have been released."}`,
       link: "/dashboard",
+      email: { cta: "View dashboard" },
     });
 
     await checkStudentSpamPattern(request.studentId);
