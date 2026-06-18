@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { ContactForm } from "./contact-form";
 
 export const metadata: Metadata = {
-  title: "Contact — EloChaser",
+  title: "Contact - EloChaser",
 };
 
 export default async function ContactPage() {
@@ -16,7 +16,7 @@ export default async function ContactPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Contact us</CardTitle>
           <CardDescription>
-            Questions, problems, or feedback — send us a message and we&apos;ll reply by email.
+            Questions, problems, or feedback? Send us a message and we&apos;ll reply by email.
           </CardDescription>
         </CardHeader>
         <CardContent>
