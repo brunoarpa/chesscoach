@@ -3,7 +3,8 @@ import { Prisma } from "@/generated/prisma/client";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson } from "@/lib/lesson-ledger";
 import { createNotification } from "@/lib/notifications";
-import { NO_SHOW_ELO_PENALTY } from "@/lib/utils";
+import { sendNotificationEmail, emailText } from "@/lib/email";
+import { NO_SHOW_ELO_PENALTY, formatInTimeZone, hadFairResponseWindow } from "@/lib/utils";
 
 /**
  * Update activity status for all users based on lastActiveAt.
@@ -77,6 +78,106 @@ export async function updateActivityStatuses() {
   // Note: coachAvailability is deliberately NOT touched here. The stored value
   // is the coach's manual choice; the 24h-inactivity rule is derived at read
   // time via getEffectiveAvailability so it self-heals when the coach returns.
+}
+
+/**
+ * Email both parties a reminder for upcoming scheduled lessons: one ~1 day
+ * before the start and one ~1 hour before. Instant (no scheduledStartAt)
+ * lessons are excluded — for those the "coach accepted, join now" notification
+ * is the cue.
+ *
+ * Idempotent: each reminder is claimed with a guarded updateMany before the
+ * emails go out, so overlapping cron runs can't double-send. Driven by a
+ * frequent cron (see /api/cron/frequent) so the 1-hour reminder lands on time;
+ * the exact cadence only affects how close to the target the email arrives.
+ */
+export async function sendLessonReminders() {
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const in1h = new Date(now.getTime() + 60 * 60 * 1000);
+
+  const include = {
+    student: { select: { email: true, username: true, timezone: true } },
+    coach: { select: { email: true, username: true, timezone: true } },
+  } as const;
+
+  // 1-day-before: accepted scheduled lessons starting within the next 24h.
+  const dayCandidates = await prisma.lessonRequest.findMany({
+    where: {
+      status: "ACCEPTED",
+      scheduledStartAt: { not: null, gt: now, lte: in24h },
+      reminderDayBeforeSentAt: null,
+    },
+    include,
+  });
+  for (const lesson of dayCandidates) {
+    const claimed = await prisma.lessonRequest.updateMany({
+      where: { id: lesson.id, reminderDayBeforeSentAt: null },
+      data: { reminderDayBeforeSentAt: new Date() },
+    });
+    if (claimed.count === 0) continue;
+    await sendReminderPair(lesson, "day");
+  }
+
+  // 1-hour-before: accepted scheduled lessons starting within the next hour.
+  const hourCandidates = await prisma.lessonRequest.findMany({
+    where: {
+      status: "ACCEPTED",
+      scheduledStartAt: { not: null, gt: now, lte: in1h },
+      reminderHourBeforeSentAt: null,
+    },
+    include,
+  });
+  for (const lesson of hourCandidates) {
+    const claimed = await prisma.lessonRequest.updateMany({
+      where: { id: lesson.id, reminderHourBeforeSentAt: null },
+      data: { reminderHourBeforeSentAt: new Date() },
+    });
+    if (claimed.count === 0) continue;
+    await sendReminderPair(lesson, "hour");
+  }
+}
+
+type ReminderParty = { email: string | null; username: string | null; timezone: string | null };
+
+async function sendReminderPair(
+  lesson: { id: string; scheduledStartAt: Date | null; student: ReminderParty; coach: ReminderParty },
+  kind: "day" | "hour",
+) {
+  if (!lesson.scheduledStartAt) return;
+  await sendReminderEmail(lesson.coach, lesson.student.username, lesson.id, lesson.scheduledStartAt, kind);
+  await sendReminderEmail(lesson.student, lesson.coach.username, lesson.id, lesson.scheduledStartAt, kind);
+}
+
+async function sendReminderEmail(
+  recipient: ReminderParty,
+  otherName: string | null,
+  lessonId: string,
+  startAt: Date,
+  kind: "day" | "hour",
+) {
+  if (!recipient.email) return;
+  const localTime = formatInTimeZone(startAt, recipient.timezone);
+  const withClause = otherName ? `with ${emailText(otherName)} ` : "";
+  const heading = kind === "day" ? "Your lesson is tomorrow" : "Your lesson starts soon";
+  const lead =
+    kind === "day"
+      ? `Your lesson ${withClause}is coming up`
+      : `Your lesson ${withClause}starts in about an hour`;
+  const bodyHtml = `<p>${lead}, at <strong>${emailText(localTime)}</strong>.</p>
+    <p>Open the lesson page to join when it is time.</p>`;
+  try {
+    await sendNotificationEmail({
+      to: recipient.email,
+      subject: heading,
+      heading,
+      bodyHtml,
+      link: `/lesson/${lessonId}`,
+      cta: "View lesson",
+    });
+  } catch (err) {
+    console.error("lesson reminder email failed", err);
+  }
 }
 
 /**
@@ -158,28 +259,38 @@ export async function expirePendingRequests(userId?: string) {
 
 /**
  * Detect coaches who consistently don't respond to requests.
- * 3+ expired requests in 7 days triggers an abuse flag.
+ * 3+ ghosted (expired, unanswered) requests in 7 days triggers an abuse flag.
+ *
+ * Only counts requests the coach genuinely ignored: respondedAt is null (a
+ * reply, accept or decline, sets it) and the coach had a fair window to respond
+ * (hadFairResponseWindow) — a near-instant booking that lapsed isn't held
+ * against them, matching the responsiveness rating.
  */
 async function detectNonResponsiveCoaches() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const nonResponsiveCoaches = await prisma.lessonRequest.groupBy({
-    by: ["coachId"],
+  const ghosted = await prisma.lessonRequest.findMany({
     where: {
       status: "EXPIRED",
+      respondedAt: null,
       createdAt: { gte: sevenDaysAgo },
     },
-    _count: { id: true },
-    having: {
-      id: { _count: { gte: 3 } },
-    },
+    select: { coachId: true, createdAt: true, acceptanceDeadline: true },
   });
 
-  for (const coach of nonResponsiveCoaches) {
+  const counts = new Map<string, number>();
+  for (const r of ghosted) {
+    if (!hadFairResponseWindow(r.createdAt, r.acceptanceDeadline)) continue;
+    counts.set(r.coachId, (counts.get(r.coachId) ?? 0) + 1);
+  }
+
+  for (const [coachId, count] of counts) {
+    if (count < 3) continue;
+
     // Avoid duplicate flags
     const recentFlag = await prisma.abuseFlag.findFirst({
       where: {
-        userId: coach.coachId,
+        userId: coachId,
         type: "COACH_NON_RESPONSIVE",
         createdAt: { gte: sevenDaysAgo },
       },
@@ -188,10 +299,10 @@ async function detectNonResponsiveCoaches() {
     if (!recentFlag) {
       await prisma.abuseFlag.create({
         data: {
-          userId: coach.coachId,
+          userId: coachId,
           type: "COACH_NON_RESPONSIVE",
           severity: "LOW",
-          details: `${coach._count.id} lesson requests expired (unanswered) in the last 7 days.`,
+          details: `${count} lesson requests expired (unanswered) in the last 7 days.`,
         },
       });
     }

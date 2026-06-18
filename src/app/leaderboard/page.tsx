@@ -85,7 +85,7 @@ export default async function LeaderboardPage({
           <div className="md:hidden space-y-3">
             {coaches.map((coach, i) => {
               const rank = skip + i + 1;
-              const availability = getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice);
+              const availability = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice);
               return (
                 <Card key={coach.username}>
                   <CardContent className="pt-4">
@@ -192,7 +192,7 @@ export default async function LeaderboardPage({
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  {getEffectiveAvailability(coach.coachAvailability, coach.lastActiveAt, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE" ? (
+                  {getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE" ? (
                     <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
                   ) : (
                     <Badge variant="secondary">Unavailable</Badge>

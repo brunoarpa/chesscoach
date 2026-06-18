@@ -30,8 +30,39 @@ export function isCoach(user: { coachChatPrice: number | null; coachCallPrice: n
   return !!(user.coachChatPrice || user.coachCallPrice);
 }
 
-// How long a coach can be away before students see them as Unavailable.
-export const AVAILABILITY_INACTIVITY_MS = 24 * 60 * 60 * 1000;
+// Instant (no-slot) lesson requests aren't tied to a future start time, so they
+// can't lean on the slot-based acceptance deadline. They expire this long after
+// creation if the coach hasn't responded, then refund the student.
+export const INSTANT_REQUEST_TTL_MS = 2 * 60 * 60 * 1000;
+
+// A coach is only penalised for letting a request expire unanswered if they had
+// at least this long to respond. Near-instant bookings (a slot starting very
+// soon, or an instant request the student fires off) can expire faster than
+// anyone can reasonably check email, so those misses still refund the student
+// but do not count against the coach's responsiveness rating.
+export const FAIR_RESPONSE_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Whether a coach had a fair chance to respond to a request before it expired.
+ * Used so near-instant bookings that lapse don't count against the coach's
+ * responsiveness (rating) or trip the non-responsive abuse flag. A missing
+ * deadline (legacy requests that relied on the 3-day sweep) counts as fair.
+ */
+export function hadFairResponseWindow(
+  createdAt: Date,
+  acceptanceDeadline: Date | null,
+): boolean {
+  if (!acceptanceDeadline) return true;
+  return acceptanceDeadline.getTime() - createdAt.getTime() >= FAIR_RESPONSE_WINDOW_MS;
+}
+
+// Student request limits. A student may have at most this many paid requests
+// awaiting a coach's response at once (each one reserves funds), and may only
+// send a limited number in a rolling window — so nobody can spam-book across
+// many coaches, tie up attention, and lock their own balance.
+export const MAX_CONCURRENT_PENDING_REQUESTS = 5;
+export const PAID_REQUEST_RATE_MAX = 10;
+export const PAID_REQUEST_RATE_WINDOW_MS = 60 * 60 * 1000;
 
 // Booking lead times. A slot must start at least MIN_BOOKING_LEAD_MS in the
 // future to be bookable, and a coach must accept at least MIN_ACCEPT_NOTICE_MS
@@ -60,21 +91,38 @@ export const NO_SHOW_ELO_PENALTY = 150;
  * Returns the effective coach availability — the single source of truth for
  * what students see and whether a coach can be booked.
  *
- * The stored coachAvailability is purely the coach's manual choice and is
- * never auto-overwritten; this helper derives the rest: a coach appears
- * UNAVAILABLE while they have no price set or have been inactive for 24+
- * hours, and automatically appears AVAILABLE again once they return.
+ * Bookability no longer depends on whether the coach is "online": coaches are
+ * notified by email when a request comes in, so presence is irrelevant. A coach
+ * is bookable when they have a price set and have not manually paused
+ * (coachAvailability = UNAVAILABLE). Their last-seen time is shown elsewhere as
+ * a cosmetic hint only.
  */
 export function getEffectiveAvailability(
   coachAvailability: string,
-  lastActiveAt: Date,
   coachChatPrice?: number | null,
   coachCallPrice?: number | null,
 ): string {
   const hasPrice = (coachChatPrice != null && coachChatPrice > 0) || (coachCallPrice != null && coachCallPrice > 0);
   if (!hasPrice) return "UNAVAILABLE";
-  if (Date.now() - lastActiveAt.getTime() >= AVAILABILITY_INACTIVITY_MS) return "UNAVAILABLE";
   return coachAvailability;
+}
+
+/**
+ * Format a UTC instant in a specific IANA timezone, for server-side contexts
+ * that can't use the client <LocalTime> component (notably emails). Falls back
+ * to UTC when the timezone is missing or invalid.
+ */
+export function formatInTimeZone(date: Date, timeZone?: string | null): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZoneName: "short",
+  };
+  try {
+    return new Intl.DateTimeFormat("en-US", { ...opts, timeZone: timeZone || "UTC" }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { ...opts, timeZone: "UTC" }).format(date);
+  }
 }
 
 /**

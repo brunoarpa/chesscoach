@@ -178,7 +178,7 @@ export default async function ProfilePage({
 
   // Check coach lesson history: paid bookings unlock only after a completed trial.
   let hasCompletedTrial = true;      // default to true so non-coaches aren't gated
-  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.lastActiveAt, user.coachChatPrice, user.coachCallPrice);
+  const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.coachChatPrice, user.coachCallPrice);
   const isCoachProfile = !!(user.coachChatPrice || user.coachCallPrice);
 
   // Global leaderboard rank (count of qualifying coaches with a higher ELO + 1).

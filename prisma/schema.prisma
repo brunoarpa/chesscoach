@@ -302,6 +302,11 @@ model LessonRequest {
   // 30-day retention: set when chat + free-text content has been purged.
   dataPurgedAt DateTime?
 
+  // Reminder email bookkeeping (scheduled lessons only). Set when the matching
+  // reminder has been sent so the sweep never double-sends.
+  reminderDayBeforeSentAt  DateTime?
+  reminderHourBeforeSentAt DateTime?
+
   reviews      Review[]
   transactions Transaction[]
   abuseFlags   AbuseFlag[]
