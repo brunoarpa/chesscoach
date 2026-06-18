@@ -83,7 +83,7 @@ export default async function LessonPage({
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)]">
+    <div className="h-[calc(100dvh-4rem)]">
       <LessonSession
         lessonId={lesson.id}
         userId={session.user.id}

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // over the dynamic `[id]` lesson route, so this never hits the real lesson page.
 export default function PracticeLessonPage() {
   return (
-    <div className="h-[calc(100vh-4rem)]">
+    <div className="h-[calc(100dvh-4rem)]">
       <PracticeSession />
     </div>
   );

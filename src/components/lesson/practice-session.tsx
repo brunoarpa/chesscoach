@@ -57,7 +57,7 @@ export function PracticeSession() {
           real lesson room so each child mounts exactly once. */}
       {isDesktop ? (
         <div className="flex flex-1 min-h-0">
-          <div className="flex-1 flex items-start justify-center p-4 overflow-y-auto min-h-0">
+          <div className="flex-1 min-w-0 flex justify-center p-4 overflow-hidden min-h-0">
             <ChessBoard
               local
               lessonId={PRACTICE_LESSON_ID}
@@ -86,15 +86,13 @@ export function PracticeSession() {
             </TabsList>
             {/* forceMount keeps both panels mounted (Radix toggles `hidden`), so
                 switching tabs doesn't reset the board or chat state. */}
-            <TabsContent forceMount value="board" className="flex-1 overflow-y-auto p-2 m-0 data-[state=inactive]:hidden">
-              <div className="flex justify-center">
-                <ChessBoard
-                  local
-                  lessonId={PRACTICE_LESSON_ID}
-                  userId={PRACTICE_USER_ID}
-                  isCoach={false}
-                />
-              </div>
+            <TabsContent forceMount value="board" className="flex-1 min-h-0 p-2 m-0 flex justify-center overflow-hidden data-[state=inactive]:hidden">
+              <ChessBoard
+                local
+                lessonId={PRACTICE_LESSON_ID}
+                userId={PRACTICE_USER_ID}
+                isCoach={false}
+              />
             </TabsContent>
             <TabsContent forceMount value="chat" className="flex-1 min-h-0 m-0 data-[state=inactive]:hidden">
               <ChatPanel
