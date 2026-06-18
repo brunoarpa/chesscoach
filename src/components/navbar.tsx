@@ -75,6 +75,13 @@ export async function Navbar() {
           >
             Leaderboard
           </NavLink>
+          <NavLink
+            href="/contact"
+            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+            activeClassName="bg-muted font-medium"
+          >
+            Contact
+          </NavLink>
 
           {session?.user ? (
             <>
