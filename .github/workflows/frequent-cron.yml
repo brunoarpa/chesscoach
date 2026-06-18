@@ -1,0 +1,48 @@
+name: Frequent cron
+
+# Free alternative to a sub-daily Vercel cron (Hobby tier only fires crons once
+# a day). Hits /api/cron/frequent every 15 minutes so lesson reminders, instant
+# request expiry, and no-show detection run on time.
+#
+# Setup: add a repository secret named CRON_SECRET (Settings -> Secrets and
+# variables -> Actions) matching the deployment's CRON_SECRET. Optionally set a
+# repository variable CRON_BASE_URL to override the default host below.
+#
+# Caveats: GitHub's scheduled runs can be delayed under load and are paused
+# after 60 days with no repo activity. Use workflow_dispatch to test on demand.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+# Don't pile up overlapping runs if one is slow or GitHub batches delayed ticks.
+concurrency:
+  group: frequent-cron
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /api/cron/frequent
+        env:
+          # Canonical host on purpose: the apex redirects to www, and a
+          # cross-host redirect drops the Authorization header.
+          BASE_URL: ${{ vars.CRON_BASE_URL || 'https://www.elochaser.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not set."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 60 -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE_URL/api/cron/frequent")
+          echo "HTTP $code"
+          cat /tmp/body.txt
+          echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Expected HTTP 200, got $code"
+            exit 1
+          fi
