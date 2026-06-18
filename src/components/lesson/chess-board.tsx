@@ -138,12 +138,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // across both participants via board sync.
   const [showHints, setShowHints] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [squareSize, setSquareSize] = useState(0);
+  // Side length of the board in px, measured to fit the available area.
+  const [boardPx, setBoardPx] = useState(0);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string; color: "w" | "b" } | null>(null);
   // Right-click context menu on a move in the list (promote / delete variation).
   const [moveMenu, setMoveMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const boardRef = useRef<HTMLDivElement>(null);
+  const boardAreaRef = useRef<HTMLDivElement>(null);
+
+  // One square is an eighth of the board; drives the on-board move badges and
+  // the promotion picker geometry.
+  const squareSize = boardPx / 8;
 
   const rightClickStartRef = useRef<string | null>(null);
   const isRemoteUpdateRef = useRef(false);
@@ -452,16 +457,24 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!isRemoteUpdateRef.current) broadcastMoves(next, newCurrent);
   }, [tree, currentNodeId, broadcastMoves]);
 
-  // Track board size so the on-board move badge scales with one square.
+  // Size the board to the largest square that fits the available area — the
+  // height the column gives us and its width minus the eval bar. Keeping the
+  // board inside the area means the whole panel (board + controls + move list)
+  // fits without a second scrollbar when the lesson window isn't full screen.
   useEffect(() => {
-    const el = boardRef.current;
+    const el = boardAreaRef.current;
     if (!el) return;
-    const update = () => setSquareSize(el.clientWidth / 8);
+    const update = () => {
+      const reserve = showHints ? 32 : 0; // eval bar (~28px) + gap
+      const w = el.clientWidth - reserve;
+      const h = el.clientHeight;
+      setBoardPx(Math.max(0, Math.floor(Math.min(w, h))));
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [showHints]);
 
   // Dismiss the move context menu on any outside click.
   useEffect(() => {
@@ -807,15 +820,18 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   })();
 
   return (
-    <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
+    <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px] h-full min-h-0" tabIndex={-1}>
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
           lightbulb gates it alongside the arrows, line list, and classifications —
-          unmounting it also stops the Stockfish worker while hints are off. */}
-      <div className="flex gap-1 w-full">
+          unmounting it also stops the Stockfish worker while hints are off.
+          This row flexes to fill the leftover height; the board is sized to the
+          measured square (boardPx) so it shrinks to fit a short window instead
+          of overflowing into a scrollbar. */}
+      <div ref={boardAreaRef} className="flex gap-1 w-full flex-1 min-h-0 items-center justify-center">
         {showHints && (
-          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={squareSize > 0 ? squareSize * 8 : undefined} />
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} />
         )}
-        <div ref={boardRef} className="relative flex-1 aspect-square">
+        <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
           <Chessboard
             options={{
               position: game.fen(),
