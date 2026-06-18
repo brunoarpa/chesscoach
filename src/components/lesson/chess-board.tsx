@@ -38,6 +38,13 @@ const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?
   blunder:     { label: "Blunder",    symbol: "??",                 badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
 };
 
+// Vertical space (px) kept below the board for the move controls and a minimum
+// info area (engine lines + move list). The board is sized from the column's
+// height minus this reserve — a *stable* number — so the board never resizes
+// when the engine-lines box appears/disappears or the move list grows. The info
+// area itself scrolls to absorb that changing content.
+const BOTTOM_RESERVE = 210;
+
 // Promotion picker piece options, queen-first (nearest the promotion square).
 const PROMOTION_PIECES: Array<{ type: "q" | "r" | "b" | "n"; key: string }> = [
   { type: "q", key: "Q" },
@@ -144,7 +151,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Right-click context menu on a move in the list (promote / delete variation).
   const [moveMenu, setMoveMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const boardAreaRef = useRef<HTMLDivElement>(null);
 
   // One square is an eighth of the board; drives the on-board move badges and
   // the promotion picker geometry.
@@ -457,17 +463,19 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!isRemoteUpdateRef.current) broadcastMoves(next, newCurrent);
   }, [tree, currentNodeId, broadcastMoves]);
 
-  // Size the board to the largest square that fits the available area — the
-  // height the column gives us and its width minus the eval bar. Keeping the
-  // board inside the area means the whole panel (board + controls + move list)
-  // fits without a second scrollbar when the lesson window isn't full screen.
+  // Size the board to the largest square that fits the column: its full width
+  // (minus the eval bar) and its height minus a fixed bottom reserve. Measuring
+  // the *column* (a stable box) rather than the leftover flex space means the
+  // board keeps its size when the engine-lines box or move list change height —
+  // those live in a scrolling area below, so the board no longer zooms in/out
+  // on every move.
   useEffect(() => {
-    const el = boardAreaRef.current;
+    const el = containerRef.current;
     if (!el) return;
     const update = () => {
       const reserve = showHints ? 32 : 0; // eval bar (~28px) + gap
       const w = el.clientWidth - reserve;
-      const h = el.clientHeight;
+      const h = el.clientHeight - BOTTOM_RESERVE;
       setBoardPx(Math.max(0, Math.floor(Math.min(w, h))));
     };
     update();
@@ -824,10 +832,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
           lightbulb gates it alongside the arrows, line list, and classifications —
           unmounting it also stops the Stockfish worker while hints are off.
-          This row flexes to fill the leftover height; the board is sized to the
-          measured square (boardPx) so it shrinks to fit a short window instead
-          of overflowing into a scrollbar. */}
-      <div ref={boardAreaRef} className="flex gap-1 w-full flex-1 min-h-0 items-center justify-center">
+          Fixed height (shrink-0): the board is sized to the measured square
+          (boardPx) from the column, not from leftover flex space, so it never
+          resizes when the content below changes. */}
+      <div className="flex gap-1 w-full shrink-0 items-start justify-center">
         {showHints && (
           <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} />
         )}
@@ -921,9 +929,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
+      {/* Info area — engine lines + move list. This region takes the remaining
+          height and scrolls, so the engine-lines box appearing/disappearing or
+          the move list growing changes only what scrolls here, never the board. */}
+      <div className="w-full flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
       {/* Top engine lines — eval + principal variation for each (hidden when hints off) */}
       {showHints && engineLines.length > 0 && engineLinesFen === currentFen && (
-        <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
+        <div className="w-full shrink-0 rounded border bg-muted/30 p-2 space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
           <div className="space-y-1">
             {engineLines.map((line) => (
@@ -944,12 +956,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       {/* Move list — main line plus indented variations; right-click a move for
           promote / delete. Classifications are shown on the board, not here. */}
       {mainlineStart && (
-        <div className="w-full max-h-[180px] overflow-y-auto rounded border bg-muted/30 p-2">
+        <div className="w-full shrink-0 rounded border bg-muted/30 p-2">
           <div className="text-sm font-mono leading-relaxed [&>button]:mr-1">
             {renderLine(mainlineStart, 1)}
           </div>
         </div>
       )}
+      </div>
 
       {/* Move context menu (promote / delete a variation) */}
       {moveMenu && (() => {
