@@ -78,7 +78,7 @@ export default async function DashboardHistoryPage({ searchParams }: PageProps) 
             const otherUser = role === "coach" ? r.student : r.coach;
             return (
               <Card key={r.id}>
-                <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{otherUser.username}</div>
                     <div className="text-sm text-muted-foreground">
