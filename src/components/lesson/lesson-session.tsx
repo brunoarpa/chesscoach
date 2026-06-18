@@ -306,9 +306,9 @@ export function LessonSession({
           channel — breaking board/chat/presence sync for everyone. */}
       {isDesktop ? (
         <div className="flex flex-1 min-h-0">
-          {/* Board. The board sizes itself to this column's height, so the column
-              just clips (no scrollbar) rather than letting a too-tall board spill. */}
-          <div className="flex-1 min-w-0 flex justify-center p-4 overflow-hidden min-h-0">
+          {/* Board. The board fills this column's visible height; the move list
+              and best-moves box flow below, so the column scrolls to reach them. */}
+          <div className="flex-1 min-w-0 flex justify-center items-start p-4 overflow-y-auto min-h-0">
             <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} initialBoardTree={initialBoardTree} />
           </div>
 
@@ -358,7 +358,7 @@ export function LessonSession({
             {/* forceMount keeps both panels mounted (Radix just toggles the
                 `hidden` attribute), so switching tabs doesn't unmount the board
                 or chat and reset their live state / realtime subscriptions. */}
-            <TabsContent forceMount value="board" className="flex-1 min-h-0 p-2 m-0 flex justify-center overflow-hidden data-[state=inactive]:hidden">
+            <TabsContent forceMount value="board" className="flex-1 min-h-0 p-2 m-0 flex justify-center items-start overflow-y-auto data-[state=inactive]:hidden">
               <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} initialBoardTree={initialBoardTree} />
             </TabsContent>
             <TabsContent forceMount value="chat" className="flex-1 min-h-0 m-0 data-[state=inactive]:hidden">
