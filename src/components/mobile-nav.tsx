@@ -42,6 +42,9 @@ export function MobileNav({ isLoggedIn, username, isAdmin }: MobileNavProps) {
           <MobileLink href="/leaderboard" onClose={() => setOpen(false)}>
             Leaderboard
           </MobileLink>
+          <MobileLink href="/contact" onClose={() => setOpen(false)}>
+            Contact
+          </MobileLink>
 
           {isLoggedIn ? (
             <>
