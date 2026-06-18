@@ -52,25 +52,25 @@ export default async function WalletPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">${(available / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Available</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">${(user.reservedBalance / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Reserved</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">${(user.pendingEarnings / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Pending Earnings</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">${(user.totalEarningsAllTime / 100).toFixed(2)}</div>
             <div className="text-sm text-muted-foreground">Total Earned</div>
           </CardContent>
@@ -87,7 +87,7 @@ export default async function WalletPage() {
             <WithdrawForm pendingEarnings={user.pendingEarnings} />
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority — EloChaser does not withhold or remit taxes on your behalf.
+            Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority. EloChaser does not withhold or remit taxes on your behalf.
           </p>
         </>
       )}
@@ -102,7 +102,7 @@ export default async function WalletPage() {
         <div className="space-y-2">
           {transactions.map((tx) => (
             <Card key={tx.id}>
-              <CardContent className="pt-4 flex items-center justify-between">
+              <CardContent className="flex items-center justify-between">
                 <div>
                   <span className="font-medium text-sm">
                     {tx.type === "DEPOSIT" && "Deposit"}
