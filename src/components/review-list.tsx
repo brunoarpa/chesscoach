@@ -23,7 +23,7 @@ export function ReviewList({ reviews }: Props) {
     <div className="space-y-3">
       {reviews.map((review) => (
         <Card key={review.id}>
-          <CardContent className="pt-4">
+          <CardContent>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">

@@ -39,7 +39,7 @@ export default async function HowItWorksPage() {
             <span className="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
             <p className="font-semibold">Both confirm start</p>
             <p className="text-sm text-muted-foreground">
-              When it&apos;s time, both open the lesson page in the dashboard. The lesson runs in-app — chess board, chat, and (for call lessons) video. Both click &quot;Confirm Start&quot; to begin.
+              When it&apos;s time, both open the lesson page in the dashboard. The lesson runs in-app, with a chess board, chat, and (for call lessons) video. Both click &quot;Confirm Start&quot; to begin.
             </p>
           </li>
           <li className="pl-8">
@@ -67,7 +67,7 @@ export default async function HowItWorksPage() {
 
         {/* Try the lesson room hands-on, no booking needed */}
         <Card className="mt-8 border-primary/30 bg-primary/5">
-          <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 pt-6">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1">
               <p className="font-semibold">Want to see what a lesson looks like?</p>
               <p className="text-sm text-muted-foreground">
@@ -88,7 +88,7 @@ export default async function HowItWorksPage() {
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-4">No-shows and refunds</h2>
         <Card>
-          <CardContent className="pt-6 space-y-2 text-sm">
+          <CardContent className="space-y-2 text-sm">
             <p>
               <strong>If the coach doesn&apos;t show up:</strong> the lesson is cancelled and the student is fully refunded. The coach receives an ELO penalty.
             </p>
@@ -96,7 +96,7 @@ export default async function HowItWorksPage() {
               <strong>If the student doesn&apos;t show up</strong> (or shows up late) but the coach is ready: the coach is paid in full. On a free trial, the student forfeits all remaining free trials. Your time matters.
             </p>
             <p className="text-muted-foreground">
-              Students can cancel an accepted lesson up to 30 minutes before it starts for a full refund — closer than that, the booking is committed. Coaches can cancel any time before the start, and the student is fully refunded.
+              Students can cancel an accepted lesson up to 30 minutes before it starts for a full refund. Closer than that, the booking is committed. Coaches can cancel any time before the start, and the student is fully refunded.
             </p>
           </CardContent>
         </Card>
@@ -108,7 +108,7 @@ export default async function HowItWorksPage() {
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-4">Free trials</h2>
         <Card>
-          <CardContent className="pt-6 space-y-2 text-sm">
+          <CardContent className="space-y-2 text-sm">
             <p>
               Every new account gets up to <strong>3 free trial lessons</strong>. Try different coaches before paying.
             </p>
@@ -135,7 +135,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Student wallet</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Deposit via Stripe ($0.40 + 2% fee, up to $20 per deposit). Your balance is used across all coaches — no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
+              Deposit via Stripe ($0.40 + 2% fee, up to $20 per deposit). Your balance is used across all coaches, with no per-lesson payment friction. When you book, the cost is reserved until the lesson completes or is cancelled.
             </CardContent>
           </Card>
 
@@ -144,7 +144,7 @@ export default async function HowItWorksPage() {
               <CardTitle className="text-base">Coach payouts</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              When a lesson completes, earnings move to your pending balance. Withdraw whenever you have $25+ — just a $0.40 + 0.5% transfer fee, plus Stripe&apos;s $2 monthly payout fee on your first withdrawal each month. Bigger, less frequent withdrawals mean lower fees.
+              When a lesson completes, earnings move to your pending balance. Withdraw whenever you have $25+, with just a $0.40 + 0.5% transfer fee, plus Stripe&apos;s $2 monthly payout fee on your first withdrawal each month. Bigger, less frequent withdrawals mean lower fees.
             </CardContent>
           </Card>
         </div>
@@ -156,7 +156,7 @@ export default async function HowItWorksPage() {
       <section className="mb-12">
         <h2 className="text-2xl font-bold mb-4">For coaches</h2>
         <Card>
-          <CardContent className="pt-6 space-y-3 text-sm">
+          <CardContent className="space-y-3 text-sm">
             <p>
               <strong>Anyone can coach.</strong> Set a chat or call price per 15 minutes and pick at least one teaching language in your{" "}
               <Link href="/profile/edit" className="underline font-medium">profile</Link>. Verifying your chess.com account is optional and adds a badge. It does not gate coaching or payouts.
@@ -181,7 +181,7 @@ export default async function HowItWorksPage() {
 
         <div className="space-y-3">
           <Card>
-            <CardContent className="pt-4 pb-4">
+            <CardContent>
               <h3 className="font-semibold mb-1">Do I need a chess.com account?</h3>
               <p className="text-sm text-muted-foreground">
                 No. Neither students nor coaches need one to use EloChaser. Coaches can optionally verify their chess.com account for a trust badge.
@@ -190,7 +190,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-4 pb-4">
+            <CardContent>
               <h3 className="font-semibold mb-1">Can I be both a student and a coach?</h3>
               <p className="text-sm text-muted-foreground">
                 Yes. Your dashboard has separate sections for coaching and learning.
@@ -199,7 +199,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-4 pb-4">
+            <CardContent>
               <h3 className="font-semibold mb-1">What if a coach doesn&apos;t respond?</h3>
               <p className="text-sm text-muted-foreground">
                 Pending requests expire automatically and your funds are released. You can also cancel anytime.
@@ -208,7 +208,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-4 pb-4">
+            <CardContent>
               <h3 className="font-semibold mb-1">What if the lesson was bad?</h3>
               <p className="text-sm text-muted-foreground">
                 Within 24 hours of the scheduled end, hit Report Issue on the lesson card. An admin reviews before any money moves.
@@ -217,7 +217,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-4 pb-4">
+            <CardContent>
               <h3 className="font-semibold mb-1">Is my chess.com username shared?</h3>
               <p className="text-sm text-muted-foreground">
                 No. Even if you verify, only a ✓ chess.com badge is shown publicly — never the username itself. We use it server-side to refresh your chess.com rating.
@@ -226,7 +226,7 @@ export default async function HowItWorksPage() {
           </Card>
 
           <Card>
-            <CardContent className="pt-4 pb-4">
+            <CardContent>
               <h3 className="font-semibold mb-1">What happens if my account is suspended?</h3>
               <p className="text-sm text-muted-foreground">
                 You can&apos;t book, accept, or deposit, and you won&apos;t appear in search. You can still withdraw any coach earnings. Email support to appeal.
