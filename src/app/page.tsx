@@ -8,15 +8,16 @@ export default async function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-10 px-4 pt-12 pb-16">
       <div className="text-center space-y-5 max-w-2xl">
-        <span className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-sm text-muted-foreground">
-          ♝ Live 1-on-1 chess coaching
-        </span>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-balance">
-          Get better at chess, 15 minutes at a time
+        <h1 className="text-6xl sm:text-7xl font-bold tracking-tighter text-balance">
+          ♝ EloChaser
         </h1>
-        <p className="text-lg sm:text-xl text-muted-foreground text-balance">
-          Book a real coach for a short, focused lesson, whenever you want one.
-          Strong player yourself? List your own slots and get paid to teach.
+        <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
+          Real chess coaches, on demand.{" "}
+          <span className="text-emerald-600 dark:text-emerald-400">Your first lessons are free.</span>
+        </p>
+        <p className="text-lg text-muted-foreground text-balance">
+          Book a one-on-one lesson with a real coach whenever you want one,
+          and pay only for the help that actually moves your rating.
         </p>
       </div>
 
