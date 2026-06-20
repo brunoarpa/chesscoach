@@ -44,6 +44,9 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
   const [connecting, setConnecting] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // iOS Safari blocks autoplay of an async-assigned remote stream; when that
+  // happens we surface a tap-to-listen button so playback starts in a gesture.
+  const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false);
 
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const peerRef = useRef<import("peerjs").default | null>(null);
@@ -69,7 +72,15 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
     if (mountedRef.current) {
       setConnected(false);
       setConnecting(false);
+      setNeedsAudioUnlock(false);
     }
+  }, []);
+
+  const unlockAudio = useCallback(() => {
+    remoteAudioRef.current
+      ?.play()
+      .then(() => setNeedsAudioUnlock(false))
+      .catch(() => {});
   }, []);
 
   const startCall = useCallback(async () => {
@@ -100,9 +111,18 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
       peerRef.current = peer;
 
       function wireRemoteStream(remoteStream: MediaStream) {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remoteStream;
-        }
+        const el = remoteAudioRef.current;
+        if (!el) return;
+        el.srcObject = remoteStream;
+        // Explicit play(): autoPlay alone is unreliable on iOS Safari because
+        // the stream is assigned outside the original tap gesture.
+        el.play()
+          .then(() => {
+            if (mountedRef.current) setNeedsAudioUnlock(false);
+          })
+          .catch(() => {
+            if (mountedRef.current) setNeedsAudioUnlock(true);
+          });
       }
 
       function attemptCall() {
@@ -260,6 +280,17 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
           </button>
         )}
       </div>
+
+      {needsAudioUnlock && (
+        <button
+          type="button"
+          onClick={unlockAudio}
+          className="mx-auto flex items-center gap-2 px-3 py-2 rounded-full border border-amber-500/50 bg-amber-500/10 text-sm font-medium text-amber-700 dark:text-amber-400"
+        >
+          <Phone className="h-4 w-4" />
+          Tap to hear {otherRole}
+        </button>
+      )}
 
       {error && (
         <p className="text-xs text-destructive text-center">{error}</p>
