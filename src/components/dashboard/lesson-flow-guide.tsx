@@ -20,7 +20,7 @@ const steps = [
   {
     number: 3,
     title: "Join the Lesson Room",
-    description: "At the scheduled time, both of you open the in-app lesson room. It unlocks 5 minutes early and the lesson starts automatically once you are both in.",
+    description: "The in-app lesson room unlocks 5 minutes before the scheduled time, so you can both settle in early. The lesson itself runs over its booked time slot.",
   },
   {
     number: 4,
