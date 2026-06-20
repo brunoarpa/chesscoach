@@ -36,8 +36,13 @@ interface Props {
 }
 
 const GRACE_PERIOD_MS = 5 * 60 * 1000;
-const PRESENCE_HEARTBEAT_MS = 5000;
-const PRESENCE_TIMEOUT_MS = 15000;
+// Presence heartbeat. Kept at 10s (not tighter) because every ping is a Pusher
+// message + a DB auth lookup per participant - the dominant realtime cost at
+// scale. Arrivals still show instantly (a ping fires on mount) and deliberate
+// departures are immediate via the visibility/unmount "leave" events; only a
+// hard crash/network drop takes up to PRESENCE_TIMEOUT_MS to reflect.
+const PRESENCE_HEARTBEAT_MS = 10000;
+const PRESENCE_TIMEOUT_MS = 25000;
 
 function formatDuration(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

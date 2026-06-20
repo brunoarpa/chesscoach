@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { callbackGameToPgn } from "@/lib/chesscom";
+import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 // No auth: this is a read-only proxy for *public* chess.com game data, locked to
 // chess.com game ids below. It must work in the login-free practice room too
 // (mirroring Lichess import, which the browser fetches directly).
 export async function GET(request: Request) {
+  // It's unauthenticated and makes a server-side outbound fetch, so rate-limit
+  // per IP to stop it being used as an open relay to chess.com's callback API.
+  const ip = getClientIpFromHeaders(request.headers);
+  const { success: rlOk } = await rateLimit(`chesscom-game:${ip}`, { maxAttempts: 30, windowMs: 60 * 1000 });
+  if (!rlOk) {
+    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
 
