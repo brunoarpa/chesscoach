@@ -10,32 +10,32 @@ const steps = [
   {
     number: 1,
     title: "Request a Lesson",
-    description: "Visit a coach's profile and send a lesson request with the desired duration.",
+    description: "Pick an open time slot on a coach's profile, choose chat or audio call, and send your request. The lesson price is reserved from your wallet.",
   },
   {
     number: 2,
     title: "Coach Accepts",
-    description: "The coach reviews and accepts or declines. If declined, reserved funds are released.",
+    description: "The coach reviews and accepts or declines. If they decline, the reserved funds are released back to your wallet.",
   },
   {
     number: 3,
-    title: "Both Confirm Start",
-    description: "Contact each other via Chess.com and both confirm the lesson has started.",
+    title: "Join the Lesson Room",
+    description: "At the scheduled time, both of you open the in-app lesson room. It unlocks 5 minutes early and the lesson starts automatically once you are both in.",
   },
   {
     number: 4,
     title: "Have the Lesson",
-    description: "The lesson is in progress. Teach, learn, and enjoy!",
+    description: "Work through positions together on a shared, live chess board while you talk over the built-in chat or audio call. Everything happens right here, no outside apps needed.",
   },
   {
     number: 5,
     title: "Lesson Completes",
-    description: "After the lesson ends, the student can Confirm to release payment to the coach right away - otherwise it transfers automatically 24 hours after the scheduled end. If the lesson was unsatisfactory, the student can Report Issue during that window for admin review.",
+    description: "After the lesson ends, the student can Confirm to release payment to the coach right away, otherwise it transfers automatically 24 hours after the scheduled end. If something went wrong, the student can Report Issue during that window for admin review.",
   },
   {
     number: 6,
     title: "Leave Reviews",
-    description: "Rate each other 1–5 stars to help the community.",
+    description: "Rate each other 1 to 5 stars to help the community.",
   },
 ];
 
