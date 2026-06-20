@@ -154,7 +154,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
           </div>
         )}
         <p className="text-sm text-muted-foreground">
-          Tap or drag to set your recurring 15-min availability slots.{" "}
+          Tap a square to toggle a 15-min slot, or drag across squares.{" "}
           {timezone ? (
             <>Times are in <span className="font-medium">{timezone}</span> (your profile timezone).</>
           ) : (
@@ -162,14 +162,14 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
               Set your timezone in your profile before saving - otherwise slots can&apos;t be scheduled correctly.
             </span>
           )}
-          <span className="sm:hidden block mt-1 text-xs">Scroll the grid horizontally on small screens.</span>
+          <span className="sm:hidden block mt-1 text-xs">Tip: use All / Clear under each day to set a whole day at once.</span>
         </p>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <div className="min-w-[600px]">
+        <div className="overflow-x-auto sm:-mx-0">
+          <div className="sm:min-w-[600px]">
             {/* Day headers */}
-            <div className="grid grid-cols-[60px_repeat(7,1fr)] gap-0.5 mb-1">
+            <div className="grid grid-cols-[36px_repeat(7,1fr)] sm:grid-cols-[60px_repeat(7,1fr)] gap-0.5 mb-1">
               <div /> {/* empty corner */}
               {DAYS.map((day, i) => (
                 <div key={day} className="text-center">
@@ -200,12 +200,12 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
                 MINUTES.map((minute) => (
                   <div
                     key={`${hour}-${minute}`}
-                    className="grid grid-cols-[60px_repeat(7,1fr)] gap-0.5 mb-0.5"
+                    className="grid grid-cols-[36px_repeat(7,1fr)] sm:grid-cols-[60px_repeat(7,1fr)] gap-0.5 mb-0.5"
                   >
                     {/* Time label - only show on :00 */}
-                    <div className="flex items-center justify-end pr-2">
+                    <div className="flex items-center justify-end pr-1 sm:pr-2">
                       {minute === 0 && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[10px] sm:text-xs text-muted-foreground tabular-nums">
                           {formatTime(hour, minute)}
                         </span>
                       )}
@@ -219,7 +219,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
                         <button
                           key={key}
                           type="button"
-                          className={`h-3 rounded-sm transition-colors ${
+                          className={`h-4 sm:h-3 rounded-sm transition-colors ${
                             isSelected
                               ? "bg-green-500 hover:bg-green-600"
                               : "bg-muted hover:bg-muted-foreground/20"

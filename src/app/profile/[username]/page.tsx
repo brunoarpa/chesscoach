@@ -225,7 +225,7 @@ export default async function ProfilePage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{user.username}</h1>
@@ -258,8 +258,8 @@ export default async function ProfilePage({
         </div>
 
         {isOwnProfile && (
-          <Link href="/profile/edit">
-            <Button variant="outline">Edit Profile</Button>
+          <Link href="/profile/edit" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto">Edit Profile</Button>
           </Link>
         )}
         {!isOwnProfile && session?.user && (
