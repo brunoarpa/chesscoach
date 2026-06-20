@@ -9,7 +9,7 @@ export default function TermsOfServicePage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8 sm:py-12">
       <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
-      <p className="text-muted-foreground mb-8">Last updated: May 16, 2026</p>
+      <p className="text-muted-foreground mb-8">Last updated: June 20, 2026</p>
 
       <div className="prose prose-neutral dark:prose-invert max-w-none space-y-6">
         <section>
@@ -41,9 +41,11 @@ export default function TermsOfServicePage() {
           <h2 className="text-xl font-semibold mt-8 mb-3">4. Payments and Wallet</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Payments are processed by Stripe. EloChaser does not store full card details.</li>
-            <li>When you book a lesson, the cost is reserved from your wallet. If the coach declines or the request expires, the reserved amount is released back automatically.</li>
+            <li>You fund a single wallet (deposits from $5.00 to $200.00 each) and spend it with any coach on the Platform. A payment-processing fee of $0.40 + 2% is added to each deposit and shown before you pay.</li>
+            <li>When you book a lesson, its cost is reserved from your wallet. If the coach declines or the request expires, the reserved amount is released back to your wallet automatically.</li>
             <li>Wallet deposits are non-refundable except where required by applicable law. Use the <Link href="/contact" className="underline">contact form</Link> for refund requests.</li>
-            <li>Coaches can withdraw their pending earnings (minimum $25.00) at any time. A transfer fee of $0.40 + 0.5% applies per withdrawal. Stripe additionally charges a $2.00 monthly payout-account fee, passed through at cost on the first withdrawal of each calendar month.</li>
+            <li>A coach&apos;s wallet shows their gross earnings; the Platform&apos;s commission is taken at withdrawal, not when a lesson completes.</li>
+            <li>Coaches can withdraw their earnings (minimum $5.00) at any time. Each withdrawal deducts a flat $2.50 payout fee (covering Stripe&apos;s payout costs) plus a 5% platform commission. The effective rate falls the more you withdraw at once, so batching payouts is cheaper.</li>
           </ul>
         </section>
 
