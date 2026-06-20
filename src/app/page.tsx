@@ -11,10 +11,10 @@ export default async function Home() {
         <h1 className="text-6xl sm:text-7xl font-bold tracking-tighter text-balance">
           ♝ EloChaser
         </h1>
-        <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-          Find the right coach for your level, your goals, and your budget.
+        <p className="text-lg sm:text-xl font-medium text-muted-foreground text-balance">
+          Find the right coach for your level, goals, and budget.
         </p>
-        <p className="text-lg sm:text-xl font-medium text-emerald-600 dark:text-emerald-400 text-balance">
+        <p className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 text-balance">
           You have 3 completely free trial lessons.
         </p>
       </div>
