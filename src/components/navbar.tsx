@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { Search, Trophy, Wallet } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
-import { SignOutButton } from "@/components/sign-out-button";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavLink } from "@/components/nav-link";
+import { AccountMenu } from "@/components/account-menu";
 import { NotificationBell, type NotificationItem } from "@/components/notification-bell";
 import { getNotifications } from "@/lib/actions/notifications";
 
@@ -13,30 +14,36 @@ export async function Navbar() {
 
   let notifications: NotificationItem[] = [];
   let unreadCount = 0;
+  let walletAvailable = 0;
   if (session?.user?.id) {
     const [user, notifData] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { lastActiveAt: true },
+        select: { lastActiveAt: true, walletBalance: true, reservedBalance: true },
       }),
       getNotifications(),
     ]);
     notifications = notifData.notifications;
     unreadCount = notifData.unreadCount;
 
-    // Touch lastActiveAt on any page view, throttled to one write per 5 min.
-    // This keeps effective availability and activity dots honest for users who
-    // browse without opening the dashboard.
-    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
-    if (user && Date.now() - user.lastActiveAt.getTime() > 5 * 60 * 1000) {
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
-      });
+    if (user) {
+      walletAvailable = user.walletBalance - user.reservedBalance;
+
+      // Touch lastActiveAt on any page view, throttled to one write per 5 min.
+      // This keeps effective availability and activity dots honest for users who
+      // browse without opening the dashboard.
+      // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
+      if (Date.now() - user.lastActiveAt.getTime() > 5 * 60 * 1000) {
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { lastActiveAt: new Date(), activityStatus: "ACTIVE" },
+        });
+      }
     }
   }
 
   const username = session?.user?.username ?? null;
+  const image = session?.user?.image ?? null;
   const isAdmin = session?.user?.role === "ADMIN";
 
   return (
@@ -48,82 +55,57 @@ export async function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
+          {/* Browse zone */}
           <NavLink
             href="/search"
-            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
             activeClassName="bg-muted font-medium"
           >
+            <Search className="h-4 w-4" />
             Find a Coach
           </NavLink>
           <NavLink
-            href="/how-it-works"
-            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-            activeClassName="bg-muted font-medium"
-          >
-            How It Works
-          </NavLink>
-          <NavLink
             href="/leaderboard"
-            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
             activeClassName="bg-muted font-medium"
           >
+            <Trophy className="h-4 w-4" />
             Leaderboard
           </NavLink>
-          <NavLink
-            href="/contact"
-            className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-            activeClassName="bg-muted font-medium"
-          >
-            Contact
-          </NavLink>
 
+          {/* Account zone */}
           {session?.user ? (
-            <>
-              <NavLink
-                href="/dashboard"
-                className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-                activeClassName="bg-muted font-medium"
-              >
-                Dashboard
-              </NavLink>
+            <div className="flex items-center gap-2 ml-2 pl-2 border-l">
               <NavLink
                 href="/wallet"
-                className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
                 activeClassName="bg-muted font-medium"
               >
-                Wallet
+                <Wallet className="h-4 w-4" />
+                ${(walletAvailable / 100).toFixed(2)}
               </NavLink>
-              {username && (
-                <NavLink
-                  href={`/profile/${username}`}
-                  className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-                  activeClassName="bg-muted font-medium"
-                >
-                  Profile
-                </NavLink>
+              {session.user.id && (
+                <NotificationBell
+                  userId={session.user.id}
+                  initialNotifications={notifications}
+                  initialUnreadCount={unreadCount}
+                />
               )}
-              {isAdmin && (
-                <NavLink
-                  href="/admin"
-                  className="text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors text-red-500"
-                  activeClassName="bg-muted font-medium"
-                >
-                  Admin
-                </NavLink>
-              )}
-              <SignOutButton />
-            </>
+              <AccountMenu username={username} image={image} isAdmin={isAdmin} />
+            </div>
           ) : (
-            <Link href="/login">
-              <Button size="sm">Sign in</Button>
-            </Link>
-          )}
-          {session?.user?.id && (
-            <NotificationBell
-              userId={session.user.id}
-              initialNotifications={notifications}
-              initialUnreadCount={unreadCount}
-            />
+            <div className="flex items-center gap-2 ml-2 pl-2 border-l">
+              <NavLink
+                href="/contact"
+                className="text-sm px-3 py-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                activeClassName="bg-muted font-medium text-foreground"
+              >
+                Contact
+              </NavLink>
+              <Link href="/login">
+                <Button size="sm">Sign in</Button>
+              </Link>
+            </div>
           )}
         </nav>
 
@@ -140,6 +122,7 @@ export async function Navbar() {
             isLoggedIn={!!session?.user}
             username={username ?? undefined}
             isAdmin={isAdmin}
+            walletAvailable={walletAvailable}
           />
         </div>
       </div>

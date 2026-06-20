@@ -17,9 +17,10 @@ interface MobileNavProps {
   isLoggedIn: boolean;
   username?: string;
   isAdmin?: boolean;
+  walletAvailable?: number;
 }
 
-export function MobileNav({ isLoggedIn, username, isAdmin }: MobileNavProps) {
+export function MobileNav({ isLoggedIn, username, isAdmin, walletAvailable = 0 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -33,32 +34,35 @@ export function MobileNav({ isLoggedIn, username, isAdmin }: MobileNavProps) {
       <SheetContent side="right" className="w-72 pt-10">
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <nav className="flex flex-col gap-1">
+          {/* Browse zone */}
           <MobileLink href="/search" onClose={() => setOpen(false)}>
             Find a Coach
-          </MobileLink>
-          <MobileLink href="/how-it-works" onClose={() => setOpen(false)}>
-            How It Works
           </MobileLink>
           <MobileLink href="/leaderboard" onClose={() => setOpen(false)}>
             Leaderboard
           </MobileLink>
-          <MobileLink href="/contact" onClose={() => setOpen(false)}>
-            Contact
-          </MobileLink>
 
           {isLoggedIn ? (
             <>
+              {/* Account zone */}
+              <div className="border-t my-2" />
               <MobileLink href="/dashboard" onClose={() => setOpen(false)}>
                 Dashboard
               </MobileLink>
               <MobileLink href="/wallet" onClose={() => setOpen(false)}>
-                Wallet
+                <span className="flex items-center justify-between gap-2">
+                  Wallet
+                  <span className="text-muted-foreground">${(walletAvailable / 100).toFixed(2)}</span>
+                </span>
               </MobileLink>
               {username && (
                 <MobileLink href={`/profile/${username}`} onClose={() => setOpen(false)}>
                   Profile
                 </MobileLink>
               )}
+              <MobileLink href="/contact" onClose={() => setOpen(false)}>
+                Contact
+              </MobileLink>
               {isAdmin && (
                 <MobileLink href="/admin" onClose={() => setOpen(false)} className="text-red-500">
                   Admin
@@ -74,6 +78,9 @@ export function MobileNav({ isLoggedIn, username, isAdmin }: MobileNavProps) {
             </>
           ) : (
             <>
+              <MobileLink href="/contact" onClose={() => setOpen(false)}>
+                Contact
+              </MobileLink>
               <div className="border-t my-2" />
               <MobileLink href="/login" onClose={() => setOpen(false)}>
                 Sign in
