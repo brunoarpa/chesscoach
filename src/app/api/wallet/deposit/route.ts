@@ -5,8 +5,11 @@ import { rateLimit } from "@/lib/rate-limit";
 import { APP_CURRENCY, getStripe } from "@/lib/stripe";
 import { processingFee } from "@/lib/fees";
 
-const MIN_DEPOSIT_CENTS = 500;   // $5.00
-const MAX_DEPOSIT_CENTS = 2000;  // $20.00
+const MIN_DEPOSIT_CENTS = 500;    // $5.00
+// Matches the max coach price ($200 / 15-min slot) so a student can fund any
+// single lesson in one deposit instead of paying the flat fee on many $20
+// top-ups. Still a per-deposit ceiling that caps exposure on any one charge.
+const MAX_DEPOSIT_CENTS = 20000;  // $200.00
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -39,11 +42,11 @@ export async function POST(request: Request) {
   }
 
   if (amount < MIN_DEPOSIT_CENTS) {
-    return NextResponse.json({ error: "Minimum deposit is $5.00" }, { status: 400 });
+    return NextResponse.json({ error: `Minimum deposit is $${(MIN_DEPOSIT_CENTS / 100).toFixed(2)}` }, { status: 400 });
   }
 
   if (amount > MAX_DEPOSIT_CENTS) {
-    return NextResponse.json({ error: "Maximum deposit is $20.00" }, { status: 400 });
+    return NextResponse.json({ error: `Maximum deposit is $${(MAX_DEPOSIT_CENTS / 100).toFixed(2)}` }, { status: 400 });
   }
 
   const stripeClient = await getStripe();
@@ -53,7 +56,14 @@ export async function POST(request: Request) {
 
   const feeCents = processingFee(amount);
 
+  // Stripe Checkout requires absolute success/cancel URLs. If the app URL is
+  // missing we'd build relative ones and the session creation would throw a
+  // 500 - fail fast with a clear message instead.
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  if (!appUrl) {
+    console.error("NEXT_PUBLIC_APP_URL is not set - cannot build Stripe Checkout return URLs");
+    return NextResponse.json({ error: "Payment processing is not configured" }, { status: 503 });
+  }
 
   // Charge in the app currency (USD). The platform holds a USD balance, so these
   // settle as USD and are withdrawable in USD.

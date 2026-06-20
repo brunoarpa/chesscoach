@@ -154,22 +154,32 @@ export async function refreshAllChessComRatings() {
     select: { id: true, chessComUsername: true },
   });
 
-  for (const user of users) {
-    if (!user.chessComUsername) continue;
-    const [rating, currentUsername] = await Promise.all([
-      fetchChessComRating(user.chessComUsername),
-      fetchChessComCurrentUsername(user.chessComUsername),
-    ]);
-    const updateData: Record<string, unknown> = {};
-    if (rating !== null) updateData.chessRating = rating;
-    if (currentUsername && currentUsername !== user.chessComUsername) {
-      updateData.chessComUsername = currentUsername;
-    }
-    if (Object.keys(updateData).length > 0) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: updateData,
-      });
-    }
+  // Each user means two external chess.com calls (each capped at 3s). A flat
+  // sequential loop would take minutes at scale and risk blowing the cron's
+  // time budget; an unbounded fan-out would hammer chess.com. Process in small
+  // bounded-concurrency chunks as a compromise.
+  const CONCURRENCY = 5;
+  for (let i = 0; i < users.length; i += CONCURRENCY) {
+    const chunk = users.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (user) => {
+        if (!user.chessComUsername) return;
+        const [rating, currentUsername] = await Promise.all([
+          fetchChessComRating(user.chessComUsername),
+          fetchChessComCurrentUsername(user.chessComUsername),
+        ]);
+        const updateData: Record<string, unknown> = {};
+        if (rating !== null) updateData.chessRating = rating;
+        if (currentUsername && currentUsername !== user.chessComUsername) {
+          updateData.chessComUsername = currentUsername;
+        }
+        if (Object.keys(updateData).length > 0) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: updateData,
+          });
+        }
+      }),
+    );
   }
 }

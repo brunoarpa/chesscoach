@@ -157,11 +157,21 @@ export async function recalculateAllElos() {
     select: { id: true },
   });
 
-  for (const coach of coaches) {
-    const elo = await calculateCoachElo(coach.id);
-    await prisma.user.update({
-      where: { id: coach.id },
-      data: { coachElo: elo },
-    });
+  // Process in bounded-concurrency chunks. Each calculateCoachElo runs several
+  // queries, so a flat sequential loop is needlessly slow at scale while an
+  // unbounded Promise.all would swamp the connection pool. 10 at a time is a
+  // safe middle ground for the daily cron.
+  const CONCURRENCY = 10;
+  for (let i = 0; i < coaches.length; i += CONCURRENCY) {
+    const chunk = coaches.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (coach) => {
+        const elo = await calculateCoachElo(coach.id);
+        await prisma.user.update({
+          where: { id: coach.id },
+          data: { coachElo: elo },
+        });
+      }),
+    );
   }
 }

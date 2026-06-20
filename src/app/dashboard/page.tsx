@@ -23,11 +23,16 @@ export default async function DashboardPage({
   // Redirect Google users (and anyone without a username) to set up their profile first.
   if (session.user.needsUsername) redirect("/setup-username");
 
-  // Run inline so deadlines & auto-completions are accurate, not just at 6am
-  // cron. Scoped to this user - the global sweep is the cron's job.
-  expirePendingRequests(session.user.id).catch(() => {});
-  autoCompleteLessons(session.user.id).catch(() => {});
-  detectNoShows(session.user.id).catch(() => {});
+  // Run inline so deadlines & auto-completions are accurate, not just at the
+  // daily cron. Scoped to this user - the global sweep is the cron's job.
+  // Awaited (allSettled) so they actually finish before the response: a
+  // serverless function can freeze the moment it returns, so fire-and-forget
+  // sweeps here would frequently be killed mid-flight and silently dropped.
+  await Promise.allSettled([
+    expirePendingRequests(session.user.id),
+    autoCompleteLessons(session.user.id),
+    detectNoShows(session.user.id),
+  ]);
 
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },

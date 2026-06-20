@@ -834,6 +834,13 @@ export async function submitReview(formData: FormData) {
 
   const lesson = await prisma.lessonRequest.findUnique({
     where: { id: lessonId },
+    select: {
+      studentId: true,
+      coachId: true,
+      status: true,
+      coachJoinedAt: true,
+      studentJoinedAt: true,
+    },
   });
 
   if (!lesson) return { error: "Lesson not found" };
@@ -843,36 +850,34 @@ export async function submitReview(formData: FormData) {
   const isCoach = lesson.coachId === session.user.id;
   if (!isStudent && !isCoach) return { error: "Not authorized" };
 
+  // A lesson only counts as having "happened" if both parties actually joined.
+  // A student no-show still ends COMPLETED (the coach is paid), but the absent
+  // student must not be able to review the coach they ghosted, and vice versa.
+  if (!lesson.coachJoinedAt || !lesson.studentJoinedAt) {
+    return { error: "You can only review a lesson that actually took place." };
+  }
+
   // Determine who we're reviewing
   const toUserId = isStudent ? lesson.coachId : lesson.studentId;
 
-  // Only allow one review per user pair (across all lessons)
+  // One review per person (across all lessons). If this user already reviewed
+  // this person on any lesson, update that review rather than erroring - the
+  // dashboard prompts on the most recent completed lesson, which may differ
+  // from the one the original review is anchored to.
   const existingReview = await prisma.review.findFirst({
-    where: {
-      fromUserId: session.user.id,
-      toUserId,
-      lessonId: { not: lessonId },
-    },
+    where: { fromUserId: session.user.id, toUserId },
+    select: { id: true },
   });
   if (existingReview) {
-    return { error: "You have already reviewed this person. You can only leave one review per person." };
+    await prisma.review.update({
+      where: { id: existingReview.id },
+      data: { rating, comment },
+    });
+  } else {
+    await prisma.review.create({
+      data: { fromUserId: session.user.id, toUserId, lessonId, rating, comment },
+    });
   }
-
-  // Upsert: create or update review
-  await prisma.review.upsert({
-    where: { fromUserId_lessonId: { fromUserId: session.user.id, lessonId } },
-    create: {
-      fromUserId: session.user.id,
-      toUserId,
-      lessonId,
-      rating,
-      comment,
-    },
-    update: {
-      rating,
-      comment,
-    },
-  });
 
   await createNotification({
     userId: toUserId,

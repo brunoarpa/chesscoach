@@ -16,8 +16,11 @@ import {
 
 export function WithdrawForm({
   pendingEarnings,
+  heldEarnings = 0,
 }: {
   pendingEarnings: number;
+  /** Earnings frozen pending a no-show dispute - not withdrawable yet. */
+  heldEarnings?: number;
 }) {
   const [loading, setLoading] = useState(false);
   const [amountStr, setAmountStr] = useState("");
@@ -35,19 +38,31 @@ export function WithdrawForm({
   }, []);
 
   const pendingDollars = pendingEarnings / 100;
+  // Withdrawable excludes earnings held pending a no-show dispute - mirrors the
+  // server-side hold so the form never offers money the API will refuse.
+  const withdrawable = Math.max(0, pendingEarnings - heldEarnings);
+  const withdrawableDollars = withdrawable / 100;
+  const heldDollars = heldEarnings / 100;
   const isConnected = connectStatus?.connected && connectStatus?.payoutsEnabled;
-  const meetsMinimum = pendingEarnings >= MIN_PAYOUT_CENTS;
+  const meetsMinimum = withdrawable >= MIN_PAYOUT_CENTS;
 
   const parsedAmount = Number(amountStr);
   const amountCents = Number.isFinite(parsedAmount) ? Math.round(parsedAmount * 100) : 0;
-  const validAmount = amountCents >= MIN_PAYOUT_CENTS && amountCents <= pendingEarnings;
+  const validAmount = amountCents >= MIN_PAYOUT_CENTS && amountCents <= withdrawable;
   const commissionCents = validAmount ? payoutCommission(amountCents) : 0;
   const feeCents = validAmount ? payoutFee(amountCents) : 0;
   const netCents = validAmount ? amountCents - feeCents : 0;
 
   function handleMax() {
-    setAmountStr((pendingEarnings / 100).toFixed(2));
+    setAmountStr((withdrawable / 100).toFixed(2));
   }
+
+  const heldNote =
+    heldEarnings > 0 ? (
+      <p className="text-xs text-amber-700 dark:text-amber-500">
+        ${heldDollars.toFixed(2)} of your earnings is on hold pending a no-show dispute and can&apos;t be withdrawn until it&apos;s resolved.
+      </p>
+    ) : null;
 
   async function handleWithdraw() {
     if (!validAmount) return;
@@ -97,6 +112,7 @@ export function WithdrawForm({
               You have <span className="font-medium">${pendingDollars.toFixed(2)}</span> in earnings waiting.
             </p>
           )}
+          {heldNote && <div className="mt-2">{heldNote}</div>}
         </CardContent>
       </Card>
     );
@@ -115,19 +131,22 @@ export function WithdrawForm({
         ) : !meetsMinimum ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              You have ${pendingDollars.toFixed(2)} in pending earnings. Minimum withdrawal is ${(MIN_PAYOUT_CENTS / 100).toFixed(2)}.
+              You have ${withdrawableDollars.toFixed(2)} available to withdraw. Minimum withdrawal is ${(MIN_PAYOUT_CENTS / 100).toFixed(2)}.
             </p>
-            <p className="text-xs text-muted-foreground">
-              Keep coaching to reach the minimum.
-            </p>
+            {heldNote ?? (
+              <p className="text-xs text-muted-foreground">
+                Keep coaching to reach the minimum.
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
+            {heldNote}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="withdraw-amount">Amount ($)</Label>
                 <span className="text-xs text-muted-foreground">
-                  Available: ${pendingDollars.toFixed(2)}
+                  Available: ${withdrawableDollars.toFixed(2)}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -137,7 +156,7 @@ export function WithdrawForm({
                   inputMode="decimal"
                   step="0.01"
                   min={(MIN_PAYOUT_CENTS / 100).toFixed(2)}
-                  max={pendingDollars.toFixed(2)}
+                  max={withdrawableDollars.toFixed(2)}
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   placeholder={`min $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}`}

@@ -83,7 +83,10 @@ export function getClientIpFromHeaders(h: Headers): string {
   const forwarded = h.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
 
-  // If no IP can be determined, use a restrictive fallback
-  // rather than "unknown" which would share a single bucket
-  return "no-ip-" + Date.now().toString(36);
+  // No IP header: fall back to a single shared bucket. A per-request unique key
+  // (e.g. timestamp-based) would defeat the limit entirely, since every request
+  // would land in its own bucket and never trip the cap. On real deployments a
+  // trusted proxy always sets one of the headers above, so this path is rare;
+  // per-account limits back every critical action regardless.
+  return "ip-unknown";
 }

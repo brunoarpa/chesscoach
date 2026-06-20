@@ -92,10 +92,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // proves ownership for THIS sign-in, but we must not retroactively bless
         // that unverified password - clear it. The owner can set a fresh one via
         // "Forgot password", which is gated on the email.
+        const hadPassword = !!dbUser.passwordHash;
         await prisma.user.update({
           where: { id: dbUser.id },
           data: { emailVerified: new Date(), passwordHash: null },
         });
+        // If we actually removed a password, tell the owner - otherwise their
+        // next email/password login silently fails and looks like a bug. This
+        // also surfaces the case where someone else had set that password.
+        if (hadPassword && user.email) {
+          try {
+            const { sendNotificationEmail } = await import("@/lib/email");
+            await sendNotificationEmail({
+              to: user.email,
+              subject: "Your password was reset",
+              heading: "Your password was reset",
+              bodyHtml:
+                `<p>You just signed in with Google, which verified your email for the first time.</p>
+                 <p>For your security we cleared the password that was previously set on this account, since it was created before the email was verified. You can keep signing in with Google, or set a fresh password any time via <strong>Forgot password</strong>.</p>`,
+              link: "/login",
+              cta: "Go to sign in",
+            });
+          } catch (err) {
+            console.error("[auth] password-cleared notification email failed", err);
+          }
+        }
       }
 
       // Upsert the Account link

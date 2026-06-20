@@ -7,6 +7,7 @@ import { DepositForm } from "@/components/deposit-form";
 import { WithdrawForm } from "@/components/withdraw-form";
 import { StripeConnectSetup } from "@/components/stripe-connect-setup";
 import { LocalTime } from "@/components/local-time";
+import { getHeldEarnings } from "@/lib/earnings";
 
 export default async function WalletPage() {
   const session = await auth();
@@ -46,6 +47,11 @@ export default async function WalletPage() {
 
   const isCoach = !!(user.coachChatPrice || user.coachCallPrice);
 
+  // Earnings frozen pending a no-show dispute aren't withdrawable yet; the
+  // withdraw form mirrors the server-side hold so the UI can't promise money
+  // the API will refuse to send.
+  const heldEarnings = isCoach ? await getHeldEarnings(session.user.id) : 0;
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <h1 className="text-3xl font-bold mb-8">Wallet</h1>
@@ -84,7 +90,7 @@ export default async function WalletPage() {
           <Separator className="my-8" />
           <StripeConnectSetup />
           <div className="mt-4">
-            <WithdrawForm pendingEarnings={user.pendingEarnings} />
+            <WithdrawForm pendingEarnings={user.pendingEarnings} heldEarnings={heldEarnings} />
           </div>
           <p className="text-xs text-muted-foreground mt-3">
             Earnings are paid out via your connected Stripe account. <strong>You are responsible for declaring this income</strong> to your local tax authority. EloChaser does not withhold or remit taxes on your behalf.

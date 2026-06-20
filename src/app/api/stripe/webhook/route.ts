@@ -32,8 +32,13 @@ export async function POST(request: Request) {
     const session = event.data.object as { metadata?: { userId?: string; type?: string; depositAmount?: string }; amount_total?: number | null; payment_intent?: string; id?: string };
     const userId = session.metadata?.userId;
     const type = session.metadata?.type;
-    // Use depositAmount from metadata (excludes processing fee), fall back to amount_total for older sessions
-    const amount = session.metadata?.depositAmount ? parseInt(session.metadata.depositAmount, 10) : session.amount_total;
+    // Credit ONLY the deposit amount from metadata (which excludes the
+    // processing fee). We deliberately do NOT fall back to amount_total - that
+    // includes the fee line item, so crediting it would hand the user the fee
+    // they paid Stripe as free wallet balance.
+    const amount = session.metadata?.depositAmount
+      ? parseInt(session.metadata.depositAmount, 10)
+      : null;
     const paymentIntentId = session.payment_intent as string;
 
     if (userId && type === "deposit" && amount && paymentIntentId) {

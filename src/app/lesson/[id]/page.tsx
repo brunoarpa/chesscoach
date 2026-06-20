@@ -55,31 +55,41 @@ export default async function LessonPage({
     redirect("/dashboard");
   }
 
-  // Record join timestamp
+  // Record this party's join timestamp, then keep the in-memory copy in sync.
   if (isCoach && !lesson.coachJoinedAt) {
+    const joinedAt = new Date();
     await prisma.lessonRequest.update({
       where: { id },
-      data: { coachJoinedAt: new Date() },
+      data: { coachJoinedAt: joinedAt },
     });
+    lesson.coachJoinedAt = joinedAt;
   }
   if (isStudent && !lesson.studentJoinedAt) {
+    const joinedAt = new Date();
     await prisma.lessonRequest.update({
       where: { id },
-      data: { studentJoinedAt: new Date() },
+      data: { studentJoinedAt: joinedAt },
     });
+    lesson.studentJoinedAt = joinedAt;
   }
 
-  // Auto-transition to IN_PROGRESS if both have joined and status is ACCEPTED
+  // Auto-transition to IN_PROGRESS once both parties have joined. The guard
+  // reads the *committed* join timestamps in the DB, not this request's stale
+  // snapshot: if both sides open the room near-simultaneously, each would
+  // otherwise see the other's timestamp as null and neither would flip the
+  // status, stranding the lesson in ACCEPTED forever (no sweep completes it,
+  // so the student's funds stay reserved and the coach is never paid).
   if (lesson.status === "ACCEPTED") {
-    const coachJoined = isCoach || !!lesson.coachJoinedAt;
-    const studentJoined = isStudent || !!lesson.studentJoinedAt;
-    if (coachJoined && studentJoined) {
-      await prisma.lessonRequest.update({
-        where: { id },
-        data: { status: "IN_PROGRESS" },
-      });
-      lesson.status = "IN_PROGRESS";
-    }
+    const flipped = await prisma.lessonRequest.updateMany({
+      where: {
+        id,
+        status: "ACCEPTED",
+        coachJoinedAt: { not: null },
+        studentJoinedAt: { not: null },
+      },
+      data: { status: "IN_PROGRESS" },
+    });
+    if (flipped.count > 0) lesson.status = "IN_PROGRESS";
   }
 
   return (

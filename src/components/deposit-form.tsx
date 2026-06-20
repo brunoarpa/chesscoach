@@ -10,7 +10,7 @@ import { toast } from "sonner";
 const FEE_FLAT = 0.40;
 const FEE_PERCENT = 0.02;
 const MIN_DEPOSIT = 5;
-const MAX_DEPOSIT = 20;
+const MAX_DEPOSIT = 200;
 
 function calculateFee(amount: number): number {
   return FEE_FLAT + Math.ceil(amount * FEE_PERCENT * 100) / 100;

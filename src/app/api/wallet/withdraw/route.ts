@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { APP_CURRENCY, getStripe } from "@/lib/stripe";
 import { payoutFee, payoutCommission, PAYOUT_BASE_FEE_CENTS, MIN_PAYOUT_CENTS } from "@/lib/fees";
+import { getHeldEarnings } from "@/lib/earnings";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -56,14 +57,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Set up your payout account first" }, { status: 400 });
   }
 
-  if (user.pendingEarnings < MIN_PAYOUT_CENTS) {
+  // Hold earnings tied to an unresolved student-no-show dispute so a later
+  // reversal always has the funds to claw back (see getHeldEarnings).
+  const heldCents = await getHeldEarnings(session.user.id);
+  const availableEarnings = user.pendingEarnings - heldCents;
+
+  if (availableEarnings < MIN_PAYOUT_CENTS) {
+    if (heldCents > 0) {
+      return NextResponse.json(
+        { error: `$${(heldCents / 100).toFixed(2)} of your earnings is on hold pending a no-show dispute and can't be withdrawn until it's resolved.` },
+        { status: 400 },
+      );
+    }
     return NextResponse.json({ error: `Minimum withdrawal is $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
   }
 
-  const grossAmount = requestedCents ?? user.pendingEarnings;
+  const grossAmount = requestedCents ?? availableEarnings;
 
-  if (grossAmount > user.pendingEarnings) {
-    return NextResponse.json({ error: "Amount exceeds your pending earnings" }, { status: 400 });
+  if (grossAmount > availableEarnings) {
+    return NextResponse.json(
+      {
+        error: heldCents > 0
+          ? `Amount exceeds your withdrawable earnings ($${(heldCents / 100).toFixed(2)} is on hold pending a no-show dispute).`
+          : "Amount exceeds your pending earnings",
+      },
+      { status: 400 },
+    );
   }
   if (grossAmount < MIN_PAYOUT_CENTS) {
     return NextResponse.json({ error: `Minimum withdrawal is $${(MIN_PAYOUT_CENTS / 100).toFixed(2)}` }, { status: 400 });
