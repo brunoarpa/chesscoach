@@ -265,7 +265,7 @@ export default async function DashboardPage({
       {isCoach && (
         <section id="schedule" className="scroll-mt-20">
           <h2 className="text-xl font-semibold mb-3">Coaching</h2>
-          <CoachScheduleEditor initialTemplates={weeklyTemplates} timezone={currentUser.timezone} />
+          <CoachScheduleEditor initialTemplates={weeklyTemplates} timezone={currentUser.timezone} initialAvailability={currentUser.coachAvailability} />
         </section>
       )}
     </div>

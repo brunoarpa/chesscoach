@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getActivityDotColor, getEffectiveAvailability, getRankStyle } from "@/lib/utils";
+import { BookingStatusBadge } from "@/components/booking-status-badge";
 
 const PER_PAGE = 10;
 
@@ -65,6 +66,11 @@ export default async function LeaderboardPage({
       coachChatPrice: true,
       coachCallPrice: true,
       verificationStatus: true,
+      _count: {
+        select: {
+          timeSlots: { where: { status: "AVAILABLE", startTime: { gte: new Date() } } },
+        },
+      },
     },
   });
 
@@ -85,7 +91,7 @@ export default async function LeaderboardPage({
           <div className="md:hidden space-y-3">
             {coaches.map((coach, i) => {
               const rank = skip + i + 1;
-              const availability = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice);
+              const bookable = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE";
               return (
                 <Card key={coach.username}>
                   <CardContent className="pt-4">
@@ -99,11 +105,7 @@ export default async function LeaderboardPage({
                           <Badge variant="outline" title="Verified on chess.com" className="text-xs">✓ chess.com</Badge>
                         )}
                       </div>
-                      {availability === "AVAILABLE" ? (
-                        <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                      ) : (
-                        <Badge variant="secondary">Unavailable</Badge>
-                      )}
+                      <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} />
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                       <span className="text-muted-foreground">Coach Rating</span>
@@ -145,12 +147,12 @@ export default async function LeaderboardPage({
               <TableHead className="text-right">Chat Lesson / slot</TableHead>
               <TableHead className="text-right">Call Lesson / slot</TableHead>
               <TableHead className="text-center">Last Active</TableHead>
-              <TableHead className="text-center">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {coaches.map((coach, i) => {
               const rank = skip + i + 1;
+              const bookable = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE";
               return (
               <TableRow key={coach.username}>
                 <TableCell>
@@ -169,6 +171,7 @@ export default async function LeaderboardPage({
                   <span className="text-xs text-muted-foreground ml-2">
                     ♝ {coach.chessRating ?? "—"}
                   </span>
+                  <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} className="ml-2" />
                 </TableCell>
                 <TableCell className="text-right font-mono font-medium">
                   {Math.round(coach.coachElo)}
@@ -190,13 +193,6 @@ export default async function LeaderboardPage({
                       {formatRelativeTime(coach.lastActiveAt)}
                     </span>
                   </div>
-                </TableCell>
-                <TableCell className="text-center">
-                  {getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE" ? (
-                    <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                  ) : (
-                    <Badge variant="secondary">Unavailable</Badge>
-                  )}
                 </TableCell>
               </TableRow>
               );

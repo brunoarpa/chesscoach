@@ -27,7 +27,6 @@ interface Props {
   coachCallPrice?: number;
   communicationPreference: string;
   bio?: string;
-  coachAvailability: string;
   timezone?: string;
   languages: string[];
 }
@@ -158,35 +157,6 @@ export function ProfileEditForm(props: Props) {
                 <SelectItem value="CHAT_AND_CALL">Chat or Call</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Coaching Availability</Label>
-            <Select
-              name="coachAvailability"
-              defaultValue={props.coachAvailability}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AVAILABLE">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                    Available
-                  </span>
-                </SelectItem>
-                <SelectItem value="UNAVAILABLE">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
-                    Unavailable
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Available: accepting requests (requires a price). Unavailable: not accepting requests. If you&apos;re away from the site for 24h+, students temporarily see you as Unavailable until you return.
-            </p>
           </div>
 
           <Button type="submit" className="w-full">

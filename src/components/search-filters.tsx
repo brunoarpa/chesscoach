@@ -227,29 +227,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <Label>Availability</Label>
-        <Select name="availability" defaultValue={searchParams.get("availability") ?? ""}>
-          <SelectTrigger>
-            <SelectValue placeholder="All" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="AVAILABLE">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                Available
-              </span>
-            </SelectItem>
-            <SelectItem value="UNAVAILABLE">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
-                Unavailable
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       <div className="space-y-2">
         <Label>Last Seen</Label>

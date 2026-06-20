@@ -3,8 +3,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/sign-out-button";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { AvailabilityToggle } from "@/components/availability-toggle";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavLink } from "@/components/nav-link";
 import { NotificationBell, type NotificationItem } from "@/components/notification-bell";
@@ -13,20 +11,16 @@ import { getNotifications } from "@/lib/actions/notifications";
 export async function Navbar() {
   const session = await auth();
 
-  let coachAvailability: string | null = null;
   let notifications: NotificationItem[] = [];
   let unreadCount = 0;
   if (session?.user?.id) {
     const [user, notifData] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { coachAvailability: true, coachChatPrice: true, coachCallPrice: true, lastActiveAt: true },
+        select: { lastActiveAt: true },
       }),
       getNotifications(),
     ]);
-    // The availability toggle only means something for coaches (price set).
-    const isCoach = !!(user?.coachChatPrice || user?.coachCallPrice);
-    coachAvailability = isCoach ? (user?.coachAvailability ?? null) : null;
     notifications = notifData.notifications;
     unreadCount = notifData.unreadCount;
 
@@ -131,8 +125,6 @@ export async function Navbar() {
               initialUnreadCount={unreadCount}
             />
           )}
-          {coachAvailability && <AvailabilityToggle initialStatus={coachAvailability} />}
-          <ThemeToggle />
         </nav>
 
         {/* Mobile nav */}
@@ -144,8 +136,6 @@ export async function Navbar() {
               initialUnreadCount={unreadCount}
             />
           )}
-          {coachAvailability && <AvailabilityToggle initialStatus={coachAvailability} />}
-          <ThemeToggle />
           <MobileNav
             isLoggedIn={!!session?.user}
             username={username ?? undefined}

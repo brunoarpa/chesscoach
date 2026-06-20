@@ -16,7 +16,6 @@ export default async function ProfileEditPage() {
       coachCallPrice: true,
       communicationPreference: true,
       bio: true,
-      coachAvailability: true,
       timezone: true,
       languages: true,
     },
@@ -34,7 +33,6 @@ export default async function ProfileEditPage() {
         coachCallPrice={user.coachCallPrice ? user.coachCallPrice / 100 : undefined}
         communicationPreference={user.communicationPreference}
         bio={user.bio ?? undefined}
-        coachAvailability={user.coachAvailability}
         timezone={user.timezone ?? undefined}
         languages={user.languages}
       />

@@ -251,12 +251,6 @@ export default async function ProfilePage({
                 </Link>
               );
             })()}
-            {isCoachProfile && effectiveAvailability === "AVAILABLE" && (
-              <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-            )}
-            {isCoachProfile && effectiveAvailability === "UNAVAILABLE" && (
-              <Badge variant="secondary">Unavailable</Badge>
-            )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             {getActivityLabel(user.lastActiveAt)}

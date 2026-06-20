@@ -73,7 +73,6 @@ export async function updateProfile(formData: FormData) {
     communicationPreference:
       (formData.get("communicationPreference") as string) || "CHAT_ONLY",
     bio: rawBio,
-    coachAvailability: (formData.get("coachAvailability") as string) || "AVAILABLE",
     timezone: rawTimezone,
     languages: filterValidLanguages(
       formData.getAll("languages").map((v) => String(v)),
@@ -92,7 +91,7 @@ export async function updateProfile(formData: FormData) {
   // Validate and handle username change
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { username: true, coachAvailability: true, coachChatPrice: true, coachCallPrice: true, timezone: true },
+    select: { username: true, coachChatPrice: true, coachCallPrice: true, timezone: true },
   });
   let newUsername = currentUser?.username ?? null;
   if (raw.username && raw.username !== currentUser?.username) {
@@ -111,27 +110,11 @@ export async function updateProfile(formData: FormData) {
 
   const chatPriceInCents = raw.coachChatPrice ? Math.round(raw.coachChatPrice * 100) : null;
   const callPriceInCents = raw.coachCallPrice ? Math.round(raw.coachCallPrice * 100) : null;
-  const availability = raw.coachAvailability as "AVAILABLE" | "UNAVAILABLE";
-  const hasPrice = chatPriceInCents !== null || callPriceInCents !== null;
-  const hasLanguages = raw.languages.length > 0;
 
-  // Only enforce coach requirements when the user is actually switching to
-  // AVAILABLE. Every account stores AVAILABLE by default (it's meaningless
-  // without a price — students never see you as bookable), so blocking the
-  // whole profile save for non-coaches would lock them out of editing.
-  const switchingToAvailable =
-    availability === "AVAILABLE" && currentUser?.coachAvailability !== "AVAILABLE";
-  if (switchingToAvailable) {
-    if (!hasPrice && !hasLanguages) {
-      return { error: "To be available as a coach, set a chat or call price and select at least one language you teach in." };
-    }
-    if (!hasPrice) {
-      return { error: "To be available as a coach, set a chat or call price." };
-    }
-    if (!hasLanguages) {
-      return { error: "To be available as a coach, select at least one language you teach in." };
-    }
-  }
+  // Pausing/resuming bookings lives on the schedule editor (updateCoachAvailability),
+  // which enforces the price + language requirements. Profile edits deliberately
+  // leave coachAvailability untouched so saving the form can't silently un-pause
+  // a coach.
 
   await prisma.user.update({
     where: { id: session.user.id },
@@ -142,7 +125,6 @@ export async function updateProfile(formData: FormData) {
       coachCallPrice: callPriceInCents,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
       bio: raw.bio || null,
-      coachAvailability: availability,
       timezone: raw.timezone || null,
       languages: raw.languages,
       lastActiveAt: new Date(),

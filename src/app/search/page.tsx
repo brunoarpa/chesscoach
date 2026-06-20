@@ -4,6 +4,7 @@ import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
 import { auth } from "@/lib/auth";
 import { filterValidLanguages } from "@/lib/languages";
+import { getEffectiveAvailability } from "@/lib/utils";
 
 interface SearchParams {
   q?: string;
@@ -14,7 +15,6 @@ interface SearchParams {
   maxPrice?: string;
   communication?: string;
   status?: string;
-  availability?: string;
   availableFrom?: string;
   availableTo?: string;
   lastSeen?: string;
@@ -91,13 +91,6 @@ export default async function SearchPage({
     where.activityStatus = params.status as "ACTIVE" | "AWAY" | "INACTIVE";
   }
 
-  if (params.availability && params.availability !== "all") {
-    // Bookability is purely the coach's manual toggle now — presence no longer
-    // gates it (see getEffectiveAvailability). A coach with no price is treated
-    // as Unavailable, matching the helper.
-    where.coachAvailability =
-      params.availability === "AVAILABLE" ? "AVAILABLE" : "UNAVAILABLE";
-  }
 
   // Booking-time filter: only surface coaches who have a bookable slot starting
   // within the requested window. availableFrom/availableTo are absolute (UTC) ISO
@@ -119,6 +112,9 @@ export default async function SearchPage({
     where.timeSlots = {
       some: { status: "AVAILABLE", startTime },
     };
+    // A coach who has paused bookings keeps their slots but must not surface in
+    // time-based searches (mirrors the getEffectiveAvailability booking gate).
+    where.coachAvailability = "AVAILABLE";
   }
 
   if (params.lastSeen && params.lastSeen !== "any") {
@@ -172,6 +168,11 @@ export default async function SearchPage({
       lessonsGiven: true,
       bio: true,
       languages: true,
+      _count: {
+        select: {
+          timeSlots: { where: { status: "AVAILABLE", startTime: { gte: new Date() } } },
+        },
+      },
     },
   });
 
@@ -223,6 +224,7 @@ export default async function SearchPage({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {coaches.map((coach) => {
                 const reviews = reviewsById.get(coach.id);
+                const bookable = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice) === "AVAILABLE";
                 return (
                   <CoachCard
                     key={coach.id}
@@ -236,6 +238,8 @@ export default async function SearchPage({
                     coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
                     coachAvailability={coach.coachAvailability}
+                    bookable={bookable}
+                    hasOpenSlots={coach._count.timeSlots > 0}
                     lastActiveAt={coach.lastActiveAt}
                     avgRating={reviews?.avg ?? null}
                     reviewCount={reviews?.count ?? 0}

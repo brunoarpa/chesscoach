@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, DollarSign, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
 import { FavouriteButton } from "@/components/favourite-button";
+import { BookingStatusBadge } from "@/components/booking-status-badge";
 import { getLanguageLabel } from "@/lib/languages";
 
 const continentLabels: Record<string, string> = {
@@ -14,7 +15,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-import { getActivityDotColor, getEffectiveAvailability, getRankStyle } from "@/lib/utils";
+import { getActivityDotColor, getRankStyle } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -39,6 +40,8 @@ interface Props {
   coachElo: number;
   activityStatus: string;
   coachAvailability: string;
+  bookable: boolean;
+  hasOpenSlots: boolean;
   lastActiveAt: Date;
   avgRating: number | null;
   reviewCount: number;
@@ -84,11 +87,7 @@ export function CoachCard(props: Props) {
             <p className="text-sm text-muted-foreground mb-3">
               <span className="flex items-center gap-1.5">
                 ♝ Chess Coach
-                {getEffectiveAvailability(props.coachAvailability, props.coachChatPrice, props.coachCallPrice) === "AVAILABLE" ? (
-                  <Badge className="bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400">Available</Badge>
-                ) : (
-                  <Badge variant="secondary">Unavailable</Badge>
-                )}
+                <BookingStatusBadge bookable={props.bookable} hasOpenSlots={props.hasOpenSlots} />
               </span>
             </p>
 

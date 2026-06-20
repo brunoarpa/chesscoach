@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveWeeklyTemplate } from "@/lib/actions/timeslots";
+import { updateCoachAvailability } from "@/lib/actions/auth";
 import { toast } from "sonner";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -28,9 +29,10 @@ function formatTime(hour: number, minute: number): string {
 interface Props {
   initialTemplates: Array<{ dayOfWeek: number; startHour: number; startMinute: number }>;
   timezone: string | null;
+  initialAvailability: string;
 }
 
-export function CoachScheduleEditor({ initialTemplates, timezone }: Props) {
+export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailability }: Props) {
   const [selected, setSelected] = useState<Set<SlotKey>>(() => {
     const set = new Set<SlotKey>();
     for (const t of initialTemplates) {
@@ -39,6 +41,8 @@ export function CoachScheduleEditor({ initialTemplates, timezone }: Props) {
     return set;
   });
   const [saving, setSaving] = useState(false);
+  const [paused, setPaused] = useState(initialAvailability !== "AVAILABLE");
+  const [pausing, setPausing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragAction, setDragAction] = useState<"add" | "remove">("add");
 
@@ -98,6 +102,19 @@ export function CoachScheduleEditor({ initialTemplates, timezone }: Props) {
     });
   }, []);
 
+  async function handlePauseToggle() {
+    const next = paused ? "AVAILABLE" : "UNAVAILABLE";
+    setPausing(true);
+    const result = await updateCoachAvailability(next);
+    setPausing(false);
+    if (result?.error) {
+      toast.error(result.error);
+      return;
+    }
+    setPaused(next !== "AVAILABLE");
+    toast.success(next === "AVAILABLE" ? "Bookings resumed." : "Bookings paused.");
+  }
+
   async function handleSave() {
     setSaving(true);
     const slots = Array.from(selected).map(parseKey);
@@ -115,10 +132,27 @@ export function CoachScheduleEditor({ initialTemplates, timezone }: Props) {
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle className="text-lg">Weekly Availability</CardTitle>
-          <Button onClick={handleSave} disabled={saving} size="sm" className="sm:w-auto w-full">
-            {saving ? "Saving..." : "Save Schedule"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handlePauseToggle}
+              disabled={pausing}
+              size="sm"
+              variant={paused ? "default" : "outline"}
+              className="sm:w-auto w-full"
+            >
+              {pausing ? "Saving..." : paused ? "Resume bookings" : "Pause bookings"}
+            </Button>
+            <Button onClick={handleSave} disabled={saving} size="sm" className="sm:w-auto w-full">
+              {saving ? "Saving..." : "Save Schedule"}
+            </Button>
+          </div>
         </div>
+        {paused && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+            Bookings are paused. Students can&apos;t book you and you won&apos;t show up
+            for time-based searches. Your weekly schedule below is saved. Resume any time.
+          </div>
+        )}
         <p className="text-sm text-muted-foreground">
           Tap or drag to set your recurring 15-min availability slots.{" "}
           {timezone ? (
