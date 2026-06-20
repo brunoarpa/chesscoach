@@ -1,9 +1,22 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export default async function Home() {
   const session = await auth();
+
+  // Logged-out visitors see the standing offer. Logged-in students see their
+  // real remaining trials, so the hook never lies once the trials are spent.
+  let trialsRemaining = 3;
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { freeTrialsRemaining: true },
+    });
+    trialsRemaining = user?.freeTrialsRemaining ?? 0;
+  }
+  const hasTrials = trialsRemaining > 0;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-10 px-4 pt-12 pb-16">
@@ -14,9 +27,15 @@ export default async function Home() {
         <p className="text-lg sm:text-xl font-medium text-muted-foreground text-balance">
           Find the right coach for your level, goals, and budget.
         </p>
-        <p className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 text-balance">
-          You have 3 completely free trial lessons.
-        </p>
+        {hasTrials ? (
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 text-balance">
+            You have {trialsRemaining} completely free trial lesson{trialsRemaining === 1 ? "" : "s"}.
+          </p>
+        ) : (
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">
+            Ready for your next lesson? Pick a coach and book in seconds.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
