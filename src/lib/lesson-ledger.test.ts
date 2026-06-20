@@ -24,7 +24,7 @@ const paidLesson = {
   isTrial: false,
 };
 
-describe("payCoachForLesson — paid lesson", () => {
+describe("payCoachForLesson - paid lesson", () => {
   it("debits the student's wallet and reserved hold by the full cost", async () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), paidLesson);
@@ -90,7 +90,7 @@ describe("payCoachForLesson — paid lesson", () => {
   });
 });
 
-describe("payCoachForLesson — free trial", () => {
+describe("payCoachForLesson - free trial", () => {
   it("moves no money: no balance changes, no ledger rows", async () => {
     const tx = makeFakeTx();
     await payCoachForLesson(asLedger(tx), { ...paidLesson, isTrial: true });

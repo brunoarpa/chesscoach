@@ -35,7 +35,7 @@ export async function signUpWithPassword(formData: FormData) {
 
   // Never let signup touch an existing account. Setting a password on an
   // account that's already email-verified (e.g. a Google sign-in) would hand
-  // login to whoever submitted this form — an account-takeover vector. An
+  // login to whoever submitted this form - an account-takeover vector. An
   // existing user who wants to add or change a password must prove they own
   // the inbox via "Forgot password", which sets the password through a token.
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -134,7 +134,7 @@ export async function resetPassword(formData: FormData) {
     where: { id: result.userId },
     data: {
       passwordHash,
-      // If they could reset via email, they own the inbox — mark verified too.
+      // If they could reset via email, they own the inbox - mark verified too.
       emailVerified: new Date(),
     },
   });

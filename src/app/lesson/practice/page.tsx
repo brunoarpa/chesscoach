@@ -3,7 +3,7 @@ import { PracticeSession } from "@/components/lesson/practice-session";
 
 export const metadata: Metadata = {
   title: "Practice Lesson",
-  description: "Explore the EloChaser lesson room — board, chat, and tools — in a private sandbox.",
+  description: "Explore the EloChaser lesson room - board, chat, and tools - in a private sandbox.",
 };
 
 // Public, login-free sandbox of the lesson room so anyone can learn the UI

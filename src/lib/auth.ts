@@ -56,7 +56,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account }) {
       if (!account) return false;
 
-      // Credentials path — authorize() already validated. Just update activity.
+      // Credentials path - authorize() already validated. Just update activity.
       if (account.provider === "credentials") {
         if (!user.id) return false;
         const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
@@ -90,7 +90,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // was set by someone who never proved they own this inbox (e.g. an
         // attacker who signed up with this email before the real owner). Google
         // proves ownership for THIS sign-in, but we must not retroactively bless
-        // that unverified password — clear it. The owner can set a fresh one via
+        // that unverified password - clear it. The owner can set a fresh one via
         // "Forgot password", which is gated on the email.
         await prisma.user.update({
           where: { id: dbUser.id },
@@ -125,7 +125,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       });
 
-      // Update activity. coachAvailability stays untouched — the 24h rule is
+      // Update activity. coachAvailability stays untouched - the 24h rule is
       // derived at read time (getEffectiveAvailability), so signing back in
       // is what makes a coach appear Available again.
       await prisma.user.update({

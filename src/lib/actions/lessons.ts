@@ -14,7 +14,7 @@ import { createNotification } from "@/lib/notifications";
 
 const lessonRequestInputSchema = z.object({
   coachId: z.string().cuid(),
-  // Every booking must target a specific time slot — there is no instant/unscheduled path.
+  // Every booking must target a specific time slot - there is no instant/unscheduled path.
   timeSlotId: z.string().cuid({ message: "Please pick a time slot to book." }),
   isTrial: z.enum(["true", "false"]).transform((v) => v === "true").optional().default(false),
   communicationMethod: z.enum(["CALL", "CHAT"]).optional(),
@@ -76,7 +76,7 @@ export async function createLessonRequest(formData: FormData) {
   });
 
   if (!coach) return { error: "Coach not found" };
-  // chess.com verification is optional — anyone with prices set and AVAILABLE can be booked.
+  // chess.com verification is optional - anyone with prices set and AVAILABLE can be booked.
   const effectiveAvailability = getEffectiveAvailability(coach.coachAvailability, coach.coachChatPrice, coach.coachCallPrice);
   if (effectiveAvailability !== "AVAILABLE") {
     return { error: "This coach is not currently accepting students" };
@@ -117,7 +117,7 @@ export async function createLessonRequest(formData: FormData) {
 
     // One free trial per coach. Statuses where the trial never actually
     // happened don't count: DECLINED/EXPIRED/CANCELLED, and NO_SHOW (the
-    // coach was the absent party — a student no-show ends as COMPLETED).
+    // coach was the absent party - a student no-show ends as COMPLETED).
     const priorTrialWithCoach = await prisma.lessonRequest.findFirst({
       where: {
         studentId: session.user.id,
@@ -134,7 +134,7 @@ export async function createLessonRequest(formData: FormData) {
   } else {
     // Coaches must actually carry out at least one free trial before receiving
     // paid bookings (see carriedOutTrialWhere for why COMPLETED alone isn't
-    // enough) — unless an admin explicitly approved them for paid bookings.
+    // enough) - unless an admin explicitly approved them for paid bookings.
     if (!coach.paidBookingsApproved) {
       const completedTrials = await prisma.lessonRequest.count({
         where: { coachId, ...carriedOutTrialWhere },
@@ -365,7 +365,7 @@ export async function respondToLessonRequest(
   if (action === "accept") {
     // Too late to accept: past the deadline, or inside the 15-min notice
     // window before the start. Don't leave the request dangling PENDING until
-    // a sweep finds it — expire it right here (refund/trial restore, slot
+    // a sweep finds it - expire it right here (refund/trial restore, slot
     // freed, student notified), exactly like the cron would.
     const nowMs = Date.now();
     const tooLate =
@@ -407,7 +407,7 @@ export async function respondToLessonRequest(
         });
       }
       revalidatePath("/dashboard");
-      return { error: "Too late to accept — lessons must be accepted at least 15 minutes before they start. The request has expired and the student got their money back." };
+      return { error: "Too late to accept - lessons must be accepted at least 15 minutes before they start. The request has expired and the student got their money back." };
     }
 
     // Atomically transition PENDING -> ACCEPTED so concurrent clicks can't double-accept.
@@ -432,7 +432,7 @@ export async function respondToLessonRequest(
     });
   } else {
     // Decline: atomically transition status, then release reserved funds.
-    // We do NOT restore the free trial count — students forfeit a trial when
+    // We do NOT restore the free trial count - students forfeit a trial when
     // a coach declines, which deters spam booking across many coaches.
     await prisma.$transaction(async (tx) => {
       const declined = await tx.lessonRequest.updateMany({
@@ -598,7 +598,7 @@ export async function disputeLesson(requestId: string, reason: string) {
   return { success: true };
 }
 
-const NO_SHOW_BUFFER_MS = 0; // No grace period — coach must be ready by scheduled start
+const NO_SHOW_BUFFER_MS = 0; // No grace period - coach must be ready by scheduled start
 // A student, however, gets a grace window before the coach can charge them as a
 // no-show: being a couple of minutes late must not cost the full lesson price.
 const STUDENT_NO_SHOW_GRACE_MS = 10 * 60 * 1000;
@@ -643,10 +643,10 @@ export async function reportNoShow(requestId: string) {
     }
     // The reporter must have shown up themselves. If neither party joined,
     // the auto-sweep expires the lesson with a full refund and no ELO
-    // penalty — letting an absent student report would pin an unfair
+    // penalty - letting an absent student report would pin an unfair
     // penalty on an equally absent coach.
     if (!request.studentJoinedAt) {
-      return { error: "Join the lesson room first — if the coach doesn't show up, report it from there. If neither of you joins, the lesson expires on its own with a full refund." };
+      return { error: "Join the lesson room first - if the coach doesn't show up, report it from there. If neither of you joins, the lesson expires on its own with a full refund." };
     }
 
     const claimed = await prisma.$transaction(async (tx) => {
@@ -712,19 +712,19 @@ export async function reportNoShow(requestId: string) {
       link: "/dashboard",
     });
   } else {
-    // Coach reporting student no-show — coach gets paid
+    // Coach reporting student no-show - coach gets paid
     if (request.studentJoinedAt) {
       return { error: "Student has already joined the lesson" };
     }
-    // The reporter must have shown up themselves — a coach who also skipped
+    // The reporter must have shown up themselves - a coach who also skipped
     // the lesson must not be able to charge the student for it. The
     // auto-sweep handles the neither-joined case as a no-payment expiry.
     if (!request.coachJoinedAt) {
-      return { error: "Join the lesson room first — a no-show can only be reported by the party who showed up. If neither of you joins, the lesson expires with no payment." };
+      return { error: "Join the lesson room first - a no-show can only be reported by the party who showed up. If neither of you joins, the lesson expires with no payment." };
     }
 
     if (now < startTime + STUDENT_NO_SHOW_GRACE_MS) {
-      return { error: "Give the student a few more minutes — you can report a no-show 10 minutes after the scheduled start." };
+      return { error: "Give the student a few more minutes - you can report a no-show 10 minutes after the scheduled start." };
     }
 
     const claimed = await prisma.$transaction(async (tx) => {
@@ -802,7 +802,7 @@ export async function confirmLessonCompletion(requestId: string) {
   if (request.status !== "IN_PROGRESS") {
     return { error: "This lesson can't be confirmed right now" };
   }
-  // Only after the scheduled end — during the lesson the room is still live,
+  // Only after the scheduled end - during the lesson the room is still live,
   // and before IN_PROGRESS the no-show flows own the lesson.
   if (!request.scheduledEndAt || Date.now() < new Date(request.scheduledEndAt).getTime()) {
     return { error: "You can confirm once the lesson has ended" };
@@ -916,7 +916,7 @@ export async function declineAcceptedLesson(requestId: string) {
 
   // Students are locked in shortly before the start: a free last-second
   // cancellation would let them ghost the coach's committed slot at no cost.
-  // Coaches may still cancel up to the start — that refunds the student in
+  // Coaches may still cancel up to the start - that refunds the student in
   // full, which is strictly better for the student than a coach no-show.
   if (
     isStudent &&

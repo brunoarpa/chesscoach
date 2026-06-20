@@ -11,7 +11,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 
 // A solo, sandboxed copy of the real lesson room used purely for onboarding:
 // it reuses the actual ChessBoard and ChatPanel so people see the exact UI a
-// real lesson has, but everything runs locally — no second participant, no
+// real lesson has, but everything runs locally - no second participant, no
 // realtime sync, no DB, and no audio/video call. A Coach/Student toggle lets one
 // person experience the room from both sides.
 const PRACTICE_LESSON_ID = "practice";
@@ -27,7 +27,7 @@ export function PracticeSession() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar — mirrors the real lesson room's header */}
+      {/* Top bar - mirrors the real lesson room's header */}
       <div className="flex items-center justify-between gap-3 px-4 py-2 border-b bg-background flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-base font-semibold">Practice Lesson</h1>
@@ -53,7 +53,7 @@ export function PracticeSession() {
         </p>
       </div>
 
-      {/* Board + chat layout — single layout chosen by media query, matching the
+      {/* Board + chat layout - single layout chosen by media query, matching the
           real lesson room so each child mounts exactly once. */}
       {isDesktop ? (
         <div className="flex flex-1 min-h-0">

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { verifyEmail } from "@/lib/actions/password-auth";
 
 export const metadata: Metadata = {
-  title: "Verify your email — EloChaser",
+  title: "Verify your email - EloChaser",
   robots: { index: false, follow: false },
 };
 
@@ -27,7 +27,7 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams: 
             {ok
               ? "Your email has been verified. You can sign in now."
               : alreadyUsed
-                ? "This link has already been used. Your email is verified — just sign in."
+                ? "This link has already been used. Your email is verified - just sign in."
                 : ("error" in result && result.error) || "Something went wrong."}
           </CardDescription>
         </CardHeader>

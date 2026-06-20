@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
 
 // chess.com has no public endpoint that returns PGN for a single game by id.
-// Its unofficial callback endpoint instead returns the moves in "TCN" — a
+// Its unofficial callback endpoint instead returns the moves in "TCN" - a
 // compact encoding of two characters per move. This module decodes TCN to
 // {from,to,promotion} squares and replays them through chess.js to rebuild a PGN.
 

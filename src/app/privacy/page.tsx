@@ -82,7 +82,7 @@ export default function PrivacyPolicyPage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">7. Cookies</h2>
           <p className="leading-relaxed">
-            We use essential cookies only — a session cookie for authentication and CSRF protection. No tracking, advertising, or third-party analytics cookies.
+            We use essential cookies only - a session cookie for authentication and CSRF protection. No tracking, advertising, or third-party analytics cookies.
           </p>
         </section>
 

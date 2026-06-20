@@ -58,7 +58,7 @@ export function hadFairResponseWindow(
 
 // Student request limits. A student may have at most this many paid requests
 // awaiting a coach's response at once (each one reserves funds), and may only
-// send a limited number in a rolling window — so nobody can spam-book across
+// send a limited number in a rolling window - so nobody can spam-book across
 // many coaches, tie up attention, and lock their own balance.
 export const MAX_CONCURRENT_PENDING_REQUESTS = 5;
 export const PAID_REQUEST_RATE_MAX = 10;
@@ -75,7 +75,7 @@ export const MIN_ACCEPT_NOTICE_MS = 15 * 60 * 1000;
 
 // How close to the scheduled start a student may still cancel an accepted
 // lesson for a full refund. Inside this window the coach has committed the
-// slot, so the student is locked in — if the coach doesn't show, the no-show
+// slot, so the student is locked in - if the coach doesn't show, the no-show
 // path still makes the student whole. Coaches are deliberately exempt:
 // a late coach cancellation refunds the student in full, which beats forcing
 // the coach into a no-show the student has to sit through and report.
@@ -83,12 +83,12 @@ export const STUDENT_CANCEL_CUTOFF_MS = 30 * 60 * 1000;
 
 // ELO penalty a coach takes for not joining a scheduled lesson. Single source
 // of truth: applied by the no-show sweep and the student's manual report, and
-// reversed by the admin dispute override — all three must move by the same
+// reversed by the admin dispute override - all three must move by the same
 // amount or penalties drift.
 export const NO_SHOW_ELO_PENALTY = 150;
 
 /**
- * Returns the effective coach availability — the single source of truth for
+ * Returns the effective coach availability - the single source of truth for
  * what students see and whether a coach can be booked.
  *
  * Bookability no longer depends on whether the coach is "online": coaches are

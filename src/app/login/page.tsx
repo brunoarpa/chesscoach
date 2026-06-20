@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ResendVerification } from "./resend-verification";
 
 export const metadata: Metadata = {
-  title: "Sign in — EloChaser",
+  title: "Sign in - EloChaser",
   robots: { index: false, follow: false },
 };
 

@@ -111,13 +111,13 @@ export default async function LeaderboardPage({
                       <span className="text-muted-foreground">Coach Rating</span>
                       <span className="text-right font-mono font-medium">{Math.round(coach.coachElo)}</span>
                       <span className="text-muted-foreground">Chess Rating</span>
-                      <span className="text-right">{coach.chessRating ?? "—"}</span>
+                      <span className="text-right">{coach.chessRating ?? "-"}</span>
                       <span className="text-muted-foreground">Lessons</span>
                       <span className="text-right">{coach.lessonsGiven}</span>
                       <span className="text-muted-foreground">Students</span>
                       <span className="text-right">{coach.playersTaught}</span>
                       <span className="text-muted-foreground">Chat lesson / slot</span>
-                      <span className="text-right">{coach.coachChatPrice !== null ? `$${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}</span>
+                      <span className="text-right">{coach.coachChatPrice !== null ? `$${(coach.coachChatPrice / 100).toFixed(2)}` : "-"}</span>
                       {coach.coachCallPrice !== null && (
                         <><span className="text-muted-foreground">Call lesson / slot</span>
                         <span className="text-right">${(coach.coachCallPrice / 100).toFixed(2)}</span></>
@@ -169,7 +169,7 @@ export default async function LeaderboardPage({
                     <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Verified on chess.com">✓</span>
                   )}
                   <span className="text-xs text-muted-foreground ml-2">
-                    ♝ {coach.chessRating ?? "—"}
+                    ♝ {coach.chessRating ?? "-"}
                   </span>
                   <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} className="ml-2" />
                 </TableCell>
@@ -177,14 +177,14 @@ export default async function LeaderboardPage({
                   {Math.round(coach.coachElo)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {coach.chessRating ?? "—"}
+                  {coach.chessRating ?? "-"}
                 </TableCell>
                 <TableCell className="text-right">{coach.lessonsGiven}</TableCell>
                 <TableCell className="text-right">
-                  {coach.coachChatPrice !== null ? `$${(coach.coachChatPrice / 100).toFixed(2)}` : "—"}
+                  {coach.coachChatPrice !== null ? `$${(coach.coachChatPrice / 100).toFixed(2)}` : "-"}
                 </TableCell>
                 <TableCell className="text-right">
-                  {coach.coachCallPrice !== null ? `$${(coach.coachCallPrice / 100).toFixed(2)}` : "—"}
+                  {coach.coachCallPrice !== null ? `$${(coach.coachCallPrice / 100).toFixed(2)}` : "-"}
                 </TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1.5">

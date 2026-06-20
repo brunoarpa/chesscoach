@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 
-// Room opens 5 minutes before the scheduled start — keep in sync with the
+// Room opens 5 minutes before the scheduled start - keep in sync with the
 // EARLY_JOIN_MS used by the dashboards and the /lesson/[id] page guard.
 const EARLY_JOIN_MS = 5 * 60 * 1000;
 
@@ -38,7 +38,7 @@ export function LessonCountdown({
   const [now, setNow] = useState(() => Date.now());
   // Tick every second close to the start (so the last minutes count down
   // visibly), lazily otherwise. The server-rendered text can differ from the
-  // client's by a tick, so the spans carry suppressHydrationWarning — same
+  // client's by a tick, so the spans carry suppressHydrationWarning - same
   // pattern as <LocalTime>.
   useEffect(() => {
     const msToStart = start - Date.now();
@@ -56,7 +56,7 @@ export function LessonCountdown({
     return (
       <span suppressHydrationWarning className={`${base} border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/30 dark:text-red-400`}>
         <Clock className="h-3 w-3" />
-        Started {formatRemaining(now - start)} ago — join now!
+        Started {formatRemaining(now - start)} ago - join now!
       </span>
     );
   }
@@ -68,7 +68,7 @@ export function LessonCountdown({
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
         </span>
-        Starting in {formatRemaining(start - now)} — you can join
+        Starting in {formatRemaining(start - now)} - you can join
       </span>
     );
   }

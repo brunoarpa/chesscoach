@@ -51,7 +51,7 @@ export async function updateProfile(formData: FormData) {
   if (rawTimezone && rawTimezone.length > 64) {
     return { error: "Invalid timezone." };
   }
-  // Must be a real IANA zone — slot generation feeds it to Intl.DateTimeFormat,
+  // Must be a real IANA zone - slot generation feeds it to Intl.DateTimeFormat,
   // which throws on unknown zones and would break the coach's schedule later.
   if (rawTimezone) {
     try {
@@ -135,7 +135,7 @@ export async function updateProfile(formData: FormData) {
   // A timezone change invalidates every future template-generated slot: the
   // stored TimeSlots are UTC instants materialized under the OLD timezone, so
   // they no longer match the wall-clock hours the coach picked. Drop the
-  // regenerable ones and rebuild under the new timezone. Booked slots stay —
+  // regenerable ones and rebuild under the new timezone. Booked slots stay -
   // both parties committed to those exact instants.
   const timezoneChanged = (raw.timezone ?? null) !== (currentUser?.timezone ?? null);
   if (timezoneChanged) {
@@ -160,7 +160,7 @@ export async function updateProfile(formData: FormData) {
 
   // Onboarding hand-off: someone who just set their first coaching price has
   // become bookable in principle, but students can only book concrete time
-  // slots — so send them straight to the schedule editor instead of their
+  // slots - so send them straight to the schedule editor instead of their
   // profile. Only fires on the no-price -> price transition with no weekly
   // template yet, so ordinary profile edits keep the normal redirect.
   const wasCoach = !!(currentUser?.coachChatPrice || currentUser?.coachCallPrice);
@@ -225,7 +225,7 @@ export async function submitChessComUsername(formData: FormData) {
     return { error: "Your account is already verified" };
   }
 
-  // chess.com usernames are case-insensitive — store lowercase so the same
+  // chess.com usernames are case-insensitive - store lowercase so the same
   // account can't be linked to two users under different casings.
   const chessComUsername = (formData.get("chessComUsername") as string)?.trim().toLowerCase();
   if (!chessComUsername) return { error: "Chess.com username is required" };
@@ -259,7 +259,7 @@ export async function verifyChessComLocation() {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
-  // Rate limit verification attempts — chess.com API check is external and can be abused.
+  // Rate limit verification attempts - chess.com API check is external and can be abused.
   const { rateLimit } = await import("@/lib/rate-limit");
   const { success: rlSuccess } = await rateLimit(`verify-chess-com:${session.user.id}`, { maxAttempts: 10, windowMs: 60 * 60 * 1000 });
   if (!rlSuccess) {
@@ -287,7 +287,7 @@ export async function verifyChessComLocation() {
     return { error: `Verification code not found in your chess.com location. Make sure your Location field contains: ${user.verificationCode}` };
   }
 
-  // Verification passed — fetch rating and profile
+  // Verification passed - fetch rating and profile
   const [rating, profile] = await Promise.all([
     fetchChessComRating(user.chessComUsername),
     fetchChessComProfile(user.chessComUsername),

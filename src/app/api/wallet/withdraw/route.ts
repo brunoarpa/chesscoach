@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       requestedCents = Math.floor(body.amountCents);
     }
   } catch {
-    // ignore parse errors — fall back to full balance
+    // ignore parse errors - fall back to full balance
   }
 
   const stripeClient = await getStripe();
@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Suspension freezes the account's money movement in BOTH directions while
-  // under review — otherwise a flagged coach could drain disputed earnings to
+  // under review - otherwise a flagged coach could drain disputed earnings to
   // their bank before an admin rules on the dispute.
   if (user.isSuspended) {
     return NextResponse.json(
-      { error: "Your account is under review. Withdrawals are paused — use the contact form at /contact to appeal." },
+      { error: "Your account is under review. Withdrawals are paused - use the contact form at /contact to appeal." },
       { status: 403 }
     );
   }
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Stripe transfer succeeded. Mark Payout COMPLETED. If this DB write fails,
-    // we DO NOT refund pendingEarnings — the money already left. The Payout row
+    // we DO NOT refund pendingEarnings - the money already left. The Payout row
     // stays PENDING for manual reconciliation by an admin.
     try {
       await prisma.payout.update({
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
           where: { id: payoutId },
           data: { status: "FAILED" },
         }),
-        // Delete the specific PAYOUT transaction we just created — never others.
+        // Delete the specific PAYOUT transaction we just created - never others.
         prisma.transaction.delete({ where: { id: transactionId } }),
       ]);
     } catch (revertError) {

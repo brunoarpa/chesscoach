@@ -83,7 +83,7 @@ export async function updateActivityStatuses() {
 /**
  * Email both parties a reminder for upcoming scheduled lessons: one ~1 day
  * before the start and one ~1 hour before. Instant (no scheduledStartAt)
- * lessons are excluded — for those the "coach accepted, join now" notification
+ * lessons are excluded - for those the "coach accepted, join now" notification
  * is the cue.
  *
  * Idempotent: each reminder is claimed with a guarded updateMany before the
@@ -184,7 +184,7 @@ async function sendReminderEmail(
  * Expire pending lesson requests older than 3 days.
  *
  * When `userId` is given (inline dashboard call), only that user's requests
- * are swept — keeps per-request work bounded instead of scanning the whole
+ * are swept - keeps per-request work bounded instead of scanning the whole
  * table on every dashboard view. The cron calls it without arguments for the
  * global sweep.
  */
@@ -251,7 +251,7 @@ export async function expirePendingRequests(userId?: string) {
   }
 
   // Check for coach non-responsive pattern: 3+ expired in 7 days.
-  // Only in the global (cron) run — it aggregates over the whole table.
+  // Only in the global (cron) run - it aggregates over the whole table.
   if (!userId) {
     await detectNonResponsiveCoaches();
   }
@@ -263,7 +263,7 @@ export async function expirePendingRequests(userId?: string) {
  *
  * Only counts requests the coach genuinely ignored: respondedAt is null (a
  * reply, accept or decline, sets it) and the coach had a fair window to respond
- * (hadFairResponseWindow) — a near-instant booking that lapsed isn't held
+ * (hadFairResponseWindow) - a near-instant booking that lapsed isn't held
  * against them, matching the responsiveness rating.
  */
 async function detectNonResponsiveCoaches() {
@@ -315,7 +315,7 @@ async function detectNonResponsiveCoaches() {
  * window has passed (cooldown + 48 hours) and the lesson never started.
  *
  * IMPORTANT: scheduled lessons (those with a scheduledStartAt) are deliberately
- * excluded — their lifecycle is driven by the scheduled time via detectNoShows
+ * excluded - their lifecycle is driven by the scheduled time via detectNoShows
  * (at the start) and autoCompleteLessons (after the end). Keying off respondedAt
  * here would otherwise expire a future scheduled lesson ~2 days after the coach
  * accepted it, before it ever happened.
@@ -351,10 +351,10 @@ export async function detectConfirmationDisputes() {
     const coachConfirmed = lesson.coachConfirmed;
 
     if (!studentConfirmed && !coachConfirmed) {
-      // Neither confirmed — timeout, expire and refund.
+      // Neither confirmed - timeout, expire and refund.
       const claimed = await prisma.$transaction(async (tx) => {
         // Guard against the no-show sweep (which runs concurrently) having
-        // already claimed this lesson — otherwise we'd refund reserved twice.
+        // already claimed this lesson - otherwise we'd refund reserved twice.
         const flipped = await tx.lessonRequest.updateMany({
           where: { id: lesson.id, status: "ACCEPTED" },
           data: { status: "EXPIRED" },
@@ -396,7 +396,7 @@ export async function detectConfirmationDisputes() {
         });
       }
     } else if (coachConfirmed && !studentConfirmed) {
-      // Coach confirmed but student didn't respond within 48h — auto-complete
+      // Coach confirmed but student didn't respond within 48h - auto-complete
       // (student silence = satisfaction)
       const completed = await prisma.$transaction(async (tx) => {
         const flipped = await tx.lessonRequest.updateMany({
@@ -431,7 +431,7 @@ export async function detectConfirmationDisputes() {
         });
       }
     } else {
-      // Student confirmed but coach didn't — expire and refund
+      // Student confirmed but coach didn't - expire and refund
       const claimed = await prisma.$transaction(async (tx) => {
         const flipped = await tx.lessonRequest.updateMany({
           where: { id: lesson.id, status: "ACCEPTED" },
@@ -524,14 +524,14 @@ type CompletableLesson = {
  * Atomically complete an IN_PROGRESS lesson: settle payment, refresh the
  * coach's stats and ELO, and notify both parties. Returns false when another
  * path (a concurrent sweep, a no-show report, a dispute) already claimed the
- * lesson — callers must treat that as "nothing happened".
+ * lesson - callers must treat that as "nothing happened".
  *
  * Shared by the auto-complete sweep and the student's manual "confirm lesson"
  * action so the money invariants live in exactly one place.
  */
 export async function completeInProgressLesson(lesson: CompletableLesson): Promise<boolean> {
   const completed = await prisma.$transaction(async (tx) => {
-    // Status-guarded claim — see autoCompleteLessons for why a plain
+    // Status-guarded claim - see autoCompleteLessons for why a plain
     // read-then-update would double-pay under concurrency.
     const flipped = await tx.lessonRequest.updateMany({
       where: { id: lesson.id, status: "IN_PROGRESS" },
@@ -546,7 +546,7 @@ export async function completeInProgressLesson(lesson: CompletableLesson): Promi
 
     await payCoachForLesson(tx, lesson);
 
-    // Free trials count toward stats for now (growth phase) — see
+    // Free trials count toward stats for now (growth phase) - see
     // payCoachForLesson, which handles the lessonsGiven/lessonsTaken bumps.
     const distinctStudents = await tx.lessonRequest.findMany({
       where: { coachId: lesson.coachId, status: "COMPLETED" },
@@ -590,7 +590,7 @@ export async function completeInProgressLesson(lesson: CompletableLesson): Promi
 /**
  * Auto-complete IN_PROGRESS lessons whose dispute window has elapsed.
  * Student silence = satisfaction: payment transfers to the coach. There is no
- * manual "confirm" step — once the room closes and no no-show/dispute flag was
+ * manual "confirm" step - once the room closes and no no-show/dispute flag was
  * raised, the lesson proceeds to completion on its own.
  *
  * Handles both scheduled lessons (window measured from scheduledEndAt) and
@@ -613,7 +613,7 @@ export async function autoCompleteLessons(userId?: string) {
           OR: [
             // Scheduled lessons: dispute window runs from the scheduled end.
             { scheduledEndAt: { not: null, lte: cutoff } },
-            // Instant lessons: no scheduled end — gated by getAutoCompleteAt below.
+            // Instant lessons: no scheduled end - gated by getAutoCompleteAt below.
             { scheduledEndAt: null },
           ],
         },
@@ -664,7 +664,7 @@ export async function detectNoShows(userId?: string) {
 
   for (const lesson of lessons) {
     if (!lesson.coachJoinedAt && !lesson.studentJoinedAt) {
-      // Neither joined — expire, make student whole.
+      // Neither joined - expire, make student whole.
       const expired = await prisma.$transaction(async (tx) => {
         // Atomically claim the lesson. If another task (manual report, the
         // confirmation-dispute sweep, or an overlapping cron) already moved it
@@ -712,7 +712,7 @@ export async function detectNoShows(userId?: string) {
         });
       }
     } else if (!lesson.coachJoinedAt) {
-      // Coach didn't join — no-show. Student made whole, coach penalised.
+      // Coach didn't join - no-show. Student made whole, coach penalised.
       const claimed = await prisma.$transaction(async (tx) => {
         const flipped = await tx.lessonRequest.updateMany({
           where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
@@ -778,7 +778,7 @@ export async function detectNoShows(userId?: string) {
         });
       }
     } else if (!lesson.studentJoinedAt) {
-      // Student didn't join — coach gets paid.
+      // Student didn't join - coach gets paid.
       const charged = await prisma.$transaction(async (tx) => {
         const flipped = await tx.lessonRequest.updateMany({
           where: { id: lesson.id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
@@ -853,7 +853,7 @@ export async function purgeExpiredLessonData() {
   const candidates = await prisma.lessonRequest.findMany({
     where: {
       dataPurgedAt: null,
-      // Only terminal lessons — never touch ones still pending/active/disputed.
+      // Only terminal lessons - never touch ones still pending/active/disputed.
       status: { in: ["COMPLETED", "DECLINED", "EXPIRED", "CANCELLED", "NO_SHOW"] },
       // Freeze on any open report against this lesson.
       abuseFlags: { none: { resolved: false } },

@@ -13,7 +13,7 @@ interface CreateNotificationInput {
   body?: string | null;
   link?: string | null;
   /**
-   * When set, also email the recipient. Most notifications are in-app only —
+   * When set, also email the recipient. Most notifications are in-app only -
    * pass this for the few events worth interrupting someone's inbox for (new
    * request, accepted, declined). The email reuses title/body/link; override
    * the subject or button label here if the in-app copy doesn't fit an inbox.
@@ -42,7 +42,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
       },
     });
   } catch (err) {
-    // The DB row is the critical part — if even that fails, give up quietly.
+    // The DB row is the critical part - if even that fails, give up quietly.
     console.error("createNotification failed", err);
     return;
   }

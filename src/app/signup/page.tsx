@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SignupForm } from "./signup-form";
 
 export const metadata: Metadata = {
-  title: "Sign up — EloChaser",
+  title: "Sign up - EloChaser",
   robots: { index: false, follow: false },
 };
 

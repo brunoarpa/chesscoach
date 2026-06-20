@@ -36,9 +36,9 @@ export function useBoardSync({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (local) return; // Practice mode — no realtime sync
+    if (local) return; // Practice mode - no realtime sync
     const pusher = getPusherClient();
-    if (!pusher) return; // Pusher not configured — skip real-time sync
+    if (!pusher) return; // Pusher not configured - skip real-time sync
 
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
     channelRef.current = channel;
@@ -68,7 +68,7 @@ export function useBoardSync({
       onRemoteReset();
     };
     // Sent instead of board:moves when the tree is too large for Pusher's
-    // 10KB event limit — pull the persisted state from the API instead.
+    // 10KB event limit - pull the persisted state from the API instead.
     const onRefetch = async (data: { currentNodeId: string; senderId: string }) => {
       if (data.senderId === userId) return;
       try {
@@ -77,7 +77,7 @@ export function useBoardSync({
         const body = await res.json();
         if (body.boardTree) onRemoteMoves(body.boardTree as MoveTree, data.currentNodeId);
       } catch {
-        // Transient — the next move broadcast (or refetch) resyncs the board.
+        // Transient - the next move broadcast (or refetch) resyncs the board.
       }
     };
 
@@ -90,7 +90,7 @@ export function useBoardSync({
     channel.bind("board:reset", onReset);
 
     return () => {
-      // Unbind only *our* handlers (pass the reference) and never unsubscribe —
+      // Unbind only *our* handlers (pass the reference) and never unsubscribe -
       // chat, presence, and call:status share this same channel, so tearing it
       // down here would silently break their realtime sync.
       channel.unbind("board:moves", onMoves);
@@ -108,7 +108,7 @@ export function useBoardSync({
   // the full tree as JSON and the main line as PGN for backward-compatible reads.
   const broadcastMoves = useCallback(
     (tree: MoveTree, currentNodeId: string) => {
-      if (local) return; // Practice mode — nothing to sync or persist
+      if (local) return; // Practice mode - nothing to sync or persist
       const boardPgn = treeToMainlinePgn(tree);
 
       // Debounce the DB persist; the API also broadcasts via Pusher.
@@ -127,7 +127,7 @@ export function useBoardSync({
   // Broadcast ephemeral state (no DB persist)
   const broadcastSync = useCallback(
     (event: string, data: Record<string, unknown>) => {
-      if (local) return; // Practice mode — no realtime broadcast
+      if (local) return; // Practice mode - no realtime broadcast
       fetch(`/api/lesson/${lessonId}/board/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

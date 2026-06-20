@@ -100,7 +100,7 @@ export function SlotPicker({
     } else {
       formData.set("isTrial", "false");
       if (commMethod) formData.set("communicationMethod", commMethod);
-      // The price the student is looking at right now — the server rejects the
+      // The price the student is looking at right now - the server rejects the
       // booking if the coach has since changed it.
       formData.set("expectedPrice", String(slotPrice));
     }
@@ -189,7 +189,7 @@ export function SlotPicker({
                   .
                 </p>
                 <p className="text-green-800 dark:text-green-300 mt-1">
-                  ⏰ Add it to your calendar now — missed lessons count as no-shows and are
+                  ⏰ Add it to your calendar now. Missed lessons count as no-shows and are
                   still charged.
                 </p>
               </div>
@@ -261,12 +261,12 @@ export function SlotPicker({
                   <SelectContent>
                     {coachChatPrice !== null && (
                       <SelectItem value="CHAT">
-                        Chat — ${(coachChatPrice / 100).toFixed(2)}/slot
+                        Chat - ${(coachChatPrice / 100).toFixed(2)}/slot
                       </SelectItem>
                     )}
                     {canCall && (
                       <SelectItem value="CALL">
-                        Call — ${(coachCallPrice! / 100).toFixed(2)}/slot
+                        Call - ${(coachCallPrice! / 100).toFixed(2)}/slot
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -302,7 +302,7 @@ export function SlotPicker({
 
             <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 p-2.5 text-xs text-amber-800 dark:text-amber-300">
               <span className="font-medium">⏰ Set yourself a reminder.</span> If you don&apos;t
-              join within 10 minutes of the start time, the lesson counts as a no-show —{" "}
+              join within 10 minutes of the start time, the lesson counts as a no-show.{" "}
               {isTrial
                 ? "you forfeit ALL your remaining free trials."
                 : "you're still charged in full and the coach is paid."}
@@ -310,14 +310,14 @@ export function SlotPicker({
 
             {!isTrial && !hasCompletedTrial && (
               <p className="text-sm text-amber-700 dark:text-amber-400">
-                This coach hasn&apos;t completed a free trial yet — book a free trial first to unlock paid lessons with them.
+                This coach hasn&apos;t completed a free trial yet. Book a free trial first to unlock paid lessons with them.
               </p>
             )}
 
             {!isTrial && commMethod && availableBalance < slotPrice && (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2.5 text-sm space-y-2">
                 <p className="text-destructive">
-                  Insufficient balance — you have ${(availableBalance / 100).toFixed(2)}, need ${(slotPrice / 100).toFixed(2)}.
+                  Insufficient balance - you have ${(availableBalance / 100).toFixed(2)}, need ${(slotPrice / 100).toFixed(2)}.
                 </p>
                 <Link href="/wallet">
                   <Button size="sm" variant="outline" className="w-full">

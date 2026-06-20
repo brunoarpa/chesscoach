@@ -7,12 +7,12 @@ import { hadFairResponseWindow } from "@/lib/utils";
 // small nudge. See the formula in calculateCoachElo for how they combine.
 const BASE = 100;
 
-// Small recency nudge. Being around helps a little, but never dominates — this
+// Small recency nudge. Being around helps a little, but never dominates - this
 // is a fraction of what reviews/responsiveness are worth (it used to be 500).
 const ACTIVITY_BONUS = 150;
 const ACTIVITY_DECAY = 0.1; // half-life ~7 days
 
-// Review quality — the central signal. Shrunk toward a neutral-good prior so a
+// Review quality - the central signal. Shrunk toward a neutral-good prior so a
 // brand-new coach with no reviews isn't buried, and one bad early review
 // doesn't tank them.
 const REVIEW_WEIGHT = 600;
@@ -103,7 +103,7 @@ export async function calculateCoachElo(userId: string, db: PrismaLike = prisma)
       responseTimes.push(r.respondedAt.getTime() - r.createdAt.getTime());
       if (r.status === "DECLINED") declined++;
     } else if (r.status === "EXPIRED" && hadFairResponseWindow(r.createdAt, r.acceptanceDeadline)) {
-      // Only count it against the coach if they actually had time to respond —
+      // Only count it against the coach if they actually had time to respond -
       // a near-instant booking that lapsed isn't their fault.
       ghosted++;
     }

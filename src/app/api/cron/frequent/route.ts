@@ -5,7 +5,7 @@ import {
   detectNoShows,
 } from "@/lib/activity";
 
-// Called frequently (every ~15 min — see vercel.json) for time-sensitive work
+// Called frequently (every ~15 min - see vercel.json) for time-sensitive work
 // the once-a-day cron can't handle: lesson reminders that must land ~1 hour
 // before the start, expiring short-fuse (instant / soon-starting) requests
 // promptly so funds are released, and catching no-shows close to the scheduled

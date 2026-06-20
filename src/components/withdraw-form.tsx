@@ -63,7 +63,7 @@ export function WithdrawForm({
 
       if (data.success) {
         toast.success(
-          `$${(data.net / 100).toFixed(2)} sent to your payout account — funds typically arrive in your bank in 1-2 business days.`,
+          `$${(data.net / 100).toFixed(2)} sent to your payout account - funds typically arrive in your bank in 1-2 business days.`,
         );
         window.location.reload();
       } else {
@@ -78,7 +78,7 @@ export function WithdrawForm({
   if (connectStatus === null) return null;
 
   if (!isConnected) {
-    // Don't silently hide withdrawals — explain that a payout account is the
+    // Don't silently hide withdrawals - explain that a payout account is the
     // prerequisite, so the "Set Up Payouts" card above makes sense.
     const detailsPending = connectStatus.connected && !connectStatus.payoutsEnabled;
     return (
@@ -90,7 +90,7 @@ export function WithdrawForm({
           <p className="text-sm text-muted-foreground">
             {detailsPending
               ? "Withdrawals unlock once Stripe finishes reviewing your payout account (usually 1–2 business days)."
-              : "To withdraw your earnings, connect a payout account using “Set Up Payouts” above. This is how the money reaches your bank — it only takes a minute."}
+              : "To withdraw your earnings, connect a payout account using “Set Up Payouts” above. This is how the money reaches your bank - it only takes a minute."}
           </p>
           {pendingEarnings > 0 && (
             <p className="text-sm text-muted-foreground mt-2">

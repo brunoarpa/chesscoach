@@ -96,7 +96,7 @@ export async function PATCH(
     const refetchPing = { currentNodeId, senderId: session.user.id };
     // Pusher rejects events over 10KB (HTTP 413), and a real lesson's
     // variation tree blows past that well before our DB size caps. Past the
-    // threshold, broadcast a tiny "refetch" ping instead — the other client
+    // threshold, broadcast a tiny "refetch" ping instead - the other client
     // pulls the persisted tree from GET, which has no such limit.
     const PUSHER_SAFE_BYTES = 9_000;
     try {

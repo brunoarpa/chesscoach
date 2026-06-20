@@ -108,7 +108,7 @@ export async function POST(request: Request) {
         });
 
         if (otherAccounts.length > 0) {
-          // Check if both accounts used free trials — higher severity
+          // Check if both accounts used free trials - higher severity
           const otherUserIds = otherAccounts.map((a) => a.userId);
           const [thisUser, otherUsers] = await Promise.all([
             prisma.user.findUnique({ where: { id: userId }, select: { freeTrialsRemaining: true } }),

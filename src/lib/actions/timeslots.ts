@@ -27,7 +27,7 @@ function tzOffsetMs(timeZone: string, date: Date): number {
     if (p.type !== "literal") map[p.type] = Number(p.value);
   }
   // Interpret the wall-clock reading as if it were UTC, then diff against the
-  // real instant — the gap is the zone's offset at that moment.
+  // real instant - the gap is the zone's offset at that moment.
   const asUTC = Date.UTC(
     map.year,
     map.month - 1,
@@ -121,7 +121,7 @@ export async function saveWeeklyTemplate(
     ...(toDelete.length > 0
       ? [
           // Removing a weekly slot must also remove the concrete future slots
-          // already generated from it — otherwise students could keep booking
+          // already generated from it - otherwise students could keep booking
           // times the coach just deleted (template deletion alone would only
           // null out templateId and leave the slots AVAILABLE). Booked slots
           // stay; slots referenced by old requests can't be deleted, so they
@@ -204,7 +204,7 @@ export async function generateUpcomingSlots(coachId: string) {
 
       // Interpret the template's wall-clock hours in the coach's timezone and
       // convert to the corresponding UTC instant. Falls back to UTC only when
-      // the coach has no timezone saved (older records — new saves require it).
+      // the coach has no timezone saved (older records - new saves require it).
       const startTime = coach?.timezone
         ? wallTimeToUtc(
             date.getUTCFullYear(),
@@ -225,7 +225,7 @@ export async function generateUpcomingSlots(coachId: string) {
 
       const endTime = new Date(startTime.getTime() + 15 * 60 * 1000);
 
-      // Skip only past slots — coaches must accept anyway, so near-term bookings are fine.
+      // Skip only past slots - coaches must accept anyway, so near-term bookings are fine.
       if (startTime.getTime() <= now.getTime()) continue;
 
       slotsToCreate.push({
@@ -302,7 +302,7 @@ export async function getAvailableSlots(coachId: string) {
       coachId,
       status: "AVAILABLE",
       startTime: {
-        // Only slots far enough out to book — must leave the coach time to
+        // Only slots far enough out to book - must leave the coach time to
         // accept before the 15-min cutoff (matches createLessonRequest).
         gt: new Date(now.getTime() + MIN_BOOKING_LEAD_MS),
         lte: weekFromNow,

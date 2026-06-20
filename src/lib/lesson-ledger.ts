@@ -30,16 +30,16 @@ export const carriedOutTrialWhere = {
 /**
  * Settle a completed lesson's payment: charge the student and credit the coach
  * the full (gross) price, writing both ledger entries and the coach's earning
- * record. The platform's commission is not taken here — the wallet shows gross
+ * record. The platform's commission is not taken here - the wallet shows gross
  * and the cut is realised at withdrawal (see payoutFee in lib/fees).
  *
  * This is the single canonical implementation of "money moves when a lesson
- * completes" — every completion path (auto-complete, no-show charge,
+ * completes" - every completion path (auto-complete, no-show charge,
  * confirmation timeout) calls it so the wallet invariants can't drift between
  * copies. The caller still owns the lesson status transition and any
  * stat/ELO recomputation.
  *
- * Free trials never move money, but (for now — growth phase, revisit once the
+ * Free trials never move money, but (for now - growth phase, revisit once the
  * user base is bigger) they DO count as real lessons: both parties' lesson
  * stats increment and the coach gets a $0 EarningRecord, which refreshes the
  * ELO earning-recency bonus without inflating lifetime earnings.
@@ -67,7 +67,7 @@ export async function payCoachForLesson(
   }
 
   // Wallet shows gross: the coach is credited the full price the student paid.
-  // The platform's commission is taken later, at withdrawal — not here.
+  // The platform's commission is taken later, at withdrawal - not here.
   // Money leaves the student's wallet AND releases the matching hold.
   await tx.user.update({
     where: { id: lesson.studentId },

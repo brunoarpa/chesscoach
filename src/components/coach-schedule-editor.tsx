@@ -159,7 +159,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
             <>Times are in <span className="font-medium">{timezone}</span> (your profile timezone).</>
           ) : (
             <span className="text-amber-700 dark:text-amber-400">
-              Set your timezone in your profile before saving — otherwise slots can&apos;t be scheduled correctly.
+              Set your timezone in your profile before saving - otherwise slots can&apos;t be scheduled correctly.
             </span>
           )}
           <span className="sm:hidden block mt-1 text-xs">Scroll the grid horizontally on small screens.</span>

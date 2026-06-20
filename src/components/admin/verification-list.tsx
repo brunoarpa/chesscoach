@@ -34,7 +34,7 @@ function VerificationCard({ user }: { user: User }) {
     setLoading(true);
     try {
       await verifyUser(user.id);
-      toast.success(`Verified ${user.username} — rating and account age fetched from chess.com`);
+      toast.success(`Verified ${user.username} - rating and account age fetched from chess.com`);
     } catch {
       toast.error("Failed to verify. Check if the chess.com username is valid.");
     }

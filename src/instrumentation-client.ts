@@ -8,7 +8,7 @@ if (dsn) {
   Sentry.init({
     dsn,
     tracesSampleRate: 0.1,
-    // Transient client-side fetch failures — dropped wifi, a backgrounded
+    // Transient client-side fetch failures - dropped wifi, a backgrounded
     // tab, or navigating away mid-request. The app already tolerates these
     // (board/chat fetches are best-effort), so they're noise, not bugs.
     ignoreErrors: [

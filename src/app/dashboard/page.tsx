@@ -24,7 +24,7 @@ export default async function DashboardPage({
   if (session.user.needsUsername) redirect("/setup-username");
 
   // Run inline so deadlines & auto-completions are accurate, not just at 6am
-  // cron. Scoped to this user — the global sweep is the cron's job.
+  // cron. Scoped to this user - the global sweep is the cron's job.
   expirePendingRequests(session.user.id).catch(() => {});
   autoCompleteLessons(session.user.id).catch(() => {});
   detectNoShows(session.user.id).catch(() => {});
@@ -37,7 +37,7 @@ export default async function DashboardPage({
 
   const isCoach = !!(currentUser.coachChatPrice || currentUser.coachCallPrice);
 
-  // Refresh activity + coach ELO at most once a minute — the dashboard
+  // Refresh activity + coach ELO at most once a minute - the dashboard
   // auto-refreshes, so unthrottled writes here multiply with user count.
   // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request, so Date.now() is stable here.
   const activityStale = Date.now() - currentUser.lastActiveAt.getTime() > 60 * 1000;
@@ -70,7 +70,7 @@ export default async function DashboardPage({
     outgoingStatusCounts,
     weeklyTemplates,
   ] = await Promise.all([
-    // Coach incoming — active
+    // Coach incoming - active
     prisma.lessonRequest.findMany({
       where: { coachId: session.user.id, status: { in: [...ACTIVE_STATUSES] } },
       include: {
@@ -82,7 +82,7 @@ export default async function DashboardPage({
       },
       orderBy: { createdAt: "desc" },
     }),
-    // Coach incoming — most recent completed (for review prompt)
+    // Coach incoming - most recent completed (for review prompt)
     prisma.lessonRequest.findMany({
       where: { coachId: session.user.id, status: "COMPLETED" },
       include: {
@@ -95,7 +95,7 @@ export default async function DashboardPage({
       orderBy: { createdAt: "desc" },
       take: 1,
     }),
-    // Coach incoming — counts by status
+    // Coach incoming - counts by status
     prisma.lessonRequest.groupBy({
       by: ["status"],
       where: { coachId: session.user.id },
@@ -107,7 +107,7 @@ export default async function DashboardPage({
       select: { id: true },
     }),
     // A trial both parties carried out that is still inside its dispute
-    // window — shown to the coach as "waiting for the student to confirm".
+    // window - shown to the coach as "waiting for the student to confirm".
     prisma.lessonRequest.findFirst({
       where: {
         coachId: session.user.id,
@@ -119,7 +119,7 @@ export default async function DashboardPage({
       select: { scheduledEndAt: true },
       orderBy: { scheduledStartAt: "desc" },
     }),
-    // Student outgoing — active
+    // Student outgoing - active
     prisma.lessonRequest.findMany({
       where: { studentId: session.user.id, status: { in: [...ACTIVE_STATUSES] } },
       include: {
@@ -131,7 +131,7 @@ export default async function DashboardPage({
       },
       orderBy: { createdAt: "desc" },
     }),
-    // Student outgoing — most recent completed (for review prompt)
+    // Student outgoing - most recent completed (for review prompt)
     prisma.lessonRequest.findMany({
       where: { studentId: session.user.id, status: "COMPLETED" },
       include: {
@@ -197,7 +197,7 @@ export default async function DashboardPage({
           step is a weekly schedule so students have slots to book. */}
       {setup === "schedule" && isCoach && weeklyTemplates.length === 0 && (
         <div className="mb-6 p-4 rounded-lg border border-primary/40 bg-primary/5">
-          <p className="font-medium">Your coach profile is set up — one last step!</p>
+          <p className="font-medium">Your coach profile is set up - one last step!</p>
           <p className="text-sm text-muted-foreground mt-1">
             Students book specific time slots, so pick your weekly availability in the{" "}
             <a href="#schedule" className="font-medium text-foreground underline underline-offset-2">
@@ -227,7 +227,7 @@ export default async function DashboardPage({
         </section>
       )}
 
-      {/* You as a student — lessons you've booked */}
+      {/* You as a student - lessons you've booked */}
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-3">Student</h2>
         <StudentDashboard
@@ -239,7 +239,7 @@ export default async function DashboardPage({
         />
       </section>
 
-      {/* You as a coach — lessons your students booked with you */}
+      {/* You as a coach - lessons your students booked with you */}
       {isCoach && (
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">Coach</h2>
@@ -261,7 +261,7 @@ export default async function DashboardPage({
         </section>
       )}
 
-      {/* Coaching schedule — pinned to the bottom */}
+      {/* Coaching schedule - pinned to the bottom */}
       {isCoach && (
         <section id="schedule" className="scroll-mt-20">
           <h2 className="text-xl font-semibold mb-3">Coaching</h2>

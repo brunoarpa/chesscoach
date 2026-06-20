@@ -6,14 +6,14 @@
  * a bad state by the old no-show accounting bug (money created on student
  * no-shows) and the concurrent-cron double-decrement of reservedBalance.
  *
- *   npx tsx prisma/repair-balances.ts            # dry run — prints drift, writes nothing
+ *   npx tsx prisma/repair-balances.ts            # dry run - prints drift, writes nothing
  *   npx tsx prisma/repair-balances.ts --commit   # apply the corrections
  *
- * reservedBalance is always recomputed from live lessons — it is fully
+ * reservedBalance is always recomputed from live lessons - it is fully
  * derivable and the field most likely to be corrupted (it went negative).
  *
  * walletBalance / pendingEarnings / totalEarningsAllTime are only rewritten when
- * the RAW (non-deduplicated) ledger already equals the stored value — proving the
+ * the RAW (non-deduplicated) ledger already equals the stored value - proving the
  * field is fully ledger-backed and the sole error is a duplicate row left by the
  * double-processing bug. We then write the DEDUPLICATED total. If the raw ledger
  * doesn't match the stored value (e.g. balances seeded directly in the DB without
@@ -129,7 +129,7 @@ async function main() {
         lines.push(`${name} ${fmt(stored)} → ${fmt(vals.ded)} (removed duplicate ledger row)`);
       } else {
         lines.push(
-          `${name} ${fmt(stored)} — NOT auto-fixed (ledger reconstructs to ${fmt(vals.ded)}; balance isn't fully ledger-backed, e.g. seeded directly). Adjust manually if needed.`,
+          `${name} ${fmt(stored)} - NOT auto-fixed (ledger reconstructs to ${fmt(vals.ded)}; balance isn't fully ledger-backed, e.g. seeded directly). Adjust manually if needed.`,
         );
       }
     };
@@ -150,7 +150,7 @@ async function main() {
 
   console.log(
     `\n${drifted} account(s) had drift. ${
-      COMMIT ? "Corrections applied." : "Dry run — re-run with --commit to apply."
+      COMMIT ? "Corrections applied." : "Dry run - re-run with --commit to apply."
     }`,
   );
 }

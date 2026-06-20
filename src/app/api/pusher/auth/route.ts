@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Real-time not configured" }, { status: 503 });
   }
 
-  // Personal notification channel — only the user themselves may subscribe.
+  // Personal notification channel - only the user themselves may subscribe.
   const userMatch = channelName.match(/^private-user-(.+)$/);
   if (userMatch) {
     if (userMatch[1] !== session.user.id) {
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json(pusher.authorizeChannel(socketId, channelName));
   }
 
-  // Validate private-lesson-{lessonId} channel — user must be a participant
+  // Validate private-lesson-{lessonId} channel - user must be a participant
   const lessonMatch = channelName.match(/^private-lesson-(.+)$/);
   if (!lessonMatch) {
     return NextResponse.json({ error: "Invalid channel" }, { status: 403 });

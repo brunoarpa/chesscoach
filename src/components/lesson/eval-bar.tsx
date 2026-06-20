@@ -25,13 +25,13 @@ const MOVE_TIME_MS = 500;
 
 // Cap how often we push engine lines up to the parent. Stockfish emits info
 // lines extremely fast in simple/endgame positions (it races to very high
-// depth), and each push re-renders the whole board — which caused lag and
+// depth), and each push re-renders the whole board - which caused lag and
 // stuttering piece animations near the end of a game. We rate-limit the push
 // and always flush a final time when the search settles.
 const LINES_EMIT_THROTTLE_MS = 120;
 
 // chess.com's win-probability constant. Maps a centipawn eval to a 0..1 win
-// chance via a logistic curve — steep near 0 (small edges shift the bar a lot)
+// chance via a logistic curve - steep near 0 (small edges shift the bar a lot)
 // and flattening at large advantages (+4 vs +7 barely differ), just like
 // chess.com. Replaces a naive linear fill that moved too little near 0 and too
 // much at the extremes.
@@ -230,7 +230,7 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
       className="relative w-7 shrink-0 min-h-[120px] rounded-sm overflow-hidden border border-border bg-zinc-800 select-none"
       style={{ height: heightPx ?? "100%" }}
     >
-      {/* White's portion — anchored to whichever end White is on. */}
+      {/* White's portion - anchored to whichever end White is on. */}
       <div
         className="absolute left-0 right-0 bg-white transition-all duration-300 ease-out"
         style={{ height: `${whitePercent}%`, ...(whiteAtBottom ? { bottom: 0 } : { top: 0 }) }}

@@ -30,7 +30,7 @@ const steps = [
   {
     number: 5,
     title: "Lesson Completes",
-    description: "After the lesson ends, the student can Confirm to release payment to the coach right away — otherwise it transfers automatically 24 hours after the scheduled end. If the lesson was unsatisfactory, the student can Report Issue during that window for admin review.",
+    description: "After the lesson ends, the student can Confirm to release payment to the coach right away - otherwise it transfers automatically 24 hours after the scheduled end. If the lesson was unsatisfactory, the student can Report Issue during that window for admin review.",
   },
   {
     number: 6,
@@ -98,7 +98,7 @@ export function LessonFlowGuide() {
             ))}
           </ol>
 
-          {/* Hands-on practice room — try the lesson UI without booking */}
+          {/* Hands-on practice room - try the lesson UI without booking */}
           <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <p className="text-sm font-medium">Want to try it first?</p>
             <p className="text-xs text-muted-foreground mt-0.5 mb-2">

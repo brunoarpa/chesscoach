@@ -66,7 +66,7 @@ export async function resetRateLimit(key: string): Promise<void> {
  *
  * NOTE: x-real-ip / x-forwarded-for are client-forgeable unless a trusted proxy
  * (Vercel, Cloudflare, nginx) overwrites them. IP-keyed limits are best-effort
- * abuse friction, not a security boundary — anything critical must also be
+ * abuse friction, not a security boundary - anything critical must also be
  * limited per-account.
  *
  * Falls back to a unique-per-request identifier to prevent all unknown IPs

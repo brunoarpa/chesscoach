@@ -65,13 +65,13 @@ export function LessonList({ lessons }: { lessons: Lesson[] }) {
             filtered.map((lesson) => (
               <TableRow key={lesson.id}>
                 <TableCell className="font-mono text-xs">{lesson.id.slice(0, 8)}…</TableCell>
-                <TableCell>{lesson.student.username ?? "—"}</TableCell>
-                <TableCell>{lesson.coach.username ?? "—"}</TableCell>
+                <TableCell>{lesson.student.username ?? "-"}</TableCell>
+                <TableCell>{lesson.coach.username ?? "-"}</TableCell>
                 <TableCell>
                   {lesson.communicationMethod ? (
                     <Badge variant="outline">{lesson.communicationMethod}</Badge>
                   ) : (
-                    "—"
+                    "-"
                   )}
                 </TableCell>
                 <TableCell>

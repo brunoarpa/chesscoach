@@ -449,7 +449,7 @@ export default async function ProfilePage({
               </Card>
             )}
 
-          {/* Lesson booking for other profiles — always slot-based. SlotPicker
+          {/* Lesson booking for other profiles - always slot-based. SlotPicker
               renders its own "no slots available" empty state. */}
           {!isOwnProfile &&
             session?.user &&

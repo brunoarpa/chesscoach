@@ -82,7 +82,7 @@ export function UserList({ users, linkedAccountsMap }: { users: User[]; linkedAc
             <TableCell>
               <div className="font-medium">{user.username}</div>
             </TableCell>
-            <TableCell className="text-xs">{user.email || "—"}</TableCell>
+            <TableCell className="text-xs">{user.email || "-"}</TableCell>
             <TableCell>
               <Badge variant={user.role === "ADMIN" ? "destructive" : "outline"}>
                 {user.role}

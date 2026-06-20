@@ -150,7 +150,7 @@ export function LessonSession({
     channel.bind("presence:leave", onLeave);
 
     // Mark other as gone if no recent ping. Runs once we have ever seen a
-    // ping (lastPingRef.current > 0) — before then the badge stays "not here yet".
+    // ping (lastPingRef.current > 0) - before then the badge stays "not here yet".
     const checkInterval = setInterval(() => {
       if (lastPingRef.current > 0 && Date.now() - lastPingRef.current > PRESENCE_TIMEOUT_MS) {
         setOtherOnPage(false);
@@ -299,11 +299,11 @@ export function LessonSession({
 
       {/* Single layout: desktop renders board + side panel, mobile renders
           tabbed board/chat. We render only ONE of these at a time (driven by a
-          media query) so each child — ChessBoard, ChatPanel, AudioCall — mounts
+          media query) so each child - ChessBoard, ChatPanel, AudioCall - mounts
           exactly once. Mounting both layouts (CSS-hidden) duplicated every
           component, gave PeerJS two peers fighting over one id, and let a tab
           switch unmount a board whose cleanup tore down the shared Pusher
-          channel — breaking board/chat/presence sync for everyone. */}
+          channel - breaking board/chat/presence sync for everyone. */}
       {isDesktop ? (
         <div className="flex flex-1 min-h-0">
           {/* Board. The board fills this column's visible height; the move list

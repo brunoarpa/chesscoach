@@ -24,7 +24,7 @@ function isRoomClosed(scheduledEndAt: string | null, now: number): boolean {
   return now > new Date(scheduledEndAt).getTime() + ROOM_GRACE_MS;
 }
 
-// Too early to join — the join window hasn't opened yet.
+// Too early to join - the join window hasn't opened yet.
 function isBeforeJoinWindow(scheduledStartAt: string | null, now: number): boolean {
   if (!scheduledStartAt) return false;
   return now < new Date(scheduledStartAt).getTime() - EARLY_JOIN_MS;
@@ -134,7 +134,7 @@ export function StudentDashboard({
 
   const inActiveStatuses = (r: Request) => r.status in STATUS_ORDER;
 
-  // IN_PROGRESS + past grace = "recently ended" — collapse into a compact list
+  // IN_PROGRESS + past grace = "recently ended" - collapse into a compact list
   // at the bottom so they don't pile up in the main view. They live in the DB
   // for up to 24h before auto-completing, but they don't need attention any
   // longer beyond the dispute option.
@@ -220,7 +220,7 @@ function RecentlyEndedList({ requests }: { requests: Request[] }) {
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
       <p className="text-sm font-medium text-muted-foreground">
-        Recently ended ({requests.length}) — confirm now, or it auto-completes within 24h
+        Recently ended ({requests.length}) - confirm now, or it auto-completes within 24h
       </p>
       {shown.map((r) => (
         <RecentlyEndedItem key={r.id} request={r} />
@@ -358,7 +358,7 @@ function StudentAcceptedCard({ request }: { request: Request }) {
   const started = request.scheduledStartAt
     ? now >= new Date(request.scheduledStartAt).getTime()
     : false;
-  // Students can't cancel within the cutoff before the start (server-rejected —
+  // Students can't cancel within the cutoff before the start (server-rejected -
   // a free last-second cancel would ghost the coach's slot), so hide the button.
   const cancelClosed = request.scheduledStartAt
     ? now >= new Date(request.scheduledStartAt).getTime() - STUDENT_CANCEL_CUTOFF_MS
@@ -393,7 +393,7 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             )}
             {request.scheduledStartAt && !started && (
               <p className="text-xs text-muted-foreground mt-1.5">
-                ⏰ Set a reminder — missing the lesson counts as a no-show and{" "}
+                ⏰ Set a reminder. Missing the lesson counts as a no-show and{" "}
                 {request.isTrial
                   ? "forfeits all your remaining free trials"
                   : "is still charged in full"}.
@@ -401,7 +401,7 @@ function StudentAcceptedCard({ request }: { request: Request }) {
             )}
             {roomClosed && (
               <p className="text-xs text-destructive mt-1.5">
-                This lesson ended without being joined — it will be processed as a no-show.
+                This lesson ended without being joined. It will be processed as a no-show.
               </p>
             )}
           </div>

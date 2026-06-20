@@ -70,7 +70,7 @@ export default async function SearchPage({
     const priceRange: { gte?: number; lte?: number } = {};
     if (params.minPrice) priceRange.gte = Math.round(Number(params.minPrice) * 100);
     if (params.maxPrice) priceRange.lte = Math.round(Number(params.maxPrice) * 100);
-    // Match if either chat OR call price falls in the range — coaches setting
+    // Match if either chat OR call price falls in the range - coaches setting
     // only one of the two prices should still surface.
     where.AND = [
       ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
@@ -102,7 +102,7 @@ export default async function SearchPage({
     const to = params.availableTo ? new Date(params.availableTo) : null;
 
     const startTime: { gte: Date; lt?: Date } = {
-      // Never surface slots in the past — floor the lower bound at the current time.
+      // Never surface slots in the past - floor the lower bound at the current time.
       gte: from && !Number.isNaN(from.getTime()) && from.getTime() > now.getTime() ? from : now,
     };
     if (to && !Number.isNaN(to.getTime())) {
@@ -179,7 +179,7 @@ export default async function SearchPage({
   const coachIds = coaches.map((c) => c.id);
 
   // Global leaderboard ranks (ties share a rank, like the leaderboard page) and
-  // review aggregates — both computed in the database for just the 50 shown
+  // review aggregates - both computed in the database for just the 50 shown
   // coaches, instead of shipping every coach row / review row to the app.
   const [rankRows, reviewStats] = coachIds.length
     ? await Promise.all([

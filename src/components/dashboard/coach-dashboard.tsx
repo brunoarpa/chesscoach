@@ -21,7 +21,7 @@ function isRoomClosed(scheduledEndAt: string | null, now: number): boolean {
   return now > new Date(scheduledEndAt).getTime() + ROOM_GRACE_MS;
 }
 
-// Too early to join — the join window hasn't opened yet.
+// Too early to join - the join window hasn't opened yet.
 function isBeforeJoinWindow(scheduledStartAt: string | null, now: number): boolean {
   if (!scheduledStartAt) return false;
   return now < new Date(scheduledStartAt).getTime() - EARLY_JOIN_MS;
@@ -140,7 +140,7 @@ export function CoachDashboard({
     DISPUTED: 3,
   };
 
-  // Recently-ended (room closed, still IN_PROGRESS in DB) — pulled out of the
+  // Recently-ended (room closed, still IN_PROGRESS in DB) - pulled out of the
   // main list so they don't pile up. Coach just sees a one-liner count.
   const recentlyEnded = requests.filter(
     (r) => r.status === "IN_PROGRESS" && isRoomClosed(r.scheduledEndAt, now)
@@ -187,8 +187,8 @@ export function CoachDashboard({
         </span>
         <span className="text-muted-foreground">
           {coachAvailability === "AVAILABLE"
-            ? "— accepting requests"
-            : "— students can't book new lessons"}
+            ? "- accepting requests"
+            : "- students can't book new lessons"}
         </span>
       </div>
 
@@ -196,7 +196,7 @@ export function CoachDashboard({
         pendingTrialAutoCompletesAt ? (
           <div className="p-3 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30 text-sm">
             <p className="font-medium text-blue-900 dark:text-blue-200">
-              Free trial done — waiting for the student to confirm.
+              Free trial done - waiting for the student to confirm.
             </p>
             <p className="text-blue-800 dark:text-blue-300 mt-0.5">
               Paid bookings unlock as soon as they confirm, or automatically by{" "}
@@ -316,7 +316,7 @@ function PendingRequestCard({ request }: { request: Request }) {
         )}
         {request.scheduledStartAt && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            ⏰ Accepting commits you to be there — if you don&apos;t join within 10 minutes of
+            ⏰ Accepting commits you to be there. If you don&apos;t join within 10 minutes of
             the start, the student is refunded and your coach rating takes a penalty. Set a
             reminder.
           </p>
@@ -365,13 +365,13 @@ function AcceptedLessonCard({ request }: { request: Request }) {
             )}
             {request.scheduledStartAt && !started && (
               <p className="text-xs text-muted-foreground mt-1.5">
-                ⏰ Set a reminder — not joining counts as a no-show and penalizes your coach
+                ⏰ Set a reminder. Not joining counts as a no-show and penalizes your coach
                 rating.
               </p>
             )}
             {roomClosed && (
               <p className="text-xs text-destructive mt-1.5">
-                This lesson ended without being joined — it will be processed as a no-show.
+                This lesson ended without being joined. It will be processed as a no-show.
               </p>
             )}
           </div>

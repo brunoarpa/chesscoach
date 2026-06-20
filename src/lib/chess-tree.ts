@@ -129,7 +129,7 @@ export function treeToMainlinePgn(tree: MoveTree): string {
   return pgn.trim();
 }
 
-// Hydrate a (linear) tree from a plain PGN — used for lessons persisted before
+// Hydrate a (linear) tree from a plain PGN - used for lessons persisted before
 // the tree existed, where only `boardPgn` is available.
 export function pgnToTree(pgn: string): MoveTree {
   let tree = createTree();

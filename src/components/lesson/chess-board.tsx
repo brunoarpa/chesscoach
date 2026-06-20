@@ -58,7 +58,7 @@ const PROMOTION_PIECES: Array<{ type: "q" | "r" | "b" | "n"; key: string }> = [
 ];
 
 // Logistic curve mapping a centipawn eval to "expected points" (win probability,
-// 0..1) — the chess.com win-percentage model. The constant is chess.com's.
+// 0..1) - the chess.com win-percentage model. The constant is chess.com's.
 const WIN_PROB_K = 0.00368208;
 function cpToExpectedPoints(cp: number): number {
   return 1 / (1 + Math.exp(-WIN_PROB_K * cp));
@@ -108,7 +108,7 @@ function formatLineEval(line: EngineLine): string {
     const v = line.cp / 100;
     return `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
   }
-  return "—";
+  return "-";
 }
 
 // Seed the initial tree + cursor from a persisted tree (preferred) or PGN.
@@ -120,7 +120,7 @@ function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): 
 
 export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false }: Props) {
   // Seed tree + cursor from one shared computation. Computing them in two
-  // separate useState initializers would call initialTreeState twice — and for an
+  // separate useState initializers would call initialTreeState twice - and for an
   // empty/PGN board that means two createTree() calls with *different* random root
   // ids, leaving currentNodeId pointing at a node absent from `tree`. addMove would
   // then find no parent and silently drop every move (pieces snap back).
@@ -137,12 +137,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   const [engineLines, setEngineLines] = useState<EngineLine[]>([]);
   // The FEN the current `engineLines` were computed for. The engine analyzes
   // asynchronously, so after a move/navigation `engineLines` still describes the
-  // *previous* position until fresh analysis arrives — we tag them with their FEN
+  // *previous* position until fresh analysis arrives - we tag them with their FEN
   // and only ever render arrows/the line list when it matches the shown position,
   // so stale best-move arrows can't linger on the new board.
   const [engineLinesFen, setEngineLinesFen] = useState<string>("");
   // Eval cache: best eval (cp, white perspective) keyed by FEN. Populated as the
-  // engine analyzes each position the user visits — feeds move classification.
+  // engine analyzes each position the user visits - feeds move classification.
   const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
   // Master engine-hint toggle (the lightbulb): gates the best-move arrows, the
   // "Best engine moves" list, and the move classifications all together. Shared
@@ -238,8 +238,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   const gameStatus: { text: string; tone: "over" | "check" } | null = (() => {
     const sideToMove = game.turn() === "w" ? "White" : "Black";
     const winner = game.turn() === "w" ? "Black" : "White";
-    if (game.isCheckmate()) return { text: `Checkmate — ${winner} wins`, tone: "over" };
-    if (game.isStalemate()) return { text: "Stalemate — draw", tone: "over" };
+    if (game.isCheckmate()) return { text: `Checkmate - ${winner} wins`, tone: "over" };
+    if (game.isStalemate()) return { text: "Stalemate - draw", tone: "over" };
     if (game.isThreefoldRepetition()) return { text: "Draw by threefold repetition", tone: "over" };
     if (game.isInsufficientMaterial()) return { text: "Draw by insufficient material", tone: "over" };
     if (game.isDraw()) return { text: "Draw by 50-move rule", tone: "over" };
@@ -469,8 +469,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   // Size the board to the largest square that fits the column's *visible* area:
   // its width (minus the eval bar) and its visible height (minus the move
-  // controls we keep on-screen). We measure the scroll column itself — a box
-  // whose size depends only on the window, not on the content inside it — so
+  // controls we keep on-screen). We measure the scroll column itself - a box
+  // whose size depends only on the window, not on the content inside it - so
   // the board keeps its size when the move list grows or the best-moves box
   // appears/disappears. Those flow below and the column scrolls to reach them.
   useEffect(() => {
@@ -598,7 +598,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // best move, lighter green for any other line within ~2cp ("excellent").
   const currentFen = game.fen();
   const engineArrows = useMemo<Arrow[]>(() => {
-    // Only draw for the position the lines actually belong to — never replay a
+    // Only draw for the position the lines actually belong to - never replay a
     // previous position's best move onto the current board.
     if (!showHints || engineLines.length === 0 || engineLinesFen !== currentFen) return [];
     const bestCp = evalToCp(engineLines[0]);
@@ -648,7 +648,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   }, [tree, evalCache]);
 
   // Destination/source squares of the move that produced the currently displayed
-  // position — drives the on-board chess.com-style marker.
+  // position - drives the on-board chess.com-style marker.
   const lastMove = useMemo(() => {
     if (atRoot) return null;
     const verbose = game.history({ verbose: true });
@@ -818,7 +818,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Engine + manual/remote arrows, deduped by square pair. react-chessboard keys
   // arrows solely by start+end square; any duplicate (e.g. an engine arrow that
   // coincides with a drawn one) collides and leaves ghost arrows React can't
-  // reconcile away — so collapse them to one here.
+  // reconcile away - so collapse them to one here.
   const boardArrows = (() => {
     const seen = new Set<string>();
     const out: Arrow[] = [];
@@ -834,7 +834,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
-          lightbulb gates it alongside the arrows, line list, and classifications —
+          lightbulb gates it alongside the arrows, line list, and classifications -
           unmounting it also stops the Stockfish worker while hints are off.
           Fixed height (shrink-0): the board is sized to the measured square
           (boardPx) from the column, not from leftover flex space, so it never
@@ -866,7 +866,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       </div>
 
-      {/* Game status — check / checkmate / stalemate / draws (incl. repetition) */}
+      {/* Game status - check / checkmate / stalemate / draws (incl. repetition) */}
       {gameStatus && (
         <div
           className={`w-full text-center text-sm font-semibold rounded-md px-3 py-1.5 ${
@@ -933,7 +933,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
-      {/* Move list — main line plus indented variations; right-click a move for
+      {/* Move list - main line plus indented variations; right-click a move for
           promote / delete. Past moves sit above the engine's best moves. These
           flow normally and the board column scrolls to reach them, so they
           never change the board's size. */}
@@ -945,7 +945,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
-      {/* Top engine lines — eval + principal variation for each (hidden when hints off) */}
+      {/* Top engine lines - eval + principal variation for each (hidden when hints off) */}
       {showHints && engineLines.length > 0 && engineLinesFen === currentFen && (
         <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
@@ -995,7 +995,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         );
       })()}
 
-      {/* Import panel — fixed overlay so it doesn't push board around */}
+      {/* Import panel - fixed overlay so it doesn't push board around */}
       {showImport && (
         <>
           <div

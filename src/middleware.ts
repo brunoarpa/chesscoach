@@ -9,7 +9,7 @@ export default authMiddleware((req) => {
   if (pathname.startsWith("/api/") && !pathname.startsWith("/api/stripe/webhook") && req.method !== "GET" && req.method !== "HEAD") {
     const origin = req.headers.get("origin");
     const host = req.headers.get("host");
-    // Require Origin on mutating requests — browsers always send it on POST/PUT/PATCH/DELETE.
+    // Require Origin on mutating requests - browsers always send it on POST/PUT/PATCH/DELETE.
     if (!origin || !host) {
       return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
     }
@@ -38,7 +38,7 @@ export default authMiddleware((req) => {
     return NextResponse.redirect(url);
   }
 
-  // Admin routes — require authentication AND ADMIN role
+  // Admin routes - require authentication AND ADMIN role
   if (pathname.startsWith("/admin")) {
     if (!req.auth) {
       const url = req.nextUrl.clone();

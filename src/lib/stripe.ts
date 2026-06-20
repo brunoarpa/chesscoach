@@ -9,9 +9,9 @@
  * otherwise transfers fail with `balance_insufficient`. Coaches in other
  * countries receive USD into their connected account; Stripe converts to their
  * local currency only when paying out to their bank, and the coach bears that
- * conversion — so the platform never takes on FX risk.
+ * conversion - so the platform never takes on FX risk.
  *
- * NOTE: do NOT derive this from the account's `default_currency` — that's the
+ * NOTE: do NOT derive this from the account's `default_currency` - that's the
  * account's home/settlement currency (e.g. EUR for a Spanish account) and is not
  * the same as the currency the app operates in.
  */

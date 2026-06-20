@@ -20,7 +20,7 @@ interface Props {
   otherName: string;
   initialMessages: Message[];
   // Practice/sandbox mode: a solo room with no second person. Messages echo
-  // back as your own bubbles only — no Pusher subscription, polling, or API.
+  // back as your own bubbles only - no Pusher subscription, polling, or API.
   local?: boolean;
 }
 
@@ -41,9 +41,9 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages, local 
 
   // Subscribe to Pusher for real-time messages
   useEffect(() => {
-    if (local) return; // Practice mode — no second participant to sync with
+    if (local) return; // Practice mode - no second participant to sync with
     const pusher = getPusherClient();
-    if (!pusher) return; // Pusher not configured — rely on polling
+    if (!pusher) return; // Pusher not configured - rely on polling
 
     const channel = pusher.subscribe(`private-lesson-${lessonId}`);
 
@@ -80,7 +80,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages, local 
   }, [lessonId]);
 
   useEffect(() => {
-    if (local) return; // Practice mode — nothing to poll
+    if (local) return; // Practice mode - nothing to poll
     pollRef.current = setInterval(fetchMessages, 30000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -105,7 +105,7 @@ export function ChatPanel({ lessonId, userId, otherName, initialMessages, local 
     };
     setMessages((prev) => [...prev, optimisticMsg]);
 
-    // Practice mode: the bubble we just added is all there is — no server,
+    // Practice mode: the bubble we just added is all there is - no server,
     // no second person. Keep it and we're done.
     if (local) {
       setSending(false);

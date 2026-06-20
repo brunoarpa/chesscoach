@@ -250,7 +250,7 @@ export async function resolveDispute(
               data: { walletBalance: { increment: lesson.estimatedCost } },
             });
             // Claw back coach earnings. pendingEarnings may go negative if the
-            // coach already withdrew the money — that's a deficit they'll
+            // coach already withdrew the money - that's a deficit they'll
             // pay back out of future earnings (Stripe transfers can't be
             // reversed once they've landed in the coach's Connect balance).
             // The withdraw form's MIN_PAYOUT_CENTS check naturally blocks
@@ -388,7 +388,7 @@ export async function resolveDispute(
           });
         });
       } else {
-        // DISPUTED: pay coach — complete the payment as normal
+        // DISPUTED: pay coach - complete the payment as normal
         await prisma.$transaction(async (tx) => {
           const claim = await tx.lessonRequest.updateMany({
             where: { id: lessonId, status: startStatus },

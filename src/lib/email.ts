@@ -44,7 +44,7 @@ function wrap(title: string, body: string): string {
     <h1 style="font-size:20px;margin:0 0 16px;">${title}</h1>
     ${body}
     <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
-    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} — <a href="${baseUrl()}/contact" style="color:#666;">${baseUrl().replace(/^https?:\/\//, "")}/contact</a></p>
+    <p style="font-size:12px;color:#666;margin:0;">${APP_NAME} - <a href="${baseUrl()}/contact" style="color:#666;">${baseUrl().replace(/^https?:\/\//, "")}/contact</a></p>
   </div>`;
 }
 
@@ -54,7 +54,7 @@ async function send(to: string, subject: string, html: string) {
       throw new Error("SENDGRID_API_KEY is not set");
     }
     // Dev fallback: log instead of throwing so flows are testable without SendGrid set up.
-    console.warn(`[email] SENDGRID_API_KEY missing — would send to ${to}: ${subject}`);
+    console.warn(`[email] SENDGRID_API_KEY missing - would send to ${to}: ${subject}`);
     console.warn(html);
     return;
   }
@@ -79,7 +79,7 @@ export async function sendVerificationEmail(email: string, token: string) {
 /**
  * Generic transactional email for lesson/notification events (new request,
  * accepted, declined, reminders). `link` is a site-relative path; it is turned
- * into an absolute URL and rendered as a button. `bodyHtml` is trusted markup —
+ * into an absolute URL and rendered as a button. `bodyHtml` is trusted markup -
  * callers must escape any user-supplied text before passing it in (see
  * createNotification, which escapes the notification body).
  */
@@ -117,7 +117,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
       `<p>We received a request to reset your password. Click the button below to set a new one. This link expires in 1 hour.</p>
        <p style="margin:24px 0;">${buttonLink(url, "Reset password")}</p>
        <p style="font-size:13px;color:#666;">Or copy and paste this URL into your browser:<br /><span style="word-break:break-all;">${url}</span></p>
-       <p style="font-size:13px;color:#666;">If you didn't request a reset, you can safely ignore this email — your password will stay the same.</p>`,
+       <p style="font-size:13px;color:#666;">If you didn't request a reset, you can safely ignore this email - your password will stay the same.</p>`,
     ),
   );
 }
