@@ -49,33 +49,36 @@ export async function Navbar() {
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="text-xl font-bold">
-          ♝ EloChaser
-        </Link>
+        {/* Left group: logo + browse links */}
+        <div className="flex items-center gap-2">
+          <Link href="/" className="text-xl font-bold">
+            ♝ EloChaser
+          </Link>
+          <nav className="hidden md:flex items-center gap-1 ml-2">
+            <NavLink
+              href="/search"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+              activeClassName="bg-muted font-medium"
+            >
+              <Search className="h-4 w-4" />
+              Find a Coach
+            </NavLink>
+            <NavLink
+              href="/leaderboard"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
+              activeClassName="bg-muted font-medium"
+            >
+              <Trophy className="h-4 w-4" />
+              Leaderboard
+            </NavLink>
+          </nav>
+        </div>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
-          {/* Browse zone */}
-          <NavLink
-            href="/search"
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-            activeClassName="bg-muted font-medium"
-          >
-            <Search className="h-4 w-4" />
-            Find a Coach
-          </NavLink>
-          <NavLink
-            href="/leaderboard"
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-            activeClassName="bg-muted font-medium"
-          >
-            <Trophy className="h-4 w-4" />
-            Leaderboard
-          </NavLink>
-
-          {/* Account zone */}
+        {/* Right group: account zone */}
+        <div className="flex items-center gap-2">
+          {/* Desktop account zone */}
           {session?.user ? (
-            <div className="flex items-center gap-2 ml-2 pl-2 border-l">
+            <div className="hidden md:flex items-center gap-2">
               <NavLink
                 href="/wallet"
                 className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
@@ -94,7 +97,7 @@ export async function Navbar() {
               <AccountMenu username={username} image={image} isAdmin={isAdmin} />
             </div>
           ) : (
-            <div className="flex items-center gap-2 ml-2 pl-2 border-l">
+            <div className="hidden md:flex items-center gap-2">
               <NavLink
                 href="/contact"
                 className="text-sm px-3 py-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -107,23 +110,23 @@ export async function Navbar() {
               </Link>
             </div>
           )}
-        </nav>
 
-        {/* Mobile nav */}
-        <div className="flex md:hidden items-center gap-2">
-          {session?.user?.id && (
-            <NotificationBell
-              userId={session.user.id}
-              initialNotifications={notifications}
-              initialUnreadCount={unreadCount}
+          {/* Mobile nav */}
+          <div className="flex md:hidden items-center gap-2">
+            {session?.user?.id && (
+              <NotificationBell
+                userId={session.user.id}
+                initialNotifications={notifications}
+                initialUnreadCount={unreadCount}
+              />
+            )}
+            <MobileNav
+              isLoggedIn={!!session?.user}
+              username={username ?? undefined}
+              isAdmin={isAdmin}
+              walletAvailable={walletAvailable}
             />
-          )}
-          <MobileNav
-            isLoggedIn={!!session?.user}
-            username={username ?? undefined}
-            isAdmin={isAdmin}
-            walletAvailable={walletAvailable}
-          />
+          </div>
         </div>
       </div>
     </header>
