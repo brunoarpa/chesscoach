@@ -132,7 +132,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle className="text-lg">Weekly Availability</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
             <Button
               onClick={handlePauseToggle}
               disabled={pausing}
@@ -219,7 +219,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
                         <button
                           key={key}
                           type="button"
-                          className={`h-4 sm:h-3 rounded-sm transition-colors ${
+                          className={`h-6 sm:h-3 rounded-sm transition-colors ${
                             isSelected
                               ? "bg-green-500 hover:bg-green-600"
                               : "bg-muted hover:bg-muted-foreground/20"
