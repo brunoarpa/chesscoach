@@ -36,7 +36,7 @@ export function PracticeSession() {
           </span>
         </div>
         <Button asChild size="sm" variant="outline">
-          <Link href="/how-it-works" title="Leave the practice room">
+          <Link href="/" title="Leave the practice room">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Leave
           </Link>
