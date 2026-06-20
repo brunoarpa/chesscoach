@@ -12,12 +12,10 @@ export default async function Home() {
           ♝ EloChaser
         </h1>
         <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-          Real chess coaches, on demand.{" "}
-          <span className="text-emerald-600 dark:text-emerald-400">Your first lessons are free.</span>
+          Find the right coach for your level, your goals, and your budget.
         </p>
-        <p className="text-lg text-muted-foreground text-balance">
-          Book a one-on-one lesson with a real coach whenever you want one,
-          and pay only for the help that actually moves your rating.
+        <p className="text-lg sm:text-xl font-medium text-emerald-600 dark:text-emerald-400 text-balance">
+          You have 3 completely free trial lessons.
         </p>
       </div>
 
@@ -71,10 +69,6 @@ export default async function Home() {
           </p>
         </div>
       </div>
-
-      <p className="text-sm text-muted-foreground text-center">
-        Try it risk-free: every new student gets up to 3 free trial lessons.
-      </p>
     </div>
   );
 }
