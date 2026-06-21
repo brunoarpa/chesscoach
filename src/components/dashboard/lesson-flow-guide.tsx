@@ -10,7 +10,7 @@ const steps = [
   {
     number: 1,
     title: "Request a Lesson",
-    description: "Pick an open time slot on a coach's profile, choose chat or audio call, and send your request. The lesson price is reserved from your wallet.",
+    description: "Pick an open time slot on a coach's profile, choose chat or audio call, and tell them what you want to work on. The coach is emailed the moment you book, so they'll see it even if they aren't online. The lesson price is reserved from your wallet.",
   },
   {
     number: 2,
@@ -37,6 +37,16 @@ const steps = [
     title: "Leave Reviews",
     description: "Rate each other 1 to 5 stars to help the community.",
   },
+];
+
+// What actually happens once you're in the room - sets student expectations so
+// they come in with a goal rather than wondering what a lesson "is".
+const activities = [
+  "Review your own games together and find where they went wrong",
+  "Have positions and ideas explained on a live, shared board",
+  "Work through tactics and endgame puzzles",
+  "Play practice games against each other",
+  "Talk through openings, plans, and where to improve next",
 ];
 
 export function LessonFlowGuide() {
@@ -97,6 +107,25 @@ export function LessonFlowGuide() {
               </li>
             ))}
           </ol>
+
+          {/* What you'll actually do in a lesson - content, not flow. */}
+          <div className="mt-6">
+            <p className="text-sm font-medium">What happens in a lesson?</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Tell your coach what you want (endgames, a game review, tactical or positional play) and you can:
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {activities.map((item) => (
+                <li key={item} className="flex gap-2 text-xs text-muted-foreground">
+                  <span className="text-primary">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground mt-2">
+              The board is shared live, so every move, arrow, and highlight shows up for both of you instantly. A built-in Stockfish 18 engine (around 3600 Elo) backs the analysis and move ratings.
+            </p>
+          </div>
 
           {/* Hands-on practice room - try the lesson UI without booking */}
           <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">
