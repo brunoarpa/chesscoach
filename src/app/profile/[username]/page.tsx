@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { ReviewList } from "@/components/review-list";
 import { SlotPicker } from "@/components/slot-picker";
 import { ChessComVerificationForm } from "@/components/chess-com-verification-form";
-import { fetchChessComRating } from "@/lib/chess-com";
+import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
 import { getAvailableSlots } from "@/lib/actions/timeslots";
 import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { FavouriteButton } from "@/components/favourite-button";
@@ -108,15 +108,31 @@ export default async function ProfilePage({
 
   if (!user) notFound();
 
-  // Refresh chess.com rapid rating on profile view for verified users (still optional)
+  // Refresh chess.com rapid rating and join date on profile view for verified
+  // users (still optional). Re-fetching the join date self-heals values stored
+  // by the old admin flow, which let an admin type the date by hand.
   if (user.verificationStatus === "VERIFIED" && user.chessComUsername) {
-    const freshRating = await fetchChessComRating(user.chessComUsername);
+    const [freshRating, freshProfile] = await Promise.all([
+      fetchChessComRating(user.chessComUsername),
+      fetchChessComProfile(user.chessComUsername),
+    ]);
+    const updateData: { chessRating?: number; chessComAccountAge?: Date } = {};
     if (freshRating !== null && freshRating !== user.chessRating) {
+      updateData.chessRating = freshRating;
+      user.chessRating = freshRating;
+    }
+    if (
+      freshProfile &&
+      freshProfile.joined.getTime() !== user.chessComAccountAge?.getTime()
+    ) {
+      updateData.chessComAccountAge = freshProfile.joined;
+      user.chessComAccountAge = freshProfile.joined;
+    }
+    if (Object.keys(updateData).length > 0) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { chessRating: freshRating },
+        data: updateData,
       });
-      user.chessRating = freshRating;
     }
   }
 
@@ -154,11 +170,6 @@ export default async function ProfilePage({
       freeTrialsRemaining = studentData.freeTrialsRemaining;
     }
   }
-
-  const websiteAge = Math.round(
-    // eslint-disable-next-line react-hooks/purity -- Server Component: rendered once per request.
-    (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-  );
 
   // Check favourite and block status
   let isFavourited = false;
@@ -395,10 +406,6 @@ export default async function ProfilePage({
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Website Age:</span>{" "}
-                {websiteAge} days
-              </div>
               {chessComAgeStr !== null && (
                 <div>
                   <span className="text-muted-foreground">Chess.com Age:</span>{" "}
