@@ -8,16 +8,6 @@ export const usernameSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
 });
 
-export const profileEditSchema = z.object({
-  continent: z.enum(["AFRICA", "ASIA", "EUROPE", "NORTH_AMERICA", "SOUTH_AMERICA", "OCEANIA"]).optional(),
-  coachChatPrice: z.coerce.number().min(0).optional(),
-  coachCallPrice: z.coerce.number().min(0).optional(),
-  communicationPreference: z.enum(["CHAT_ONLY", "CHAT_AND_CALL"]),
-  bio: z.string().max(500).optional(),
-  timezone: z.string().optional(),
-  languages: z.array(z.string()).optional(),
-});
-
 export const chessComUsernameSchema = z.object({
   chessComUsername: z
     .string()
@@ -41,7 +31,6 @@ export const depositSchema = z.object({
 });
 
 export type UsernameInput = z.infer<typeof usernameSchema>;
-export type ProfileEditInput = z.infer<typeof profileEditSchema>;
 export type LessonRequestInput = z.infer<typeof lessonRequestSchema>;
 export type ReviewInput = z.infer<typeof reviewSchema>;
 export type DepositInput = z.infer<typeof depositSchema>;
