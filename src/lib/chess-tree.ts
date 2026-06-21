@@ -14,6 +14,9 @@ export interface MoveNode {
 export interface MoveTree {
   rootId: string;
   nodes: Record<string, MoveNode>;
+  // Starting position the root represents. Absent means the standard initial
+  // position; a FEN here lets a tree begin from an arbitrary uploaded position.
+  startFen?: string;
 }
 
 function newId(): string {
@@ -23,12 +26,28 @@ function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function createTree(): MoveTree {
+export function createTree(startFen?: string): MoveTree {
   const rootId = newId();
-  return {
+  const tree: MoveTree = {
     rootId,
     nodes: { [rootId]: { id: rootId, san: "", parentId: null, children: [] } },
   };
+  // Only record a custom starting position; a standard start stays implicit so
+  // existing trees and PGN round-trips are unchanged.
+  if (startFen && startFen.trim()) tree.startFen = startFen.trim();
+  return tree;
+}
+
+// Build a tree whose root is an arbitrary uploaded position. Returns null when
+// the FEN is not a legal position.
+export function fenToTree(fen: string): MoveTree | null {
+  const trimmed = fen.trim();
+  try {
+    new Chess(trimmed);
+  } catch {
+    return null;
+  }
+  return createTree(trimmed);
 }
 
 // SANs from the root down to `nodeId` (root excluded), in play order.
@@ -54,7 +73,12 @@ export function plyOf(tree: MoveTree, nodeId: string): number {
 }
 
 export function gameAtNode(tree: MoveTree, nodeId: string): Chess {
-  const g = new Chess();
+  let g: Chess;
+  try {
+    g = new Chess(tree.startFen);
+  } catch {
+    g = new Chess();
+  }
   for (const san of sanPath(tree, nodeId)) {
     try {
       g.move(san);
@@ -212,5 +236,17 @@ export function sanitizeTree(value: unknown): MoveTree | null {
       return null;
     }
   }
-  return { rootId: t.rootId, nodes: t.nodes };
+  const sanitized: MoveTree = { rootId: t.rootId, nodes: t.nodes };
+  // Carry over a custom starting position only when it is a legal FEN, so a
+  // malformed value from the DB or a peer falls back to the standard start
+  // rather than breaking gameAtNode.
+  if (typeof t.startFen === "string" && t.startFen.trim()) {
+    try {
+      new Chess(t.startFen.trim());
+      sanitized.startFen = t.startFen.trim();
+    } catch {
+      // ignore invalid FEN
+    }
+  }
+  return sanitized;
 }
