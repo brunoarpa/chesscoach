@@ -5,7 +5,7 @@ import { Chess, Square } from "chess.js";
 import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, LayoutGrid, Trash2, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, Trash2, type LucideIcon } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 import {
@@ -979,7 +979,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           </div>
 
           {/* Palette + tools */}
-          <div className="w-full rounded-md border bg-muted/30 p-2 space-y-2">
+          <div className="w-full rounded-md border bg-muted/50 p-2 space-y-2">
             <p className="text-xs font-semibold text-muted-foreground text-center">
               {editBrush === "trash"
                 ? "Eraser selected - click pieces to remove them"
@@ -997,7 +997,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
                       key={pt}
                       type="button"
                       onClick={() => setEditBrush(active ? null : pt)}
-                      className={`h-10 w-10 rounded p-0.5 transition-colors ${active ? "bg-primary/25 ring-2 ring-primary" : "hover:bg-muted"}`}
+                      className={`h-10 w-10 rounded p-0.5 transition-colors ring-1 ring-black/10 ${active ? "bg-neutral-200 ring-2 ring-primary" : "bg-neutral-200/90 hover:bg-neutral-100"}`}
                       title={`Place ${color === "w" ? "white" : "black"} ${PIECE_NAMES[t]}`}
                     >
                       {defaultPieces[pt]?.({ svgStyle: { width: "100%", height: "100%" } })}
@@ -1109,8 +1109,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowImport(!showImport)} title="Upload PGN, FEN, or game link">
           <Upload className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={enterEditMode} title="Set up a position (place pieces by hand)">
-          <LayoutGrid className="h-5 w-5" />
+        <Button variant="ghost" size="sm" className="h-9 px-2.5 text-xs font-medium" onClick={enterEditMode} title="Set up a position (place pieces by hand)">
+          Set up
         </Button>
         <Button
           variant={showHints ? "default" : "ghost"}
