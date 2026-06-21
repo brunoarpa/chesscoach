@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveWeeklyTemplate } from "@/lib/actions/timeslots";
-import { updateCoachAvailability } from "@/lib/actions/auth";
+import { updateCoachAvailability, updateAcceptingFreeTrials } from "@/lib/actions/auth";
 import { toast } from "sonner";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -30,9 +30,13 @@ interface Props {
   initialTemplates: Array<{ dayOfWeek: number; startHour: number; startMinute: number }>;
   timezone: string | null;
   initialAvailability: string;
+  initialAcceptingFreeTrials: boolean;
+  // Coaches can only turn trials off once they've carried out their first one
+  // (and thereby unlocked paid bookings). Before that the toggle is locked on.
+  canToggleFreeTrials: boolean;
 }
 
-export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailability }: Props) {
+export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailability, initialAcceptingFreeTrials, canToggleFreeTrials }: Props) {
   const [selected, setSelected] = useState<Set<SlotKey>>(() => {
     const set = new Set<SlotKey>();
     for (const t of initialTemplates) {
@@ -43,6 +47,8 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
   const [saving, setSaving] = useState(false);
   const [paused, setPaused] = useState(initialAvailability !== "AVAILABLE");
   const [pausing, setPausing] = useState(false);
+  const [acceptingTrials, setAcceptingTrials] = useState(initialAcceptingFreeTrials);
+  const [trialsSaving, setTrialsSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragAction, setDragAction] = useState<"add" | "remove">("add");
 
@@ -115,6 +121,19 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
     toast.success(next === "AVAILABLE" ? "Bookings resumed." : "Bookings paused.");
   }
 
+  async function handleTrialsToggle() {
+    const next = !acceptingTrials;
+    setTrialsSaving(true);
+    const result = await updateAcceptingFreeTrials(next);
+    setTrialsSaving(false);
+    if (result?.error) {
+      toast.error(result.error);
+      return;
+    }
+    setAcceptingTrials(next);
+    toast.success(next ? "Now accepting free trials." : "Free trials turned off.");
+  }
+
   async function handleSave() {
     setSaving(true);
     const slots = Array.from(selected).map(parseKey);
@@ -153,6 +172,37 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
             for time-based searches. Your weekly schedule below is saved. Resume any time.
           </div>
         )}
+
+        {/* Free trials toggle. Free trials are how new students try a coach, so
+            we nudge coaches to keep them on - and lock the toggle on until the
+            coach has carried out their first trial. */}
+        <div className="rounded-md border px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              Free trials {acceptingTrials ? "on" : "off"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {acceptingTrials
+                ? "Free trials help you get students - they're the easiest way for someone to try you and become a paying student."
+                : "You're not accepting new free trials. Turning them back on helps you get students, since a free trial is the easiest way for someone to try you out."}
+            </p>
+          </div>
+          {canToggleFreeTrials ? (
+            <Button
+              onClick={handleTrialsToggle}
+              disabled={trialsSaving}
+              size="sm"
+              variant={acceptingTrials ? "outline" : "default"}
+              className="sm:w-auto w-full shrink-0"
+            >
+              {trialsSaving ? "Saving..." : acceptingTrials ? "Turn off free trials" : "Accept free trials"}
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground shrink-0">
+              Unlocks after your first trial
+            </span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           Tap a square to toggle a 15-min slot, or drag across squares.{" "}
           {timezone ? (

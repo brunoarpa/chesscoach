@@ -166,6 +166,11 @@ model User {
   // Free trials
   freeTrialsRemaining Int @default(3)
 
+  // Coach toggle: whether they currently accept new free-trial requests.
+  // Defaults true (and only unlockable to false once they've carried out a
+  // trial) so new coaches always stay reachable for their first booking.
+  acceptingFreeTrials Boolean @default(true)
+
   // Admin override: lets a coach receive paid bookings without the
   // carried-out-free-trial requirement (e.g. a coach the admin vouches for).
   paidBookingsApproved Boolean @default(false)

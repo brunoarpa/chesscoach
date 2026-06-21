@@ -27,6 +27,7 @@ interface Props {
   freeTrialsRemaining: number;
   slots: Slot[];
   hasCompletedTrial?: boolean;
+  coachAcceptingFreeTrials?: boolean;
 }
 
 type GroupedSlots = Record<string, Slot[]>;
@@ -62,6 +63,7 @@ export function SlotPicker({
   freeTrialsRemaining,
   slots,
   hasCompletedTrial = true,
+  coachAcceptingFreeTrials = true,
 }: Props) {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [commMethod, setCommMethod] = useState<string>("");
@@ -206,7 +208,7 @@ export function SlotPicker({
             vs chat/call without scrolling past a long list of slots. */}
         <div className="space-y-3">
           {/* Trial option */}
-          {freeTrialsRemaining > 0 && (
+          {freeTrialsRemaining > 0 && coachAcceptingFreeTrials && (
             <div className="flex items-center gap-2">
               <Button
                 size="sm"

@@ -83,6 +83,7 @@ export default async function ProfilePage({
       coachCallPrice: true,
       communicationPreference: true,
       coachAvailability: true,
+      acceptingFreeTrials: true,
       coachElo: true,
       chessRating: true,
       chessComUsername: true,
@@ -472,6 +473,7 @@ export default async function ProfilePage({
                 freeTrialsRemaining={freeTrialsRemaining}
                 slots={availableSlots}
                 hasCompletedTrial={hasCompletedTrial}
+                coachAcceptingFreeTrials={user.acceptingFreeTrials}
               />
             )}
           {!isOwnProfile && isBlocked && session?.user && (

@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation } from "@/lib/chess-com";
 import { filterValidLanguages } from "@/lib/languages";
 import { generateUpcomingSlots } from "@/lib/actions/timeslots";
+import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import crypto from "crypto";
 
 export async function setUsername(formData: FormData) {
@@ -208,6 +209,43 @@ export async function updateCoachAvailability(newStatus: "AVAILABLE" | "UNAVAILA
 
   revalidatePath("/dashboard");
   return { success: true, status: newStatus };
+}
+
+export async function updateAcceptingFreeTrials(accepting: boolean) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated" };
+
+  // Turning trials OFF is only allowed once the coach has carried out their
+  // first trial (or been admin-approved for paid bookings). Before that, free
+  // trials are their only way into the paid pool, so they must stay on.
+  if (!accepting) {
+    const coach = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { paidBookingsApproved: true },
+    });
+    if (!coach) return { error: "User not found" };
+    if (!coach.paidBookingsApproved) {
+      const completedTrial = await prisma.lessonRequest.findFirst({
+        where: { coachId: session.user.id, ...carriedOutTrialWhere },
+        select: { id: true },
+      });
+      if (!completedTrial) {
+        return { error: "Complete your first free trial to unlock paid bookings before turning trials off." };
+      }
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      acceptingFreeTrials: accepting,
+      lastActiveAt: new Date(),
+      activityStatus: "ACTIVE",
+    },
+  });
+
+  revalidatePath("/dashboard");
+  return { success: true, accepting };
 }
 
 export async function submitChessComUsername(formData: FormData) {

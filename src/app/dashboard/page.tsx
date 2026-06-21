@@ -36,7 +36,7 @@ export default async function DashboardPage({
 
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true, lastActiveAt: true, paidBookingsApproved: true },
+    select: { isSuspended: true, freeTrialsRemaining: true, coachAvailability: true, hasActiveDispute: true, verificationStatus: true, coachChatPrice: true, coachCallPrice: true, timezone: true, lastActiveAt: true, paidBookingsApproved: true, acceptingFreeTrials: true },
   });
   if (!currentUser) redirect("/login");
 
@@ -270,7 +270,13 @@ export default async function DashboardPage({
       {isCoach && (
         <section id="schedule" className="scroll-mt-20">
           <h2 className="text-xl font-semibold mb-3">Coaching</h2>
-          <CoachScheduleEditor initialTemplates={weeklyTemplates} timezone={currentUser.timezone} initialAvailability={currentUser.coachAvailability} />
+          <CoachScheduleEditor
+            initialTemplates={weeklyTemplates}
+            timezone={currentUser.timezone}
+            initialAvailability={currentUser.coachAvailability}
+            initialAcceptingFreeTrials={currentUser.acceptingFreeTrials}
+            canToggleFreeTrials={!!incomingHasCompletedTrial || currentUser.paidBookingsApproved}
+          />
         </section>
       )}
     </div>

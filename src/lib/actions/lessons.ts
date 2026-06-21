@@ -72,6 +72,7 @@ export async function createLessonRequest(formData: FormData) {
       coachAvailability: true,
       communicationPreference: true,
       paidBookingsApproved: true,
+      acceptingFreeTrials: true,
     },
   });
 
@@ -99,6 +100,9 @@ export async function createLessonRequest(formData: FormData) {
   let estimatedCost: number;
   if (isTrial) {
     // Free trial: no cost
+    if (!coach.acceptingFreeTrials) {
+      return { error: "This coach isn't accepting free trials right now. You can still book a paid lesson with them." };
+    }
     if (currentUser.freeTrialsRemaining <= 0) {
       return { error: "You have no free trials remaining" };
     }
