@@ -164,6 +164,7 @@ export default async function SearchPage({
       coachElo: true,
       activityStatus: true,
       coachAvailability: true,
+      acceptingFreeTrials: true,
       lastActiveAt: true,
       lessonsGiven: true,
       bio: true,
@@ -240,6 +241,7 @@ export default async function SearchPage({
                     coachAvailability={coach.coachAvailability}
                     bookable={bookable}
                     hasOpenSlots={coach._count.timeSlots > 0}
+                    acceptingFreeTrials={coach.acceptingFreeTrials}
                     lastActiveAt={coach.lastActiveAt}
                     avgRating={reviews?.avg ?? null}
                     reviewCount={reviews?.count ?? 0}

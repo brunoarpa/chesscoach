@@ -42,6 +42,7 @@ interface Props {
   coachAvailability: string;
   bookable: boolean;
   hasOpenSlots: boolean;
+  acceptingFreeTrials?: boolean;
   lastActiveAt: Date;
   avgRating: number | null;
   reviewCount: number;
@@ -87,7 +88,7 @@ export function CoachCard(props: Props) {
             <p className="text-sm text-muted-foreground mb-3">
               <span className="flex items-center gap-1.5">
                 ♝ Chess Coach
-                <BookingStatusBadge bookable={props.bookable} hasOpenSlots={props.hasOpenSlots} />
+                <BookingStatusBadge bookable={props.bookable} hasOpenSlots={props.hasOpenSlots} acceptingFreeTrials={props.acceptingFreeTrials} />
               </span>
             </p>
 

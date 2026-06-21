@@ -63,6 +63,7 @@ export default async function LeaderboardPage({
       activityStatus: true,
       lastActiveAt: true,
       coachAvailability: true,
+      acceptingFreeTrials: true,
       coachChatPrice: true,
       coachCallPrice: true,
       verificationStatus: true,
@@ -105,7 +106,7 @@ export default async function LeaderboardPage({
                           <Badge variant="outline" title="Verified on chess.com" className="text-xs">✓ chess.com</Badge>
                         )}
                       </div>
-                      <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} />
+                      <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} acceptingFreeTrials={coach.acceptingFreeTrials} />
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                       <span className="text-muted-foreground">Coach Rating</span>
@@ -171,7 +172,7 @@ export default async function LeaderboardPage({
                   <span className="text-xs text-muted-foreground ml-2">
                     ♝ {coach.chessRating ?? "-"}
                   </span>
-                  <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} className="ml-2" />
+                  <BookingStatusBadge bookable={bookable} hasOpenSlots={coach._count.timeSlots > 0} acceptingFreeTrials={coach.acceptingFreeTrials} className="ml-2" />
                 </TableCell>
                 <TableCell className="text-right font-mono font-medium">
                   {Math.round(coach.coachElo)}
