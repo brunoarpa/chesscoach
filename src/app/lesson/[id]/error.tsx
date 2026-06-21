@@ -31,6 +31,15 @@ export default function LessonError({
           <a href="/dashboard">Return to dashboard</a>
         </Button>
       </div>
+      {/* TEMPORARY: surface the real error so a phone screenshot is enough to
+          diagnose (no error reporting is wired up). For a client-side crash
+          error.message is the real text in production; server errors are
+          redacted by Next.js, leaving just the digest. Remove once fixed. */}
+      {error.message && (
+        <pre className="max-w-md whitespace-pre-wrap break-words rounded bg-muted p-2 text-left text-xs text-muted-foreground">
+          {error.message}
+        </pre>
+      )}
       {error.digest && (
         <p className="text-xs text-muted-foreground/70">
           Error reference: {error.digest}
