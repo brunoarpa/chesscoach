@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { createLessonRequest } from "@/lib/actions/lessons";
 import { toast } from "sonner";
-import { Calendar, CheckCircle2, Clock, Gift } from "lucide-react";
+import { Calendar, CheckCircle2, Clock } from "lucide-react";
 
 interface Slot {
   id: string;
@@ -202,45 +202,52 @@ export function SlotPicker({
           </div>
         )}
 
-        {/* Free trial spotlight - first thing a student sees, before any slot
-            is picked. Toggles trial mode so the rest of the form goes free. */}
-        {freeTrialsRemaining > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsTrial((prev) => {
-                const next = !prev;
-                if (next) setCommMethod("");
-                return next;
-              });
-            }}
-            aria-pressed={isTrial}
-            className={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
-              isTrial
-                ? "border-green-500 bg-green-100 dark:border-green-500 dark:bg-green-900/40"
-                : "border-green-500 bg-green-50 hover:bg-green-100 dark:border-green-600 dark:bg-green-950/40 dark:hover:bg-green-900/40"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
-                {isTrial ? <CheckCircle2 className="h-5 w-5" /> : <Gift className="h-5 w-5" />}
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-green-900 dark:text-green-100">
-                  {isTrial ? "Free trial selected - now pick a time" : "Try your first lesson free"}
-                </p>
-                <p className="text-xs text-green-800 dark:text-green-300 mt-0.5">
-                  {freeTrialsRemaining} free trial{freeTrialsRemaining !== 1 ? "s" : ""} left · 15 min, no charge
-                </p>
-              </div>
-              {!isTrial && (
-                <span className="flex-shrink-0 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white">
-                  Start free
-                </span>
-              )}
+        {/* Booking type - kept above the times so the student picks free trial
+            vs chat/call without scrolling past a long list of slots. */}
+        <div className="space-y-3">
+          {/* Trial option */}
+          {freeTrialsRemaining > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setIsTrial(!isTrial);
+                  if (!isTrial) setCommMethod("");
+                }}
+                className="bg-green-600 text-white hover:bg-green-700"
+              >
+                {isTrial ? "Free Trial ✓" : "Use Free Trial"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {freeTrialsRemaining} trial{freeTrialsRemaining !== 1 ? "s" : ""} left
+              </span>
             </div>
-          </button>
-        )}
+          )}
+
+          {/* Communication method */}
+          {!isTrial && (
+            <div className="space-y-1.5">
+              <Label className="text-sm">Lesson Type</Label>
+              <Select value={commMethod} onValueChange={setCommMethod}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose chat or call" />
+                </SelectTrigger>
+                <SelectContent>
+                  {coachChatPrice !== null && (
+                    <SelectItem value="CHAT">
+                      Chat - ${(coachChatPrice / 100).toFixed(2)}/slot
+                    </SelectItem>
+                  )}
+                  {canCall && (
+                    <SelectItem value="CALL">
+                      Call - ${(coachCallPrice! / 100).toFixed(2)}/slot
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
 
         {/* Slot grid grouped by day */}
         <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
@@ -271,38 +278,6 @@ export function SlotPicker({
         {/* Booking options (show when slot selected) */}
         {selectedSlotId && (
           <div className="border-t pt-4 space-y-3">
-            {/* Trial status - toggled from the spotlight banner above */}
-            {isTrial && (
-              <div className="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                Free trial - this lesson is on us
-              </div>
-            )}
-
-            {/* Communication method */}
-            {!isTrial && (
-              <div className="space-y-1.5">
-                <Label className="text-sm">Lesson Type</Label>
-                <Select value={commMethod} onValueChange={setCommMethod}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choose chat or call" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {coachChatPrice !== null && (
-                      <SelectItem value="CHAT">
-                        Chat - ${(coachChatPrice / 100).toFixed(2)}/slot
-                      </SelectItem>
-                    )}
-                    {canCall && (
-                      <SelectItem value="CALL">
-                        Call - ${(coachCallPrice! / 100).toFixed(2)}/slot
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             {/* Message */}
             <div className="space-y-1.5">
               <Label className="text-sm">What do you want from this lesson?</Label>
