@@ -17,7 +17,13 @@ export function register() {
     // Node runtime warnings (emitted on every serverless cold start) get
     // picked up by the console capture below - they're platform noise, not
     // app errors, and would otherwise burn alert attention and event quota.
-    ignoreErrors: [/ExperimentalWarning/, /DeprecationWarning/],
+    //
+    // CredentialsSignin covers the normal failed-login path - Auth.js logs a
+    // console.error whenever authorize() throws (wrong password, unverified
+    // email, rate-limited), which the console capture below would otherwise
+    // forward as an alert. A genuine fault inside authorize (DB/bcrypt) logs a
+    // different error name and still comes through.
+    ignoreErrors: [/ExperimentalWarning/, /DeprecationWarning/, /CredentialsSignin/],
     integrations:
       process.env.NEXT_RUNTIME === "nodejs"
         ? [Sentry.captureConsoleIntegration({ levels: ["error"] })]
