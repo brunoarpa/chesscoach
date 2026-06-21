@@ -18,6 +18,7 @@ import {
   mainlineForward,
   endOfLine,
   pgnToTree,
+  fenToTree,
   promoteVariation,
   deleteSubtree,
   sanitizeTree,
@@ -520,6 +521,18 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, endId);
   }
 
+  function loadTreeFromFen(fen: string) {
+    const nextTree = fenToTree(fen);
+    if (!nextTree) return false;
+    setTree(nextTree);
+    setCurrentNodeId(nextTree.rootId);
+    setShowImport(false);
+    setImportText("");
+    setImportError("");
+    if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, nextTree.rootId);
+    return true;
+  }
+
   function handleImport() {
     const text = importText.trim();
     if (!text) return;
@@ -541,7 +554,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       return;
     }
 
-    setImportError("Could not parse as PGN or game link. Paste a valid PGN or Lichess/Chess.com game link.");
+    // A single FEN line sets up an arbitrary starting position with no moves.
+    if (loadTreeFromFen(text)) return;
+
+    setImportError("Could not parse as PGN, FEN, or game link. Paste a valid PGN, FEN, or Lichess/Chess.com game link.");
   }
 
   async function handleLinkImport(url: string) {
@@ -900,7 +916,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={requestReset} title="New game (clears the board)">
           <FilePlus className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowImport(!showImport)} title="Upload PGN or game link">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowImport(!showImport)} title="Upload PGN, FEN, or game link">
           <Upload className="h-5 w-5" />
         </Button>
         <Button
@@ -1008,12 +1024,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           >
             <h3 className="text-base font-semibold">Upload a game</h3>
             <p className="text-sm text-muted-foreground">
-              Paste a PGN or a Lichess / Chess.com game link:
+              Paste a PGN, a FEN, or a Lichess / Chess.com game link:
             </p>
             <Textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder="1. e4 e5 2. Nf3... or https://lichess.org/... or https://chess.com/game/live/..."
+              placeholder="1. e4 e5 2. Nf3... or rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b ... or https://lichess.org/..."
               rows={5}
               className="font-mono text-sm"
             />
