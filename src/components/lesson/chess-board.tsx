@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, Trash2, type LucideIcon } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   type MoveTree,
   type MoveNode,
@@ -193,6 +194,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // across both participants via board sync.
   const [showHints, setShowHints] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Stockfish runs in-browser, so on a phone the student's CPU would pay for
+  // the (synced) engine hints and stutter the whole lesson. Gate the engine on
+  // viewport: mobile gets no eval bar, best-move arrows, or move ratings - just
+  // a responsive board. Coaches teach from a wider screen where it runs fine.
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const engineEnabled = !isMobile;
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
   // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
@@ -588,7 +596,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     const col = root?.parentElement;
     if (!root || !col) return;
     const update = () => {
-      const w = root.clientWidth - (showHints ? EVAL_BAR_RESERVE : 0);
+      const w = root.clientWidth - (showHints && engineEnabled ? EVAL_BAR_RESERVE : 0);
       const h = col.clientHeight - COLUMN_PADDING - BOARD_BOTTOM_RESERVE;
       setBoardPx(Math.max(MIN_BOARD, Math.floor(Math.min(w, h))));
     };
@@ -596,7 +604,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     const ro = new ResizeObserver(update);
     ro.observe(col);
     return () => ro.disconnect();
-  }, [showHints]);
+  }, [showHints, engineEnabled]);
 
   // Dismiss the move context menu on any outside click.
   useEffect(() => {
@@ -1046,7 +1054,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           (boardPx) from the column, not from leftover flex space, so it never
           resizes when the content below changes. */}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
-        {showHints && (
+        {showHints && engineEnabled && (
           <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} />
         )}
         <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
@@ -1112,15 +1120,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <Button variant="ghost" size="sm" className="h-9 px-2.5 text-xs font-medium" onClick={enterEditMode} title="Set up a position (place pieces by hand)">
           Set up
         </Button>
-        <Button
-          variant={showHints ? "default" : "ghost"}
-          size="icon"
-          className="h-9 w-9"
-          onClick={toggleHints}
-          title={showHints ? "Hide engine hints (eval bar, best moves & move ratings)" : "Show engine hints (eval bar, best moves & move ratings)"}
-        >
-          <Lightbulb className="h-5 w-5" />
-        </Button>
+        {engineEnabled && (
+          <Button
+            variant={showHints ? "default" : "ghost"}
+            size="icon"
+            className="h-9 w-9"
+            onClick={toggleHints}
+            title={showHints ? "Hide engine hints (eval bar, best moves & move ratings)" : "Show engine hints (eval bar, best moves & move ratings)"}
+          >
+            <Lightbulb className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* Shared-board reassurance. Only in a real lesson - in practice mode the

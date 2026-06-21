@@ -54,9 +54,30 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
   const callRef = useRef<import("peerjs").MediaConnection | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
+  // Separate counter for "id taken" retries (a stale peer left registered after
+  // the phone slept), kept apart from peer-unavailable retries so one doesn't
+  // exhaust the other.
+  const idRetryRef = useRef(0);
   const mountedRef = useRef(true);
+  // Whether the user intends to be in the call. Drives auto-recovery: a phone
+  // that backgrounds the tab kills the peer, and on return we rebuild it.
+  const wantCallRef = useRef(false);
+  // Ref mirrors of the connection state so the reentry guard and the
+  // visibility handler read fresh values instead of stale render closures.
+  const connectedRef = useRef(false);
+  const connectingRef = useRef(false);
 
   const otherRole = isCoach ? "student" : "coach";
+
+  const setConnectingState = useCallback((v: boolean) => {
+    connectingRef.current = v;
+    if (mountedRef.current) setConnecting(v);
+  }, []);
+
+  const setConnectedState = useCallback((v: boolean) => {
+    connectedRef.current = v;
+    if (mountedRef.current) setConnected(v);
+  }, []);
 
   const cleanup = useCallback(() => {
     if (retryTimerRef.current) {
@@ -69,6 +90,8 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
     callRef.current = null;
     peerRef.current?.destroy();
     peerRef.current = null;
+    connectedRef.current = false;
+    connectingRef.current = false;
     if (mountedRef.current) {
       setConnected(false);
       setConnecting(false);
@@ -84,9 +107,10 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
   }, []);
 
   const startCall = useCallback(async () => {
-    if (peerRef.current || connecting) return;
+    if (peerRef.current || connectingRef.current) return;
 
-    setConnecting(true);
+    wantCallRef.current = true;
+    setConnectingState(true);
     setError(null);
     retryCountRef.current = 0;
 
@@ -125,6 +149,13 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
           });
       }
 
+      function onConnected() {
+        setConnectedState(true);
+        setConnectingState(false);
+        retryCountRef.current = 0;
+        idRetryRef.current = 0;
+      }
+
       function attemptCall() {
         if (!peerRef.current || !localStreamRef.current || !mountedRef.current) return;
 
@@ -133,16 +164,10 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
           callRef.current = call;
           call.on("stream", (remoteStream) => {
             wireRemoteStream(remoteStream);
-            if (mountedRef.current) {
-              setConnected(true);
-              setConnecting(false);
-            }
-            retryCountRef.current = 0;
+            onConnected();
           });
           call.on("close", () => {
-            if (mountedRef.current) {
-              setConnected(false);
-            }
+            setConnectedState(false);
           });
         }
       }
@@ -157,16 +182,10 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
         callRef.current = incomingCall;
         incomingCall.on("stream", (remoteStream) => {
           wireRemoteStream(remoteStream);
-          if (mountedRef.current) {
-            setConnected(true);
-            setConnecting(false);
-          }
-          retryCountRef.current = 0;
+          onConnected();
         });
         incomingCall.on("close", () => {
-          if (mountedRef.current) {
-            setConnected(false);
-          }
+          setConnectedState(false);
         });
       });
 
@@ -178,18 +197,23 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
             retryTimerRef.current = setTimeout(attemptCall, delay);
           }
         } else if (err.type === "unavailable-id") {
-          peer.destroy();
-          peerRef.current = null;
-          if (retryCountRef.current < 3 && mountedRef.current) {
-            retryCountRef.current++;
-            retryTimerRef.current = setTimeout(() => startCall(), 1000);
+          // Our role-based id is still held on the server, almost always by this
+          // device's own peer left registered after the tab was suspended (the
+          // common mobile case). Tear everything down and retry with backoff
+          // while the server releases the stale id, instead of dead-ending on a
+          // "please refresh the page" prompt the way this used to.
+          cleanup();
+          if (idRetryRef.current < 8 && mountedRef.current && wantCallRef.current) {
+            idRetryRef.current++;
+            const delay = Math.min(8000, 1500 * idRetryRef.current);
+            retryTimerRef.current = setTimeout(() => startCall(), delay);
           } else if (mountedRef.current) {
-            setError("Connection error. Please refresh the page.");
-            setConnecting(false);
+            setError("Couldn't reconnect the call. Tap Join to try again.");
+            setConnectingState(false);
           }
         } else if (mountedRef.current) {
           setError(`Connection error: ${err.type}`);
-          setConnecting(false);
+          setConnectingState(false);
         }
       });
 
@@ -201,14 +225,35 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
     } catch {
       if (mountedRef.current) {
         setError("Could not access microphone. Please check permissions.");
-        setConnecting(false);
+        setConnectingState(false);
       }
     }
-  }, [lessonId, isCoach, otherRole, connecting]);
+  }, [lessonId, isCoach, otherRole, cleanup, setConnectedState, setConnectingState]);
 
   const endCall = useCallback(() => {
+    wantCallRef.current = false;
+    idRetryRef.current = 0;
     cleanup();
   }, [cleanup]);
+
+  // Mobile browsers suspend a backgrounded tab and kill the WebRTC peer. When
+  // the user returns and they should still be in the call but the peer is dead
+  // or disconnected, rebuild it automatically rather than stranding them.
+  useEffect(() => {
+    const onVisible = () => {
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+      if (!wantCallRef.current || !mountedRef.current || connectingRef.current) return;
+      const peer = peerRef.current;
+      const healthy = peer && !peer.destroyed && !peer.disconnected && connectedRef.current;
+      if (healthy) return;
+      cleanup();
+      idRetryRef.current = 0;
+      retryCountRef.current = 0;
+      startCall();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [cleanup, startCall]);
 
   // Notify parent when connected state changes
   useEffect(() => {
@@ -221,6 +266,7 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      wantCallRef.current = false;
       cleanup();
     };
   }, [cleanup]);
