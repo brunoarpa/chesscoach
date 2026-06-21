@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { MIN_BOOKING_LEAD_MS } from "@/lib/utils";
+import { MIN_BOOKING_LEAD_MS, LESSON_DURATION_MS, SLOT_START_MINUTES } from "@/lib/utils";
 
 /**
  * Offset (in ms) of an IANA timezone from UTC at a given instant.
@@ -63,7 +63,7 @@ function wallTimeToUtc(
 /**
  * Save a coach's weekly recurring availability template.
  * Replaces all existing templates for the coach.
- * Each slot is { dayOfWeek: 0-6, startHour: 0-23, startMinute: 0|15|30|45 }
+ * Each slot is { dayOfWeek: 0-6, startHour: 0-23, startMinute: 0|30 }
  */
 export async function saveWeeklyTemplate(
   slots: Array<{ dayOfWeek: number; startHour: number; startMinute: number }>
@@ -87,7 +87,7 @@ export async function saveWeeklyTemplate(
     if (
       slot.dayOfWeek < 0 || slot.dayOfWeek > 6 ||
       slot.startHour < 0 || slot.startHour > 23 ||
-      ![0, 15, 30, 45].includes(slot.startMinute)
+      !SLOT_START_MINUTES.includes(slot.startMinute as 0 | 30)
     ) {
       return { error: "Invalid slot data" };
     }
@@ -223,7 +223,7 @@ export async function generateUpcomingSlots(coachId: string) {
             0
           ));
 
-      const endTime = new Date(startTime.getTime() + 15 * 60 * 1000);
+      const endTime = new Date(startTime.getTime() + LESSON_DURATION_MS);
 
       // Skip only past slots - coaches must accept anyway, so near-term bookings are fine.
       if (startTime.getTime() <= now.getTime()) continue;

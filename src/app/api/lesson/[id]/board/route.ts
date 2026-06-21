@@ -63,7 +63,7 @@ export async function PATCH(
   const body = await request.json();
   const { boardPgn, boardTree, currentNodeId } = body;
 
-  // Size caps: a 15-minute lesson's moves are a few KB at most. These bounds
+  // Size caps: a 30-minute lesson's moves are a few KB at most. These bounds
   // are generous headroom for legitimate variation trees while stopping a
   // participant from writing unbounded JSON into the row on every keystroke.
   const MAX_PGN_CHARS = 20_000;

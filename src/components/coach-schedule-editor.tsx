@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveWeeklyTemplate } from "@/lib/actions/timeslots";
 import { updateCoachAvailability, updateAcceptingFreeTrials } from "@/lib/actions/auth";
+import { LESSON_DURATION_MINUTES, SLOT_START_MINUTES } from "@/lib/utils";
 import { toast } from "sonner";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 6:00 - 23:00
-const MINUTES = [0, 15, 30, 45];
+const MINUTES = [...SLOT_START_MINUTES];
 
 type SlotKey = string; // "dayOfWeek-hour-minute"
 
@@ -204,7 +205,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Tap a square to toggle a 15-min slot, or drag across squares.{" "}
+          Tap a square to toggle a {LESSON_DURATION_MINUTES}-min slot, or drag across squares.{" "}
           {timezone ? (
             <>Times are in <span className="font-medium">{timezone}</span> (your profile timezone).</>
           ) : (
@@ -297,7 +298,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
             <div className="w-3 h-3 rounded-sm bg-muted" />
             Unavailable
           </div>
-          <span className="ml-auto">{selected.size} slots ({(selected.size * 15 / 60).toFixed(1)}h/week)</span>
+          <span className="ml-auto">{selected.size} slots ({(selected.size * LESSON_DURATION_MINUTES / 60).toFixed(1)}h/week)</span>
         </div>
       </CardContent>
     </Card>

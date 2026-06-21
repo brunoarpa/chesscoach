@@ -76,7 +76,7 @@ export default async function Home() {
         <div className="space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Short, focused lessons</h3>
           <p className="text-base text-muted-foreground">
-            Every lesson is one 15-minute slot, so it stays cheap and easy to fit in.
+            Every lesson is one 30-minute slot, so it stays cheap and easy to fit in.
             Want a deep dive? Book back-to-back slots for a longer session.
           </p>
         </div>

@@ -137,8 +137,8 @@ model User {
   // Profile info
   continent             Continent?
   chessRating           Int?
-  coachChatPrice        Int?      // cents per 15-min slot (chat)
-  coachCallPrice        Int?      // cents per 15-min slot (call)
+  coachChatPrice        Int?      // cents per 30-min slot (chat)
+  coachCallPrice        Int?      // cents per 30-min slot (call)
   communicationPreference CommunicationPreference @default(CHAT_ONLY)
   chessComAccountAge    DateTime? // when the chess.com account was created
   bio                   String?
@@ -276,7 +276,7 @@ model LessonRequest {
   coach     User   @relation("Coach", fields: [coachId], references: [id])
   
   type            LessonType
-  durationMinutes Int            @default(15) // always 15 for timeslot system
+  durationMinutes Int            @default(30) // always 30 for timeslot system (LESSON_DURATION_MINUTES)
   estimatedCost   Int            // cents
   isTrial         Boolean        @default(false)
   communicationMethod LessonCommunicationMethod?
@@ -517,7 +517,7 @@ model TimeSlotTemplate {
   
   dayOfWeek   Int    // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   startHour   Int    // 0-23
-  startMinute Int    // 0 or 15 or 30 or 45
+  startMinute Int    // 0 or 30 (slot starts; tiles the hour by LESSON_DURATION_MINUTES)
   
   createdAt   DateTime @default(now())
   

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { rateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS, INSTANT_REQUEST_TTL_MS, MAX_CONCURRENT_PENDING_REQUESTS, PAID_REQUEST_RATE_MAX, PAID_REQUEST_RATE_WINDOW_MS } from "@/lib/utils";
+import { getEffectiveAvailability, MIN_BOOKING_LEAD_MS, MIN_ACCEPT_NOTICE_MS, NO_SHOW_ELO_PENALTY, STUDENT_CANCEL_CUTOFF_MS, INSTANT_REQUEST_TTL_MS, MAX_CONCURRENT_PENDING_REQUESTS, PAID_REQUEST_RATE_MAX, PAID_REQUEST_RATE_WINDOW_MS, LESSON_DURATION_MINUTES } from "@/lib/utils";
 import { calculateCoachElo } from "@/lib/elo";
 import { payCoachForLesson, carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { completeInProgressLesson } from "@/lib/activity";
@@ -168,7 +168,7 @@ export async function createLessonRequest(formData: FormData) {
       };
     }
 
-    estimatedCost = slotPrice; // 1 slot = 15 min
+    estimatedCost = slotPrice; // 1 slot = 1 lesson (LESSON_DURATION_MINUTES)
   }
 
   // Check student wallet (skip for free trials)
@@ -310,7 +310,7 @@ export async function createLessonRequest(formData: FormData) {
           studentId: session.user.id,
           coachId,
           type: "LESSON",
-          durationMinutes: 15,
+          durationMinutes: LESSON_DURATION_MINUTES,
           estimatedCost,
           isTrial,
           communicationMethod: communicationMethod as "CALL" | "CHAT" | undefined,
@@ -333,7 +333,7 @@ export async function createLessonRequest(formData: FormData) {
     userId: coachId,
     type: "LESSON_REQUESTED",
     title: "New lesson request",
-    body: `${studentName} requested a ${isTrial ? "free trial" : "15-min"} lesson. Accept or decline it from your dashboard.`,
+    body: `${studentName} requested a ${isTrial ? "free trial" : `${LESSON_DURATION_MINUTES}-min`} lesson. Accept or decline it from your dashboard.`,
     link: "/dashboard",
     email: { cta: "Review request" },
   });

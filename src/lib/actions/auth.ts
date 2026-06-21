@@ -81,7 +81,7 @@ export async function updateProfile(formData: FormData) {
   };
 
   // Validate price ranges (in dollars, before *100)
-  const MAX_PRICE_USD = 200; // $200 per 15 minutes is plenty
+  const MAX_PRICE_USD = 200; // $200 per 30-min lesson is plenty
   if (raw.coachChatPrice !== undefined && (raw.coachChatPrice < 0 || raw.coachChatPrice > MAX_PRICE_USD || !Number.isFinite(raw.coachChatPrice))) {
     return { error: `Chat price must be between $0 and $${MAX_PRICE_USD}.` };
   }

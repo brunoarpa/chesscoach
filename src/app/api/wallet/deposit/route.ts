@@ -6,7 +6,7 @@ import { APP_CURRENCY, getStripe } from "@/lib/stripe";
 import { processingFee } from "@/lib/fees";
 
 const MIN_DEPOSIT_CENTS = 500;    // $5.00
-// Matches the max coach price ($200 / 15-min slot) so a student can fund any
+// Matches the max coach price ($200 / 30-min slot) so a student can fund any
 // single lesson in one deposit instead of paying the flat fee on many $20
 // top-ups. Still a per-deposit ceiling that caps exposure on any one charge.
 const MAX_DEPOSIT_CENTS = 20000;  // $200.00

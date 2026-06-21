@@ -64,6 +64,18 @@ export const MAX_CONCURRENT_PENDING_REQUESTS = 5;
 export const PAID_REQUEST_RATE_MAX = 10;
 export const PAID_REQUEST_RATE_WINDOW_MS = 60 * 60 * 1000;
 
+// Length of a single lesson / time slot. Lessons are a fixed length: one slot
+// is one lesson. Slot start times are therefore aligned to this length, so
+// adjacent bookable slots never overlap (see SLOT_START_MINUTES).
+export const LESSON_DURATION_MINUTES = 30;
+export const LESSON_DURATION_MS = LESSON_DURATION_MINUTES * 60 * 1000;
+
+// The minute marks within an hour at which a slot may start. Must tile the hour
+// by LESSON_DURATION_MINUTES so two slots can't overlap: [0, 30] for 30-min
+// lessons. Shared by the schedule editor (which renders these rows) and the
+// template validation (which rejects anything else).
+export const SLOT_START_MINUTES = [0, 30] as const;
+
 // Booking lead times. A slot must start at least MIN_BOOKING_LEAD_MS in the
 // future to be bookable, and a coach must accept at least MIN_ACCEPT_NOTICE_MS
 // before the start. The 2x gap guarantees every legal booking leaves the coach

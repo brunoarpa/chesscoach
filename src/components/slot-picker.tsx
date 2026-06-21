@@ -165,7 +165,7 @@ export function SlotPicker({
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">Book a Lesson</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Select a 15-minute time slot. Times shown in your local timezone.
+          Select a 30-minute time slot. Times shown in your local timezone.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

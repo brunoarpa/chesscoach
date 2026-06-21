@@ -140,7 +140,7 @@ export function ProfileEditForm(props: Props) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Each slot is 15 minutes. Leave empty if not coaching that type.
+            Each slot is 30 minutes. Leave empty if not coaching that type.
           </p>
 
           <div className="space-y-2">

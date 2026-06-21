@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { LANGUAGES } from "@/lib/languages";
+import { LESSON_DURATION_MS } from "@/lib/utils";
 
 const continents = [
   { value: "", label: "All" },
@@ -23,7 +24,7 @@ const ratingOptions = Array.from({ length: 30 }, (_, i) => (i + 1) * 100); // 10
 
 const languageOptions = LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
-const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+const SLOT_MS = LESSON_DURATION_MS;
 
 // Format a Date as the `YYYY-MM-DDTHH:mm` wall-clock string a datetime-local input expects.
 function toLocalInputValue(d: Date): string {
@@ -31,15 +32,15 @@ function toLocalInputValue(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Round up to the next :00/:15/:30/:45 boundary so the picker aligns with bookable slots.
-// All real-world UTC offsets are multiples of 15 min, so rounding the absolute instant
-// keeps the local wall-clock value 15-min aligned too.
-function roundUpTo15(d: Date): Date {
-  return new Date(Math.ceil(d.getTime() / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS);
+// Round to the next/previous slot boundary (:00/:30) so the picker aligns with
+// bookable slots. All real-world UTC offsets are multiples of 30 min, so rounding
+// the absolute instant keeps the local wall-clock value slot-aligned too.
+function roundUpToSlot(d: Date): Date {
+  return new Date(Math.ceil(d.getTime() / SLOT_MS) * SLOT_MS);
 }
 
-function roundDownTo15(d: Date): Date {
-  return new Date(Math.floor(d.getTime() / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS);
+function roundDownToSlot(d: Date): Date {
+  return new Date(Math.floor(d.getTime() / SLOT_MS) * SLOT_MS);
 }
 
 function paramToLocalInput(raw: string | null): string {
@@ -63,7 +64,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
   const [bookingBounds] = useState(() => {
     const now = new Date();
     const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    return { min: toLocalInputValue(roundDownTo15(now)), max: toLocalInputValue(roundUpTo15(weekAhead)) };
+    return { min: toLocalInputValue(roundDownToSlot(now)), max: toLocalInputValue(roundUpToSlot(weekAhead)) };
   });
 
   const availableFromDefault = paramToLocalInput(searchParams.get("availableFrom"));
@@ -82,10 +83,10 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
         const d = new Date(value as string);
         if (Number.isNaN(d.getTime())) continue;
         // A pick before now just means "from now"; clamp up instead of erroring.
-        // Slots always start on 15-min boundaries, so round up to the next
-        // quarter-hour (16:19 -> 16:30). Users needn't enter exact multiples.
+        // Slots always start on 30-min boundaries, so round up to the next
+        // half-hour (16:19 -> 16:30). Users needn't enter exact multiples.
         const effective = d.getTime() < now.getTime() ? now : d;
-        const iso = roundUpTo15(effective).toISOString();
+        const iso = roundUpToSlot(effective).toISOString();
         if (key === "availableFrom") fromIso = iso;
         else toIso = iso;
         continue;
@@ -183,7 +184,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label>Price per 15 min ($)</Label>
+        <Label>Price per 30 min ($)</Label>
         <div className="flex gap-2">
           <Input
             name="minPrice"
