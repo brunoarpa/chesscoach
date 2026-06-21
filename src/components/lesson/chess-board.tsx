@@ -5,7 +5,7 @@ import { Chess, Square } from "chess.js";
 import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, LayoutGrid, Trash2, type LucideIcon } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 import {
@@ -91,6 +91,49 @@ function evalToCp(line: { cp: number | null; mate: number | null }): number {
   return line.cp ?? 0;
 }
 
+// ---- Position editor (chess.com-style "set up position") ----
+// A board square -> piece map, matching react-chessboard's PositionDataType and
+// defaultPieces keys ("wP", "bK", ...). pieceType = color letter + uppercase type.
+type EditorPosition = Record<string, { pieceType: string }>;
+
+// Palette layout: pawn, bishop, knight, rook, queen, king (chess.com order).
+const EDITOR_PIECE_TYPES = ["P", "B", "N", "R", "Q", "K"] as const;
+const PIECE_NAMES: Record<string, string> = {
+  P: "pawn", B: "bishop", N: "knight", R: "rook", Q: "queen", K: "king",
+};
+
+// chess.js board() -> editor position map ({ e4: { pieceType: "wP" } }).
+function gameToEditorPosition(game: Chess): EditorPosition {
+  const pos: EditorPosition = {};
+  for (const row of game.board()) {
+    for (const cell of row) {
+      if (cell) pos[cell.square] = { pieceType: `${cell.color}${cell.type.toUpperCase()}` };
+    }
+  }
+  return pos;
+}
+
+// Editor position + side to move -> FEN. Castling/en-passant are cleared and the
+// clocks reset, as for any hand-built position; chess.js validates it on load.
+function editorPositionToFen(pos: EditorPosition, turn: "w" | "b"): string {
+  const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  const ranks: string[] = [];
+  for (let r = 8; r >= 1; r--) {
+    let rankStr = "";
+    let empty = 0;
+    for (const f of files) {
+      const piece = pos[`${f}${r}`];
+      if (!piece) { empty++; continue; }
+      if (empty > 0) { rankStr += empty; empty = 0; }
+      const letter = piece.pieceType[1].toLowerCase();
+      rankStr += piece.pieceType[0] === "w" ? letter.toUpperCase() : letter;
+    }
+    if (empty > 0) rankStr += empty;
+    ranks.push(rankStr);
+  }
+  return `${ranks.join("/")} ${turn} - - 0 1`;
+}
+
 interface Props {
   lessonId: string;
   userId: string;
@@ -150,6 +193,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // across both participants via board sync.
   const [showHints, setShowHints] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // Position editor ("set up position"): a local working board that only syncs to
+  // the partner on Apply, so they never see a half-built position. `editBrush` is
+  // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
+  const [editMode, setEditMode] = useState(false);
+  const [editPosition, setEditPosition] = useState<EditorPosition>({});
+  const [editBrush, setEditBrush] = useState<string | null>(null);
+  const [editTurn, setEditTurn] = useState<"w" | "b">("w");
+  const [editError, setEditError] = useState("");
   // Side length of the board in px, measured to fit the available area.
   const [boardPx, setBoardPx] = useState(0);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string; color: "w" | "b" } | null>(null);
@@ -449,6 +500,64 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     });
   }, [broadcastHints]);
 
+  // ---- Position editor ----
+  // Seed the editor from whatever is currently on the board, so you can tweak an
+  // existing position rather than always starting from scratch.
+  const enterEditMode = useCallback(() => {
+    setEditPosition(gameToEditorPosition(game));
+    setEditTurn(game.turn());
+    setEditBrush(null);
+    setEditError("");
+    setEditMode(true);
+  }, [game]);
+
+  const exitEditMode = useCallback(() => {
+    setEditMode(false);
+    setEditBrush(null);
+    setEditError("");
+  }, []);
+
+  // Click a square: erase, stamp the selected piece, or toggle it off if the same
+  // piece is already there. With no brush selected a click does nothing.
+  function onEditSquareClick({ square, piece }: SquareHandlerArgs) {
+    setEditError("");
+    setEditPosition((prev) => {
+      const next = { ...prev };
+      if (editBrush === "trash") {
+        if (piece) delete next[square];
+      } else if (editBrush) {
+        if (next[square]?.pieceType === editBrush) delete next[square];
+        else next[square] = { pieceType: editBrush };
+      }
+      return next;
+    });
+  }
+
+  // Drag a piece to relocate it; drag it off the board to remove it.
+  function onEditPieceDrop({ sourceSquare, targetSquare, piece }: PieceDropHandlerArgs): boolean {
+    setEditError("");
+    setEditPosition((prev) => {
+      const next = { ...prev };
+      const moving = next[sourceSquare] ?? (piece ? { pieceType: piece.pieceType } : null);
+      delete next[sourceSquare];
+      if (targetSquare && moving) next[targetSquare] = moving;
+      return next;
+    });
+    return true;
+  }
+
+  // Commit the edited position as a fresh board. chess.js validates the FEN (one
+  // king per side, no back-rank pawns, ...); loadTreeFromFen syncs it to the
+  // partner. On failure we keep the editor open and explain why.
+  function applyEditPosition() {
+    const fen = editorPositionToFen(editPosition, editTurn);
+    if (loadTreeFromFen(fen)) {
+      exitEditMode();
+    } else {
+      setEditError("This position can't be used. Each side needs exactly one king, and pawns can't sit on the first or last rank.");
+    }
+  }
+
   // ---- Move-list context-menu actions (promote / delete a variation) ----
   const promoteMoveNode = useCallback((nodeId: string) => {
     const next = promoteVariation(tree, nodeId);
@@ -500,6 +609,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Keyboard arrow navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (editMode) return; // Editing the board, not navigating the line
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowLeft") { e.preventDefault(); goBack(); }
       else if (e.key === "ArrowRight") { e.preventDefault(); goForward(); }
@@ -508,7 +618,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goBack, goForward, goToStart, goToEnd]);
+  }, [goBack, goForward, goToStart, goToEnd, editMode]);
 
   function loadTreeFromPgn(pgn: string) {
     const nextTree = pgnToTree(pgn);
@@ -849,6 +959,86 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   return (
     <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
+      {editMode && (
+        <div className="flex flex-col items-center gap-2 w-full">
+          {/* Editor board: free placement, no legality. Click a palette piece then
+              squares to stamp it; drag pieces to move them, or off-board to remove. */}
+          <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
+            <Chessboard
+              options={{
+                id: "position-editor",
+                position: editPosition,
+                onSquareClick: onEditSquareClick,
+                onPieceDrop: onEditPieceDrop,
+                boardOrientation: boardOrientation,
+                allowDragOffBoard: true,
+                allowDrawingArrows: false,
+                showAnimations: false,
+              }}
+            />
+          </div>
+
+          {/* Palette + tools */}
+          <div className="w-full rounded-md border bg-muted/30 p-2 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground text-center">
+              {editBrush === "trash"
+                ? "Eraser selected - click pieces to remove them"
+                : editBrush
+                ? `Placing ${PIECE_NAMES[editBrush[1]]} - click squares to add it`
+                : "Pick a piece, then click squares to place it"}
+            </p>
+            {(["w", "b"] as const).map((color) => (
+              <div key={color} className="flex items-center gap-1 justify-center">
+                {EDITOR_PIECE_TYPES.map((t) => {
+                  const pt = `${color}${t}`;
+                  const active = editBrush === pt;
+                  return (
+                    <button
+                      key={pt}
+                      type="button"
+                      onClick={() => setEditBrush(active ? null : pt)}
+                      className={`h-10 w-10 rounded p-0.5 transition-colors ${active ? "bg-primary/25 ring-2 ring-primary" : "hover:bg-muted"}`}
+                      title={`Place ${color === "w" ? "white" : "black"} ${PIECE_NAMES[t]}`}
+                    >
+                      {defaultPieces[pt]?.({ svgStyle: { width: "100%", height: "100%" } })}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+              <Button type="button" size="sm" variant={editBrush === "trash" ? "default" : "outline"} onClick={() => setEditBrush(editBrush === "trash" ? null : "trash")} title="Eraser: click squares to remove pieces">
+                <Trash2 className="h-4 w-4 mr-1" /> Erase
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setEditPosition({}); setEditError(""); }}>
+                Clear board
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setEditPosition(gameToEditorPosition(new Chess())); setEditError(""); }}>
+                Start position
+              </Button>
+              <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => setBoardOrientation((o) => (o === "white" ? "black" : "white"))} title="Flip board">
+                <ArrowDownUp className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs text-muted-foreground">Side to move:</span>
+              <div className="inline-flex rounded-md border overflow-hidden">
+                <button type="button" onClick={() => setEditTurn("w")} className={`px-3 py-1 text-sm ${editTurn === "w" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}>White</button>
+                <button type="button" onClick={() => setEditTurn("b")} className={`px-3 py-1 text-sm ${editTurn === "b" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}>Black</button>
+              </div>
+            </div>
+          </div>
+
+          {editError && <p className="w-full text-sm text-destructive text-center">{editError}</p>}
+
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button type="button" variant="ghost" onClick={exitEditMode}>Cancel</Button>
+            <Button type="button" onClick={applyEditPosition}>Set up position</Button>
+          </div>
+        </div>
+      )}
+
+      {!editMode && (<>
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
           lightbulb gates it alongside the arrows, line list, and classifications -
           unmounting it also stops the Stockfish worker while hints are off.
@@ -918,6 +1108,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowImport(!showImport)} title="Upload PGN, FEN, or game link">
           <Upload className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={enterEditMode} title="Set up a position (place pieces by hand)">
+          <LayoutGrid className="h-5 w-5" />
         </Button>
         <Button
           variant={showHints ? "default" : "ghost"}
@@ -1041,6 +1234,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           </div>
         </>
       )}
+      </>)}
     </div>
   );
 }
