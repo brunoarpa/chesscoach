@@ -276,14 +276,17 @@ export function SlotPicker({
 
             {/* Message */}
             <div className="space-y-1.5">
-              <Label className="text-sm">Message (optional)</Label>
+              <Label className="text-sm">What do you want from this lesson?</Label>
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Any specific topics you'd like to cover?"
+                placeholder="e.g. review my recent games, work on endgames, or sharpen tactical and positional thinking. Tell the coach where you want to improve."
                 maxLength={500}
-                rows={2}
+                rows={3}
               />
+              <p className="text-xs text-muted-foreground">
+                Optional, but it helps your coach prepare. The more specific, the better the lesson.
+              </p>
             </div>
 
             {/* Price summary */}
@@ -326,6 +329,10 @@ export function SlotPicker({
                 </Link>
               </div>
             )}
+
+            <p className="text-xs text-muted-foreground text-center">
+              We email your coach the moment you book, so they&apos;ll see your request even if they&apos;re not online right now.
+            </p>
 
             <Button
               onClick={handleBook}

@@ -1123,6 +1123,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </Button>
       </div>
 
+      {/* Shared-board reassurance. Only in a real lesson - in practice mode the
+          board is yours alone, so the note would be misleading. */}
+      {!local && (
+        <p className="w-full text-center text-xs text-muted-foreground">
+          Your moves, arrows, and highlights are shared live with your {isCoach ? "student" : "coach"}.
+        </p>
+      )}
+
       {/* Reset confirmation */}
       {showResetConfirm && (
         <div className="w-full rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 p-3 space-y-2">
@@ -1157,7 +1165,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       {/* Top engine lines - eval + principal variation for each (hidden when hints off) */}
       {showHints && engineLines.length > 0 && engineLinesFen === currentFen && (
         <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground">Best engine moves</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            Best engine moves <span className="font-normal">· Stockfish 18 (~3600 Elo)</span>
+          </p>
           <div className="space-y-1">
             {engineLines.map((line) => (
               <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
