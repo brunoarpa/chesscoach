@@ -8,6 +8,14 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Link from "next/link";
 import { LessonCountdown } from "@/components/lesson-countdown";
 import { STUDENT_CANCEL_CUTOFF_MS } from "@/lib/utils";
@@ -352,6 +360,8 @@ function PendingCard({ request }: { request: Request }) {
 
 function StudentAcceptedCard({ request }: { request: Request }) {
   const [declLoading, setDeclLoading] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
   const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
@@ -365,11 +375,21 @@ function StudentAcceptedCard({ request }: { request: Request }) {
     : false;
 
   async function handleDecline() {
+    const reason = declineReason.trim();
+    if (reason.length < 3) {
+      toast.error("Please give a brief reason for cancelling.");
+      return;
+    }
     setDeclLoading(true);
-    const result = await declineAcceptedLesson(request.id);
+    const result = await declineAcceptedLesson(request.id, reason);
     setDeclLoading(false);
-    if (result.error) toast.error(result.error);
-    else toast.success("Lesson declined. Funds released.");
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Lesson cancelled. Funds released.");
+      setDeclineOpen(false);
+      setDeclineReason("");
+    }
   }
 
   return (
@@ -417,12 +437,38 @@ function StudentAcceptedCard({ request }: { request: Request }) {
               </Button>
             )}
             {!cancelClosed && (
-              <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
+              <Button size="sm" variant="ghost" onClick={() => setDeclineOpen(true)} disabled={declLoading}>
                 Decline
               </Button>
             )}
           </div>
         </div>
+        <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel this lesson</DialogTitle>
+              <DialogDescription>
+                Let {request.coach.username ?? "your coach"} know why you&apos;re cancelling.
+                This is shared with the coach and kept on record.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder="e.g. Something came up and I can't make this time."
+              maxLength={500}
+              rows={4}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeclineOpen(false)} disabled={declLoading}>
+                Keep lesson
+              </Button>
+              <Button onClick={handleDecline} disabled={declLoading}>
+                Cancel lesson
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

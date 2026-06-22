@@ -382,6 +382,8 @@ function PendingRequestCard({ request }: { request: Request }) {
 
 function AcceptedLessonCard({ request }: { request: Request }) {
   const [declLoading, setDeclLoading] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
   const now = useNow();
   const roomClosed = isRoomClosed(request.scheduledEndAt, now);
   const tooEarly = isBeforeJoinWindow(request.scheduledStartAt, now);
@@ -391,11 +393,21 @@ function AcceptedLessonCard({ request }: { request: Request }) {
     : false;
 
   async function handleDecline() {
+    const reason = declineReason.trim();
+    if (reason.length < 3) {
+      toast.error("Please give a brief reason for cancelling.");
+      return;
+    }
     setDeclLoading(true);
-    const result = await declineAcceptedLesson(request.id);
+    const result = await declineAcceptedLesson(request.id, reason);
     setDeclLoading(false);
-    if (result.error) toast.error(result.error);
-    else toast.success("Lesson declined.");
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Lesson cancelled.");
+      setDeclineOpen(false);
+      setDeclineReason("");
+    }
   }
 
   return (
@@ -441,12 +453,38 @@ function AcceptedLessonCard({ request }: { request: Request }) {
               </Button>
             )}
             {!started && (
-              <Button size="sm" variant="ghost" onClick={handleDecline} disabled={declLoading}>
+              <Button size="sm" variant="ghost" onClick={() => setDeclineOpen(true)} disabled={declLoading}>
                 Decline
               </Button>
             )}
           </div>
         </div>
+        <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel this lesson</DialogTitle>
+              <DialogDescription>
+                Let {request.student.username ?? "the student"} know why you&apos;re cancelling.
+                This is shared with the student and kept on record.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder="e.g. Something came up and I can't make this time."
+              maxLength={500}
+              rows={4}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeclineOpen(false)} disabled={declLoading}>
+                Keep lesson
+              </Button>
+              <Button onClick={handleDecline} disabled={declLoading}>
+                Cancel lesson
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

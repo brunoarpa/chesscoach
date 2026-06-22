@@ -927,9 +927,19 @@ export async function submitReview(formData: FormData) {
  * Decline an accepted lesson before it starts.
  * Either coach or student can do this. Full refund, no admin needed.
  */
-export async function declineAcceptedLesson(requestId: string) {
+export async function declineAcceptedLesson(requestId: string, reason?: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
+
+  // Cancelling a committed/scheduled lesson requires a written reason, recorded
+  // for the other party's context and for admin review (admin lessons tab).
+  let cancelReason = (reason ?? "").trim();
+  if (cancelReason.length < 3) {
+    return { error: "Please give a brief reason for cancelling." };
+  }
+  if (cancelReason.length > 500) {
+    cancelReason = cancelReason.slice(0, 500);
+  }
 
   const request = await prisma.lessonRequest.findUnique({
     where: { id: requestId },
@@ -966,7 +976,7 @@ export async function declineAcceptedLesson(requestId: string) {
   const didDecline = await prisma.$transaction(async (tx) => {
     const cancelled = await tx.lessonRequest.updateMany({
       where: { id: requestId, status: "ACCEPTED" },
-      data: { status: "CANCELLED" },
+      data: { status: "CANCELLED", declineReason: cancelReason },
     });
     if (cancelled.count === 0) {
       throw new Error("ALREADY_PROCESSED");
@@ -1000,7 +1010,7 @@ export async function declineAcceptedLesson(requestId: string) {
       userId: otherUserId,
       type: "LESSON_CANCELLED",
       title: "Scheduled lesson cancelled",
-      body: `${session.user.username ?? (isStudent ? "The student" : "The coach")} cancelled a scheduled lesson. ${request.isTrial ? "" : "Funds were released."}`.trim(),
+      body: `${session.user.username ?? (isStudent ? "The student" : "The coach")} cancelled a scheduled lesson. ${request.isTrial ? "" : "Funds were released."} Reason: ${cancelReason}`.trim(),
       link: "/dashboard",
     });
   }
