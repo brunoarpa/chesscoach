@@ -435,9 +435,11 @@ export async function respondToLessonRequest(
       email: { cta: "View lesson" },
     });
   } else {
-    // Decline: atomically transition status, then release reserved funds.
-    // We do NOT restore the free trial count - students forfeit a trial when
-    // a coach declines, which deters spam booking across many coaches.
+    // Decline: atomically transition status, then make the student whole.
+    // The trial never happened, so we restore the free trial count - a student
+    // shouldn't lose a trial just because a coach declined. A declined trial
+    // also doesn't count against the one-trial-per-coach limit (see the
+    // priorTrialWithCoach status filter), so they can rebook elsewhere.
     await prisma.$transaction(async (tx) => {
       const declined = await tx.lessonRequest.updateMany({
         where: { id: requestId, status: "PENDING" },
@@ -447,7 +449,12 @@ export async function respondToLessonRequest(
         throw new Error("ALREADY_PROCESSED");
       }
 
-      if (!request.isTrial) {
+      if (request.isTrial) {
+        await tx.user.update({
+          where: { id: request.studentId },
+          data: { freeTrialsRemaining: { increment: 1 } },
+        });
+      } else {
         await tx.user.update({
           where: { id: request.studentId },
           data: { reservedBalance: { decrement: request.estimatedCost } },
@@ -474,7 +481,7 @@ export async function respondToLessonRequest(
       userId: request.studentId,
       type: "LESSON_DECLINED",
       title: "Lesson declined",
-      body: `${request.coach.username ?? "The coach"} declined your lesson request.${request.isTrial ? "" : " Your funds have been released."}`,
+      body: `${request.coach.username ?? "The coach"} declined your lesson request.${request.isTrial ? " Your free trial was restored." : " Your funds have been released."}`,
       link: "/dashboard",
       email: { cta: "View dashboard" },
     });
