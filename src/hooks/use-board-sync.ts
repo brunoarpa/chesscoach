@@ -17,7 +17,6 @@ interface UseBoardSyncOptions {
   onRemoteNavigate: (currentNodeId: string) => void;
   onRemoteArrows: (arrows: Arrow[]) => void;
   onRemoteHighlights: (highlights: Record<string, React.CSSProperties>) => void;
-  onRemoteHints: (showHints: boolean) => void;
   onRemoteReset: () => void;
 }
 
@@ -29,7 +28,6 @@ export function useBoardSync({
   onRemoteNavigate,
   onRemoteArrows,
   onRemoteHighlights,
-  onRemoteHints,
   onRemoteReset,
 }: UseBoardSyncOptions) {
   const channelRef = useRef<Channel | null>(null);
@@ -59,10 +57,6 @@ export function useBoardSync({
       if (data.senderId === userId) return;
       onRemoteHighlights(data.highlights);
     };
-    const onHints = (data: { showHints: boolean; senderId: string }) => {
-      if (data.senderId === userId) return;
-      onRemoteHints(data.showHints);
-    };
     const onReset = (data: { senderId: string }) => {
       if (data.senderId === userId) return;
       onRemoteReset();
@@ -86,7 +80,6 @@ export function useBoardSync({
     channel.bind("board:navigate", onNavigate);
     channel.bind("board:arrows", onArrows);
     channel.bind("board:highlights", onHighlights);
-    channel.bind("board:hints", onHints);
     channel.bind("board:reset", onReset);
 
     return () => {
@@ -98,11 +91,10 @@ export function useBoardSync({
       channel.unbind("board:navigate", onNavigate);
       channel.unbind("board:arrows", onArrows);
       channel.unbind("board:highlights", onHighlights);
-      channel.unbind("board:hints", onHints);
       channel.unbind("board:reset", onReset);
       channelRef.current = null;
     };
-  }, [lessonId, userId, local, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteHints, onRemoteReset]);
+  }, [lessonId, userId, local, onRemoteMoves, onRemoteNavigate, onRemoteArrows, onRemoteHighlights, onRemoteReset]);
 
   // Broadcast the variation tree + persist to DB (debounced DB write). We persist
   // the full tree as JSON and the main line as PGN for backward-compatible reads.
@@ -158,13 +150,6 @@ export function useBoardSync({
     [broadcastSync]
   );
 
-  const broadcastHints = useCallback(
-    (showHints: boolean) => {
-      broadcastSync("board:hints", { showHints });
-    },
-    [broadcastSync]
-  );
-
   const broadcastReset = useCallback(() => {
     broadcastSync("board:reset", {});
   }, [broadcastSync]);
@@ -174,7 +159,6 @@ export function useBoardSync({
     broadcastNavigate,
     broadcastArrows,
     broadcastHighlights,
-    broadcastHints,
     broadcastReset,
     channel: channelRef,
   };
