@@ -66,6 +66,9 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
   // visibility handler read fresh values instead of stale render closures.
   const connectedRef = useRef(false);
   const connectingRef = useRef(false);
+  // Holds the latest connectPeer so the reconnect timers can call it without
+  // making connectPeer depend on itself.
+  const connectPeerRef = useRef<() => void>(() => {});
 
   const otherRole = isCoach ? "student" : "coach";
 
@@ -79,17 +82,25 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
     if (mountedRef.current) setConnected(v);
   }, []);
 
-  const cleanup = useCallback(() => {
+  // Drop the live peer/call but leave the microphone stream and the user's
+  // intent (wantCall) and the "connecting" indicator alone. Used by the
+  // unavailable-id retry so reconnecting doesn't flash the UI back to the
+  // "Join Call" state on every attempt.
+  const teardownPeer = useCallback(() => {
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     }
-    localStreamRef.current?.getTracks().forEach((t) => t.stop());
-    localStreamRef.current = null;
     callRef.current?.close();
     callRef.current = null;
     peerRef.current?.destroy();
     peerRef.current = null;
+  }, []);
+
+  const cleanup = useCallback(() => {
+    teardownPeer();
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
     connectedRef.current = false;
     connectingRef.current = false;
     if (mountedRef.current) {
@@ -97,7 +108,7 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
       setConnecting(false);
       setNeedsAudioUnlock(false);
     }
-  }, []);
+  }, [teardownPeer]);
 
   const unlockAudio = useCallback(() => {
     remoteAudioRef.current
@@ -106,129 +117,173 @@ export function AudioCall({ lessonId, isCoach, otherInCall, onCallStatusChange, 
       .catch(() => {});
   }, []);
 
-  const startCall = useCallback(async () => {
-    if (peerRef.current || connectingRef.current) return;
-
-    wantCallRef.current = true;
-    setConnectingState(true);
-    setError(null);
-    retryCountRef.current = 0;
+  // Builds (or rebuilds) the PeerJS peer and wires the call. Assumes the user
+  // wants to be in the call; reuses the existing microphone stream when present
+  // so retries don't re-prompt for permission. Safe to call repeatedly: it
+  // no-ops if a peer is already live.
+  const connectPeer = useCallback(async () => {
+    if (!mountedRef.current || !wantCallRef.current || peerRef.current) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStreamRef.current = stream;
-
-      const { default: Peer } = await import("peerjs");
-
-      const peerId = `lesson-${lessonId}-${isCoach ? "coach" : "student"}`;
-      const otherPeerId = `lesson-${lessonId}-${otherRole}`;
-
-      const iceServers = await getIceServers();
-      if (!mountedRef.current) return;
-
-      const peer = new Peer(peerId, {
-        debug: 0,
-        config: {
-          iceServers,
-        },
-      });
-      peerRef.current = peer;
-
-      function wireRemoteStream(remoteStream: MediaStream) {
-        const el = remoteAudioRef.current;
-        if (!el) return;
-        el.srcObject = remoteStream;
-        // Explicit play(): autoPlay alone is unreliable on iOS Safari because
-        // the stream is assigned outside the original tap gesture.
-        el.play()
-          .then(() => {
-            if (mountedRef.current) setNeedsAudioUnlock(false);
-          })
-          .catch(() => {
-            if (mountedRef.current) setNeedsAudioUnlock(true);
-          });
+      if (!localStreamRef.current) {
+        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
-
-      function onConnected() {
-        setConnectedState(true);
-        setConnectingState(false);
-        retryCountRef.current = 0;
-        idRetryRef.current = 0;
-      }
-
-      function attemptCall() {
-        if (!peerRef.current || !localStreamRef.current || !mountedRef.current) return;
-
-        const call = peer.call(otherPeerId, localStreamRef.current);
-        if (call) {
-          callRef.current = call;
-          call.on("stream", (remoteStream) => {
-            wireRemoteStream(remoteStream);
-            onConnected();
-          });
-          call.on("close", () => {
-            setConnectedState(false);
-          });
-        }
-      }
-
-      peer.on("open", () => {
-        attemptCall();
-      });
-
-      peer.on("call", (incomingCall) => {
-        if (!localStreamRef.current) return;
-        incomingCall.answer(localStreamRef.current);
-        callRef.current = incomingCall;
-        incomingCall.on("stream", (remoteStream) => {
-          wireRemoteStream(remoteStream);
-          onConnected();
-        });
-        incomingCall.on("close", () => {
-          setConnectedState(false);
-        });
-      });
-
-      peer.on("error", (err) => {
-        if (err.type === "peer-unavailable") {
-          if (retryCountRef.current < 20 && mountedRef.current) {
-            retryCountRef.current++;
-            const delay = Math.min(3000, 1000 * retryCountRef.current);
-            retryTimerRef.current = setTimeout(attemptCall, delay);
-          }
-        } else if (err.type === "unavailable-id") {
-          // Our role-based id is still held on the server, almost always by this
-          // device's own peer left registered after the tab was suspended (the
-          // common mobile case). Tear everything down and retry with backoff
-          // while the server releases the stale id, instead of dead-ending on a
-          // "please refresh the page" prompt the way this used to.
-          cleanup();
-          if (idRetryRef.current < 8 && mountedRef.current && wantCallRef.current) {
-            idRetryRef.current++;
-            const delay = Math.min(8000, 1500 * idRetryRef.current);
-            retryTimerRef.current = setTimeout(() => startCall(), delay);
-          } else if (mountedRef.current) {
-            setError("Couldn't reconnect the call. Tap Join to try again.");
-            setConnectingState(false);
-          }
-        } else if (mountedRef.current) {
-          setError(`Connection error: ${err.type}`);
-          setConnectingState(false);
-        }
-      });
-
-      peer.on("disconnected", () => {
-        if (mountedRef.current && peerRef.current && !peerRef.current.destroyed) {
-          peerRef.current.reconnect();
-        }
-      });
     } catch {
+      wantCallRef.current = false;
       if (mountedRef.current) {
         setError("Could not access microphone. Please check permissions.");
         setConnectingState(false);
       }
+      return;
     }
-  }, [lessonId, isCoach, otherRole, cleanup, setConnectedState, setConnectingState]);
+    if (!mountedRef.current || !wantCallRef.current || peerRef.current) return;
+
+    const { default: Peer } = await import("peerjs");
+
+    const peerId = `lesson-${lessonId}-${isCoach ? "coach" : "student"}`;
+    const otherPeerId = `lesson-${lessonId}-${otherRole}`;
+
+    const iceServers = await getIceServers();
+    if (!mountedRef.current || !wantCallRef.current || peerRef.current) return;
+
+    const peer = new Peer(peerId, {
+      debug: 0,
+      config: {
+        iceServers,
+      },
+    });
+    peerRef.current = peer;
+
+    function wireRemoteStream(remoteStream: MediaStream) {
+      const el = remoteAudioRef.current;
+      if (!el) return;
+      el.srcObject = remoteStream;
+      // Explicit play(): autoPlay alone is unreliable on iOS Safari because
+      // the stream is assigned outside the original tap gesture.
+      el.play()
+        .then(() => {
+          if (mountedRef.current) setNeedsAudioUnlock(false);
+        })
+        .catch(() => {
+          if (mountedRef.current) setNeedsAudioUnlock(true);
+        });
+    }
+
+    function onConnected() {
+      setConnectedState(true);
+      setConnectingState(false);
+      retryCountRef.current = 0;
+      idRetryRef.current = 0;
+    }
+
+    // A single deterministic caller (the coach) avoids "glare": if both sides
+    // place a call AND answer, two media connections form for one call, share
+    // one callRef, and either one closing flips the UI to "disconnected" while
+    // the other is still live. The coach calls; the student only answers.
+    function attemptCall() {
+      if (!peerRef.current || !localStreamRef.current || !mountedRef.current) return;
+
+      const call = peerRef.current.call(otherPeerId, localStreamRef.current);
+      if (call) {
+        callRef.current = call;
+        call.on("stream", (remoteStream) => {
+          wireRemoteStream(remoteStream);
+          onConnected();
+        });
+        call.on("close", onCallClose);
+      }
+    }
+
+    function onCallClose() {
+      setConnectedState(false);
+      // The caller keeps trying to re-reach the other side after an unexpected
+      // drop (e.g. the student backgrounded their phone and is rebuilding their
+      // peer), as long as the user still wants to be in the call.
+      if (
+        isCoach &&
+        wantCallRef.current &&
+        mountedRef.current &&
+        peerRef.current &&
+        !peerRef.current.destroyed
+      ) {
+        setConnectingState(true);
+        retryCountRef.current = 0;
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(attemptCall, 1500);
+      }
+    }
+
+    peer.on("open", () => {
+      if (isCoach) attemptCall();
+    });
+
+    peer.on("call", (incomingCall) => {
+      if (!localStreamRef.current) return;
+      incomingCall.answer(localStreamRef.current);
+      callRef.current = incomingCall;
+      incomingCall.on("stream", (remoteStream) => {
+        wireRemoteStream(remoteStream);
+        onConnected();
+      });
+      incomingCall.on("close", onCallClose);
+    });
+
+    peer.on("error", (err) => {
+      if (err.type === "peer-unavailable") {
+        // Only the caller (coach) retries reaching the other side; the student
+        // just waits to be called.
+        if (isCoach && retryCountRef.current < 20 && mountedRef.current && wantCallRef.current) {
+          retryCountRef.current++;
+          // Jitter so the backoff doesn't lockstep with the other client.
+          const delay = Math.min(3000, 1000 * retryCountRef.current) + Math.floor(Math.random() * 500);
+          retryTimerRef.current = setTimeout(attemptCall, delay);
+        }
+      } else if (err.type === "unavailable-id") {
+        // Our role-based id is still held on the broker, almost always by this
+        // device's own peer left registered after the tab was suspended or a
+        // network drop. Drop just the dead peer (keep the mic and the
+        // "connecting" indicator) and retry with a jittered backoff while the
+        // broker releases the stale id. Keeping the indicator on means the UI
+        // stays "Connecting" instead of flickering back to "Join Call", and the
+        // jitter stops two clients that dropped together from retrying in
+        // lockstep and knocking each other's id offline forever.
+        teardownPeer();
+        if (idRetryRef.current < 8 && mountedRef.current && wantCallRef.current) {
+          idRetryRef.current++;
+          const delay = Math.min(8000, 1500 * idRetryRef.current) + Math.floor(Math.random() * 1500);
+          setConnectingState(true);
+          retryTimerRef.current = setTimeout(() => connectPeerRef.current(), delay);
+        } else if (mountedRef.current) {
+          setError("Couldn't reconnect the call. Tap Join to try again.");
+          setConnectingState(false);
+        }
+      } else if (mountedRef.current) {
+        setError(`Connection error: ${err.type}`);
+        setConnectingState(false);
+      }
+    });
+
+    peer.on("disconnected", () => {
+      if (mountedRef.current && peerRef.current && !peerRef.current.destroyed) {
+        peerRef.current.reconnect();
+      }
+    });
+  }, [lessonId, isCoach, otherRole, teardownPeer, setConnectedState, setConnectingState]);
+
+  // Keep the ref pointing at the latest connectPeer for the reconnect timers.
+  useEffect(() => {
+    connectPeerRef.current = connectPeer;
+  }, [connectPeer]);
+
+  const startCall = useCallback(() => {
+    if (peerRef.current || connectingRef.current) return;
+    wantCallRef.current = true;
+    setError(null);
+    retryCountRef.current = 0;
+    idRetryRef.current = 0;
+    setConnectingState(true);
+    connectPeer();
+  }, [connectPeer, setConnectingState]);
 
   const endCall = useCallback(() => {
     wantCallRef.current = false;
