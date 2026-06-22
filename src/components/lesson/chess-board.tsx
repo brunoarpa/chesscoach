@@ -40,6 +40,10 @@ const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?
   blunder:     { label: "Blunder",    symbol: "??",                 badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
 };
 
+// Plain last-move highlight used when the engine is off (chess.com-style yellow),
+// so both players can always see the most recent move and whose turn it is.
+const LAST_MOVE_TINT = "rgba(255,213,0,0.42)";
+
 // The board is sized to fill the column's *visible* height (a stable number, so
 // it never resizes as the content below changes) minus these reserves, then
 // capped by width. The move controls stay on-screen with the board; the move
@@ -794,16 +798,20 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   // Square size in px (board width / 8), so the corner badge scales with the board.
   const renderSquare: SquareRenderer = ({ square, children }) => {
-    const isDest = !!currentMoveClass && lastMove?.to === square;
-    const isFrom = !!currentMoveClass && lastMove?.from === square;
+    const isDest = lastMove?.to === square;
+    const isFrom = lastMove?.from === square;
     const style: React.CSSProperties = {
       position: "relative",
       width: "100%",
       height: "100%",
       ...squareStyles[square],
     };
-    if (currentMoveClass && (isDest || isFrom) && !squareStyles[square]?.backgroundColor) {
-      style.backgroundColor = MOVE_CLASS_STYLE[currentMoveClass].tint;
+    if ((isDest || isFrom) && !squareStyles[square]?.backgroundColor) {
+      // With the engine on, tint by move quality; otherwise fall back to a plain
+      // chess.com-style yellow so the last move is always visible (whose turn it is).
+      style.backgroundColor = currentMoveClass
+        ? MOVE_CLASS_STYLE[currentMoveClass].tint
+        : LAST_MOVE_TINT;
     }
     const badgePx = squareSize * 0.4;
     return (
