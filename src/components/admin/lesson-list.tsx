@@ -14,6 +14,7 @@ interface Lesson {
   scheduledStartAt: string | null;
   createdAt: string;
   dataPurgedAt: string | null;
+  declineReason: string | null;
   student: { username: string | null };
   coach: { username: string | null };
 }
@@ -78,6 +79,11 @@ export function LessonList({ lessons }: { lessons: Lesson[] }) {
                   <Badge variant={lesson.status === "DISPUTED" ? "destructive" : "secondary"}>
                     {lesson.status}
                   </Badge>
+                  {lesson.declineReason && (
+                    <p className="mt-1 max-w-[16rem] text-xs text-muted-foreground whitespace-normal">
+                      <span className="font-medium">Reason:</span> {lesson.declineReason}
+                    </p>
+                  )}
                 </TableCell>
                 <TableCell className="text-xs">
                   {lesson.scheduledStartAt ? (

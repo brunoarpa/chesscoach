@@ -297,6 +297,7 @@ model LessonRequest {
   studentConfirmed Boolean @default(false)
   coachConfirmed   Boolean @default(false)
   disputeReason    String?
+  declineReason    String?
   boardPgn         String?
   boardTree        Json?
   

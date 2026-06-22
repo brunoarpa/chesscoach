@@ -8,6 +8,14 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Link from "next/link";
 import { LessonCountdown } from "@/components/lesson-countdown";
 
@@ -268,13 +276,33 @@ function CoachCard({ request }: { request: Request }) {
 function PendingRequestCard({ request }: { request: Request }) {
   const [loading, setLoading] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
 
-  async function handleRespond(action: "accept" | "decline") {
+  async function handleAccept() {
     setLoading(true);
-    const result = await respondToLessonRequest(request.id, action);
+    const result = await respondToLessonRequest(request.id, "accept");
     setLoading(false);
     if (result.error) toast.error(result.error);
-    else toast.success(action === "accept" ? "Accepted!" : "Declined.");
+    else toast.success("Accepted!");
+  }
+
+  async function handleDecline() {
+    const reason = declineReason.trim();
+    if (reason.length < 3) {
+      toast.error("Please give a brief reason for declining.");
+      return;
+    }
+    setLoading(true);
+    const result = await respondToLessonRequest(request.id, "decline", reason);
+    setLoading(false);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Declined.");
+      setDeclineOpen(false);
+      setDeclineReason("");
+    }
   }
 
   async function handleBlock() {
@@ -298,16 +326,42 @@ function PendingRequestCard({ request }: { request: Request }) {
             <RequestMeta request={request} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button size="sm" onClick={() => handleRespond("accept")} disabled={loading}>
+            <Button size="sm" onClick={handleAccept} disabled={loading}>
               Accept
             </Button>
-            <Button size="sm" variant="outline" onClick={() => handleRespond("decline")} disabled={loading}>
+            <Button size="sm" variant="outline" onClick={() => setDeclineOpen(true)} disabled={loading}>
               Decline
             </Button>
             <Button size="sm" variant="ghost" className="text-destructive" onClick={handleBlock} disabled={blockLoading}>
               Block
             </Button>
           </div>
+          <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Decline this request</DialogTitle>
+                <DialogDescription>
+                  Let {request.student.username ?? "the student"} know why you&apos;re declining.
+                  This is shared with the student and kept on record.
+                </DialogDescription>
+              </DialogHeader>
+              <Textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="e.g. I'm fully booked this week, or this isn't a good fit for my coaching style."
+                maxLength={500}
+                rows={4}
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeclineOpen(false)} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleDecline} disabled={loading}>
+                  Decline request
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
         {request.message && (
           <p className="text-sm text-muted-foreground">

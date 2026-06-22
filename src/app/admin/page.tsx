@@ -84,6 +84,7 @@ export default async function AdminPage() {
         scheduledStartAt: true,
         createdAt: true,
         dataPurgedAt: true,
+        declineReason: true,
         student: { select: { username: true } },
         coach: { select: { username: true } },
       },

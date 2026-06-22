@@ -884,6 +884,7 @@ export async function purgeExpiredLessonData() {
       data: {
         message: null,
         disputeReason: null,
+        declineReason: null,
         boardPgn: null,
         boardTree: Prisma.DbNull,
         dataPurgedAt: new Date(),

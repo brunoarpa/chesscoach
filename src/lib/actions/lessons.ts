@@ -344,10 +344,24 @@ export async function createLessonRequest(formData: FormData) {
 
 export async function respondToLessonRequest(
   requestId: string,
-  action: "accept" | "decline"
+  action: "accept" | "decline",
+  reason?: string
 ) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
+
+  // Declining requires a written reason, recorded for the student's context
+  // and for admin review (see the admin lessons tab).
+  let declineReason = "";
+  if (action === "decline") {
+    declineReason = (reason ?? "").trim();
+    if (declineReason.length < 3) {
+      return { error: "Please give a brief reason for declining." };
+    }
+    if (declineReason.length > 500) {
+      declineReason = declineReason.slice(0, 500);
+    }
+  }
 
   const request = await prisma.lessonRequest.findUnique({
     where: { id: requestId },
@@ -446,7 +460,7 @@ export async function respondToLessonRequest(
     await prisma.$transaction(async (tx) => {
       const declined = await tx.lessonRequest.updateMany({
         where: { id: requestId, status: "PENDING" },
-        data: { status: "DECLINED", respondedAt: new Date() },
+        data: { status: "DECLINED", respondedAt: new Date(), declineReason },
       });
       if (declined.count === 0) {
         throw new Error("ALREADY_PROCESSED");
@@ -484,7 +498,7 @@ export async function respondToLessonRequest(
       userId: request.studentId,
       type: "LESSON_DECLINED",
       title: "Lesson declined",
-      body: `${request.coach.username ?? "The coach"} declined your lesson request.${request.isTrial ? " Your free trial was restored." : " Your funds have been released."}`,
+      body: `${request.coach.username ?? "The coach"} declined your lesson request.${request.isTrial ? " Your free trial was restored." : " Your funds have been released."} Reason: ${declineReason}`,
       link: "/dashboard",
       email: {
         subject: `${request.coach.username ?? "The coach"} declined your lesson request`,
