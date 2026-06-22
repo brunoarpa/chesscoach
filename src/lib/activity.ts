@@ -160,6 +160,13 @@ async function sendReminderEmail(
   const localTime = formatInTimeZone(startAt, recipient.timezone);
   const withClause = otherName ? `with ${emailText(otherName)} ` : "";
   const heading = kind === "day" ? "Your lesson is tomorrow" : "Your lesson starts soon";
+  // Distinct subject per reminder (other party + time) so Gmail doesn't thread
+  // separate lessons' reminders into one conversation.
+  const withName = otherName ? ` with ${otherName}` : "";
+  const subject =
+    kind === "day"
+      ? `Reminder: your lesson${withName} is tomorrow at ${localTime}`
+      : `Reminder: your lesson${withName} starts soon, at ${localTime}`;
   const lead =
     kind === "day"
       ? `Your lesson ${withClause}is coming up`
@@ -169,7 +176,7 @@ async function sendReminderEmail(
   try {
     await sendNotificationEmail({
       to: recipient.email,
-      subject: heading,
+      subject,
       heading,
       bodyHtml,
       link: `/lesson/${lessonId}`,

@@ -335,7 +335,7 @@ export async function createLessonRequest(formData: FormData) {
     title: "New lesson request",
     body: `${studentName} requested a ${isTrial ? "free trial" : `${LESSON_DURATION_MINUTES}-min`} lesson. Accept or decline it from your dashboard.`,
     link: "/dashboard",
-    email: { cta: "Review request" },
+    email: { subject: `New lesson request from ${studentName}`, cta: "Review request" },
   });
 
   revalidatePath("/dashboard");
@@ -432,7 +432,10 @@ export async function respondToLessonRequest(
       title: "Lesson accepted",
       body: `${request.coach.username ?? "Your coach"} accepted your lesson request.`,
       link: `/lesson/${requestId}`,
-      email: { cta: "View lesson" },
+      email: {
+        subject: `${request.coach.username ?? "Your coach"} accepted your lesson request`,
+        cta: "View lesson",
+      },
     });
   } else {
     // Decline: atomically transition status, then make the student whole.
@@ -483,7 +486,10 @@ export async function respondToLessonRequest(
       title: "Lesson declined",
       body: `${request.coach.username ?? "The coach"} declined your lesson request.${request.isTrial ? " Your free trial was restored." : " Your funds have been released."}`,
       link: "/dashboard",
-      email: { cta: "View dashboard" },
+      email: {
+        subject: `${request.coach.username ?? "The coach"} declined your lesson request`,
+        cta: "View dashboard",
+      },
     });
 
     await checkStudentSpamPattern(request.studentId);
