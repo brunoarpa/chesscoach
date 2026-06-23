@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, Fi
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useGameReview } from "@/hooks/use-game-review";
 import {
   type MoveTree,
   type MoveNode,
@@ -17,6 +18,7 @@ import {
   fenAtNode,
   addMove,
   mainlineForward,
+  mainlineNodeIds,
   endOfLine,
   pgnToTree,
   fenToTree,
@@ -24,9 +26,13 @@ import {
   deleteSubtree,
   sanitizeTree,
 } from "@/lib/chess-tree";
-
-// Move quality classification.
-type MoveClass = "best" | "excellent" | "good" | "inaccuracy" | "mistake" | "blunder";
+import {
+  type MoveClass,
+  classifyMove,
+  evalToCp,
+  summarizeGame,
+  type GameReviewSummary,
+} from "@/lib/game-review";
 
 // Per-class presentation for the on-board chess.com-style markers: `label` for
 // the tooltip, `symbol`/`icon` for the glyph (icon wins when set), `badge` (solid)
@@ -62,39 +68,6 @@ const PROMOTION_PIECES: Array<{ type: "q" | "r" | "b" | "n"; key: string }> = [
   { type: "b", key: "B" },
   { type: "n", key: "N" },
 ];
-
-// Logistic curve mapping a centipawn eval to "expected points" (win probability,
-// 0..1) - the chess.com win-percentage model. The constant is chess.com's.
-const WIN_PROB_K = 0.00368208;
-function cpToExpectedPoints(cp: number): number {
-  return 1 / (1 + Math.exp(-WIN_PROB_K * cp));
-}
-
-// Classify by expected points *lost* by the move. Cutoffs match the user's table:
-// Best 0, Excellent ≤0.02, Good ≤0.05, Inaccuracy ≤0.10, Mistake ≤0.20, else Blunder.
-function classifyByExpectedPointsLost(loss: number): MoveClass {
-  if (loss <= 0) return "best";
-  if (loss <= 0.02) return "excellent";
-  if (loss <= 0.05) return "good";
-  if (loss <= 0.10) return "inaccuracy";
-  if (loss <= 0.20) return "mistake";
-  return "blunder";
-}
-
-// Classify a played move from the mover's perspective: how much did the position's
-// expected points drop from the best available (before) to the result (after)?
-// Both evals are white-perspective centipawns.
-function classifyMove(parentBestCp: number, resultCp: number, moverIsWhite: boolean): MoveClass {
-  const sign = moverIsWhite ? 1 : -1;
-  const epBefore = cpToExpectedPoints(sign * parentBestCp);
-  const epAfter = cpToExpectedPoints(sign * resultCp);
-  return classifyByExpectedPointsLost(Math.max(0, epBefore - epAfter));
-}
-
-function evalToCp(line: { cp: number | null; mate: number | null }): number {
-  if (line.mate !== null) return line.mate > 0 ? 100000 : -100000;
-  return line.cp ?? 0;
-}
 
 // ---- Position editor (chess.com-style "set up position") ----
 // A board square -> piece map, matching react-chessboard's PositionDataType and
@@ -196,6 +169,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Eval cache: best eval (cp, white perspective) keyed by FEN. Populated as the
   // engine analyzes each position the user visits - feeds move classification.
   const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
+  // Mainline positions queued for the whole-game review (set when a game is
+  // imported). Empty means no review is running.
+  const [reviewFens, setReviewFens] = useState<string[]>([]);
   // Master engine-hint toggle (the lightbulb): gates the best-move arrows, the
   // "Best engine moves" list, and the move classifications all together. The
   // engine is coach-only (see engineEnabled below), so this is purely local to
@@ -206,12 +182,42 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // In a real lesson the engine is a coach-only teaching aid: it runs only on the
   // coach's device and the student never sees the eval bar, best-move arrows, or
   // move ratings (the coach explains what the engine shows). In practice/solo mode
-  // (`local`) the board is the user's own, so the engine is theirs to use. Either
-  // way it's gated off on phones - Stockfish runs in-browser, so a phone CPU would
-  // stutter the lesson. When the engine is off, the board falls back to a plain
-  // last-move highlight.
+  // (`local`) the board is the user's own, so the engine is theirs to use. Phones
+  // now get the engine too, but with a lighter search (fewer lines, shorter time)
+  // so the in-browser Stockfish doesn't stutter on a weak CPU.
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const engineEnabled = (isCoach || local) && !isMobile;
+  const engineEnabled = isCoach || local;
+  // Lighter live-engine settings on phones; the desktop defaults stay full.
+  const evalMultiPv = isMobile ? 2 : 5;
+  const evalMoveTimeMs = isMobile ? 300 : 500;
+
+  // Background whole-game review: evaluates every imported mainline position so
+  // the move list and report card can be filled in while the user explores.
+  const review = useGameReview(reviewFens, engineEnabled, isMobile ? 250 : 350);
+  // Best-eval lookup, white perspective. The live deep analysis of the current
+  // position (evalCache) takes precedence over the shallower review pass.
+  const combinedEvals = useMemo(() => {
+    const m = new Map(review.evals);
+    for (const [k, v] of evalCache) m.set(k, v);
+    return m;
+  }, [review.evals, evalCache]);
+
+  // Mainline node ids (root first) - used to map graph points back to moves.
+  const mainlineIds = useMemo(() => mainlineNodeIds(tree), [tree]);
+
+  // Whole-game report card. Null until every reviewed position has an eval, so
+  // accuracy/rating only appear once the background pass is complete.
+  const reviewSummary = useMemo<GameReviewSummary | null>(() => {
+    if (reviewFens.length < 3) return null;
+    const evalsWhite: number[] = [];
+    for (const fen of reviewFens) {
+      const v = combinedEvals.get(fen);
+      if (v == null) return null;
+      evalsWhite.push(v);
+    }
+    const firstMoverWhite = reviewFens[0].split(" ")[1] !== "b";
+    return summarizeGame(evalsWhite, firstMoverWhite);
+  }, [reviewFens, combinedEvals]);
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
   // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
@@ -495,6 +501,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setSelectedSquare(null);
     setHighlightedSquares({});
     setShowResetConfirm(false);
+    setReviewFens([]);
     if (!isRemoteUpdateRef.current) broadcastReset();
   }, [broadcastReset]);
 
@@ -636,6 +643,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setShowImport(false);
     setImportText("");
     setImportError("");
+    // Queue the imported game for a background whole-game review (engine only).
+    const ids = mainlineNodeIds(nextTree);
+    setReviewFens(engineEnabled && ids.length > 2 ? ids.map((id) => fenAtNode(nextTree, id)) : []);
     if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, endId);
   }
 
@@ -774,12 +784,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!node || node.parentId === null) return null;
     const parentFen = fenAtNode(tree, node.parentId);
     const childFen = fenAtNode(tree, nodeId);
-    const parentBest = evalCache.get(parentFen);
-    const childBest = evalCache.get(childFen);
+    const parentBest = combinedEvals.get(parentFen);
+    const childBest = combinedEvals.get(childFen);
     if (parentBest == null || childBest == null) return null;
     const parentTurn = parentFen.split(" ")[1];
     return classifyMove(parentBest, childBest, parentTurn === "w");
-  }, [tree, evalCache]);
+  }, [tree, combinedEvals]);
 
   // Destination/source squares of the move that produced the currently displayed
   // position - drives the on-board chess.com-style marker.
@@ -896,7 +906,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Renders the line starting at `startId`, following the main continuation
   // (children[0]); where a node has variation siblings, each is rendered as an
   // indented, parenthesized sub-line right after the move it diverges from.
-  function renderLine(startId: string, startPly: number): React.ReactNode[] {
+  function renderLine(startId: string, startPly: number, isMainline = true): React.ReactNode[] {
     const out: React.ReactNode[] = [];
     let cur: string | null = startId;
     let ply = startPly;
@@ -911,6 +921,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       const prefix = isWhite ? `${moveNum}.` : needsNumber ? `${moveNum}…` : "";
       const isActive = nodeId === currentNodeId;
 
+      // Move-quality marker (mainline only, when the engine is on): color and a
+      // glyph for sub-par moves once the review has evaluated this position.
+      const cls = isMainline && showHints ? classifyMoveAtNode(nodeId) : null;
+      const flag: MoveClass | null =
+        cls === "inaccuracy" || cls === "mistake" || cls === "blunder" ? cls : null;
+
       out.push(
         <button
           key={nodeId}
@@ -921,8 +937,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
             setMoveMenu({ nodeId, x: e.clientX, y: e.clientY });
           }}
           className={`px-1 rounded ${isActive ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+          style={flag ? { color: MOVE_CLASS_STYLE[flag].badge } : undefined}
+          title={cls ? MOVE_CLASS_STYLE[cls].label : undefined}
         >
           {prefix ? `${prefix} ${node.san}` : node.san}
+          {flag ? ` ${MOVE_CLASS_STYLE[flag].symbol}` : ""}
         </button>
       );
       needsNumber = false;
@@ -937,7 +956,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
               className="my-0.5 ml-3 pl-2 border-l border-border text-xs text-muted-foreground"
             >
               <span className="mr-0.5">(</span>
-              {renderLine(sibId, ply)}
+              {renderLine(sibId, ply, false)}
               <span className="ml-0.5">)</span>
             </div>
           );
@@ -952,6 +971,47 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   }
 
   const mainlineStart = mainlineForward(tree, tree.rootId);
+
+  // chess.com-style eval graph: white-perspective advantage across the game.
+  // Clicking a point jumps to that move; a marker tracks the current position.
+  function renderEvalGraph(graph: number[]): React.ReactNode {
+    const n = graph.length;
+    if (n < 2) return null;
+    const W = 300;
+    const H = 60;
+    const mid = H / 2;
+    const px = (i: number) => (i / (n - 1)) * W;
+    const py = (cp: number) => mid - (Math.max(-1000, Math.min(1000, cp)) / 1000) * mid;
+    const linePts = graph.map((cp, i) => `${px(i).toFixed(1)},${py(cp).toFixed(1)}`).join(" ");
+    const areaPath =
+      `M0,${mid} L ` +
+      graph.map((cp, i) => `${px(i).toFixed(1)},${py(cp).toFixed(1)}`).join(" L ") +
+      ` L${W},${mid} Z`;
+    const curIdx = mainlineIds.indexOf(currentNodeId);
+    const band = W / (n - 1);
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-14 rounded bg-zinc-800">
+        <line x1="0" y1={mid} x2={W} y2={mid} stroke="rgba(255,255,255,0.25)" strokeWidth="0.5" />
+        <path d={areaPath} fill="rgba(129,182,76,0.35)" />
+        <polyline points={linePts} fill="none" stroke="#e2e8f0" strokeWidth="1" />
+        {curIdx >= 0 && (
+          <line x1={px(curIdx)} y1="0" x2={px(curIdx)} y2={H} stroke="#f7c631" strokeWidth="1" />
+        )}
+        {graph.map((_, i) => (
+          <rect
+            key={i}
+            x={px(i) - band / 2}
+            y="0"
+            width={band}
+            height={H}
+            fill="transparent"
+            className="cursor-pointer"
+            onClick={() => mainlineIds[i] && navigateTo(mainlineIds[i])}
+          />
+        ))}
+      </svg>
+    );
+  }
 
   // Engine + manual/remote arrows, deduped by square pair. react-chessboard keys
   // arrows solely by start+end square; any duplicate (e.g. an engine arrow that
@@ -1059,7 +1119,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           resizes when the content below changes. */}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
         {showHints && engineEnabled && (
-          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} />
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} />
         )}
         <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
           <Chessboard
@@ -1161,6 +1221,56 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
               Clear board
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Whole-game review report card: runs in the background after a game is
+          imported, then shows per-side accuracy, an estimated rating, the
+          mistake tally, and a clickable eval graph. */}
+      {engineEnabled && reviewFens.length > 2 && (
+        <div className="w-full rounded border bg-muted/30 p-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground">Game review</p>
+            {review.running && (
+              <span className="text-xs text-muted-foreground">
+                Analyzing {review.done}/{review.total}…
+              </span>
+            )}
+          </div>
+          {review.running && (
+            <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${review.total ? (review.done / review.total) * 100 : 0}%` }}
+              />
+            </div>
+          )}
+          {reviewSummary && (
+            <>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                {([
+                  { label: "White", side: reviewSummary.white },
+                  { label: "Black", side: reviewSummary.black },
+                ] as const).map(({ label, side }) => (
+                  <div key={label} className="rounded border p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="text-xl font-bold leading-tight">{side.accuracy}%</p>
+                    <p className="text-[11px] text-muted-foreground">accuracy</p>
+                    <p className="text-xs mt-0.5">~{side.estRating} est. rating</p>
+                    <div className="flex justify-center gap-2 text-[11px] mt-1">
+                      <span style={{ color: MOVE_CLASS_STYLE.blunder.badge }}>{side.counts.blunder} ??</span>
+                      <span style={{ color: MOVE_CLASS_STYLE.mistake.badge }}>{side.counts.mistake} ?</span>
+                      <span style={{ color: MOVE_CLASS_STYLE.inaccuracy.badge }}>{side.counts.inaccuracy} ?!</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {renderEvalGraph(reviewSummary.graph)}
+              <p className="text-[10px] text-muted-foreground">
+                Accuracy and estimated rating are approximate.
+              </p>
+            </>
+          )}
         </div>
       )}
 

@@ -18,6 +18,10 @@ interface Props {
   // itself internally, so relying on flex stretch collapses the bar to its
   // min-height; the parent passes the measured board size instead.
   heightPx?: number;
+  // Engine load knobs. Phones get fewer lines and a shorter search so the live
+  // bar plus the background game review don't peg a weak CPU.
+  multiPv?: number;
+  moveTimeMs?: number;
 }
 
 const MULTI_PV = 5;
@@ -37,8 +41,14 @@ const LINES_EMIT_THROTTLE_MS = 120;
 // much at the extremes.
 const WIN_PROB_K = 0.00368208;
 
-export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Props) {
+export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS }: Props) {
   const workerRef = useRef<Worker | null>(null);
+  // Read inside the worker callbacks, which are set up once; refs keep them
+  // current without re-spawning the worker when the props change.
+  const multiPvRef = useRef(multiPv);
+  const moveTimeRef = useRef(moveTimeMs);
+  multiPvRef.current = multiPv;
+  moveTimeRef.current = moveTimeMs;
   const [evaluation, setEvaluation] = useState<number>(0); // in centipawns
   const [mate, setMate] = useState<number | null>(null);
   const [depth, setDepth] = useState(0);
@@ -98,7 +108,7 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
       if (line.includes("uciok")) {
         worker.postMessage("setoption name Threads value 1");
         worker.postMessage("setoption name Hash value 16");
-        worker.postMessage(`setoption name MultiPV value ${MULTI_PV}`);
+        worker.postMessage(`setoption name MultiPV value ${multiPvRef.current}`);
         worker.postMessage("isready");
       }
       if (line.includes("readyok")) {
@@ -160,7 +170,7 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
           isAnalyzingRef.current = true;
           linesRef.current = {};
           worker.postMessage(`position fen ${next}`);
-          worker.postMessage(`go movetime ${MOVE_TIME_MS}`);
+          worker.postMessage(`go movetime ${moveTimeRef.current}`);
         }
       }
     };
@@ -193,7 +203,7 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx }: Prop
       isAnalyzingRef.current = true;
       linesRef.current = {};
       worker.postMessage(`position fen ${next}`);
-      worker.postMessage(`go movetime ${MOVE_TIME_MS}`);
+      worker.postMessage(`go movetime ${moveTimeRef.current}`);
     }
   }, [isReady]);
 

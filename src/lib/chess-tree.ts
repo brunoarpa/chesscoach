@@ -142,6 +142,18 @@ export function mainlineSans(tree: MoveTree): string[] {
   return sanPath(tree, endOfLine(tree, tree.rootId));
 }
 
+// Node ids along the main line, root first. Used by the whole-game review to
+// analyze every position in playing order.
+export function mainlineNodeIds(tree: MoveTree): string[] {
+  const ids: string[] = [];
+  let cur: string | null = tree.rootId;
+  while (cur) {
+    ids.push(cur);
+    cur = mainlineForward(tree, cur);
+  }
+  return ids;
+}
+
 // Mainline-only PGN, used for backward-compatible persistence in `boardPgn`.
 export function treeToMainlinePgn(tree: MoveTree): string {
   const moves = mainlineSans(tree);
