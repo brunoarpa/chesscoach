@@ -25,7 +25,8 @@ export default async function Home() {
           ♝ EloChaser
         </h1>
         <p className="text-lg sm:text-xl font-medium text-muted-foreground text-balance">
-          Find the right coach for your level, goals, and budget.
+          Stuck at the same rating? Review your game free, then play through it
+          with a coach on a live board until the mistakes stop.
         </p>
         {hasTrials ? (
           <p className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 text-balance">
@@ -39,8 +40,11 @@ export default async function Home() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
+        <Link href="/review">
+          <Button size="lg" className="w-full sm:w-auto">Review your game free</Button>
+        </Link>
         <Link href="/search">
-          <Button size="lg" className="w-full sm:w-auto">Find a Coach</Button>
+          <Button size="lg" variant="outline" className="w-full sm:w-auto">Find a Coach</Button>
         </Link>
         {session?.user ? (
           session.user.needsUsername ? (
@@ -74,10 +78,16 @@ export default async function Home() {
           </p>
         </div>
         <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Short, focused lessons</h3>
+          <h3 className="font-semibold text-lg">Try it before you pay</h3>
           <p className="text-base text-muted-foreground">
-            Every lesson is one 30-minute slot, so it stays cheap and easy to fit in.
-            Want a deep dive? Book back-to-back slots for a longer session.
+            <Link href="/review" className="underline underline-offset-2 hover:text-foreground">
+              Review your game free
+            </Link>{" "}
+            with the same engine your coach uses, or{" "}
+            <Link href="/lesson/practice" className="underline underline-offset-2 hover:text-foreground">
+              explore the lesson room
+            </Link>{" "}
+            in a private sandbox. No sign-up needed.
           </p>
         </div>
         <div className="space-y-2 p-6 rounded-lg border">

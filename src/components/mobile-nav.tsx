@@ -38,6 +38,9 @@ export function MobileNav({ isLoggedIn, username, isAdmin, walletAvailable = 0 }
           <MobileLink href="/search" onClose={() => setOpen(false)}>
             Find a Coach
           </MobileLink>
+          <MobileLink href="/review" onClose={() => setOpen(false)}>
+            Review a game
+          </MobileLink>
           <MobileLink href="/leaderboard" onClose={() => setOpen(false)}>
             Leaderboard
           </MobileLink>

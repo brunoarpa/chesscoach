@@ -149,6 +149,9 @@ interface Props {
   // Practice/sandbox mode: one person exploring the board alone. Disables the
   // realtime sync so moves stay local and copy stops referring to a partner.
   local?: boolean;
+  // Open the import panel on mount. Used by the public game-review page so the
+  // first thing a visitor sees is "paste your game" rather than a hidden button.
+  startImportOpen?: boolean;
 }
 
 function formatLineEval(line: EngineLine): string {
@@ -167,7 +170,7 @@ function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): 
   return { tree, nodeId: endOfLine(tree, tree.rootId) };
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false }: Props) {
   // Seed tree + cursor from one shared computation. Computing them in two
   // separate useState initializers would call initialTreeState twice - and for an
   // empty/PGN board that means two createTree() calls with *different* random root
@@ -177,7 +180,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   const [tree, setTree] = useState<MoveTree>(seed.tree);
   const [currentNodeId, setCurrentNodeId] = useState<string>(seed.nodeId);
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
-  const [showImport, setShowImport] = useState(false);
+  const [showImport, setShowImport] = useState(startImportOpen);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
   const [arrows, setArrows] = useState<Arrow[]>([]);
