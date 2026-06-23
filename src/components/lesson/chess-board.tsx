@@ -1072,15 +1072,15 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         className="inline-flex items-center justify-center rounded-full text-white shrink-0"
         style={{
           background: MOVE_CLASS_STYLE[cls].badge,
-          width: 15,
-          height: 15,
-          fontSize: 9,
+          width: 17,
+          height: 17,
+          fontSize: 11,
           fontWeight: 800,
           lineHeight: 1,
           border: "1px solid rgba(255,255,255,0.85)",
         }}
       >
-        {Icon ? <Icon size={9} strokeWidth={2.5} fill="#fff" /> : MOVE_CLASS_STYLE[cls].symbol}
+        {Icon ? <Icon size={11} strokeWidth={2.5} fill="#fff" /> : MOVE_CLASS_STYLE[cls].symbol}
       </span>
     );
   }
