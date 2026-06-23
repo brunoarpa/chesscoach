@@ -205,21 +205,31 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Mainline node ids (root first) - used to map graph points back to moves.
   const mainlineIds = useMemo(() => mainlineNodeIds(tree), [tree]);
 
-  // Precompute each mainline move's positions once per tree. Doing this here
-  // (not per-node in render) is what keeps the move list cheap: classifying a
-  // move otherwise replays the whole game from move 1, for every move, on every
-  // render - O(moves^2) board rebuilds that made the board lag.
+  // Precompute each mainline move's positions in a single forward pass (one move
+  // per node, O(moves)). The previous version called fenAtNode per node, which
+  // replays the game from the start each time - O(moves^2) - and recomputed on
+  // every tree change, so playing a brand-new move off the line stalled the
+  // board for ~1s. Walking forward once keeps it instant.
   const mainlinePositions = useMemo(() => {
     const out: { nodeId: string; fen: string; parentFen: string; moverIsWhite: boolean }[] = [];
-    const fens = mainlineIds.map((id) => fenAtNode(tree, id));
+    let game: Chess;
+    try {
+      game = tree.startFen ? new Chess(tree.startFen) : new Chess();
+    } catch {
+      return out;
+    }
+    let parentFen = game.fen();
     for (let i = 1; i < mainlineIds.length; i++) {
-      const parentFen = fens[i - 1];
-      out.push({
-        nodeId: mainlineIds[i],
-        fen: fens[i],
-        parentFen,
-        moverIsWhite: parentFen.split(" ")[1] === "w",
-      });
+      const node = tree.nodes[mainlineIds[i]];
+      if (!node) break;
+      try {
+        game.move(node.san);
+      } catch {
+        break;
+      }
+      const fen = game.fen();
+      out.push({ nodeId: node.id, fen, parentFen, moverIsWhite: parentFen.split(" ")[1] === "w" });
+      parentFen = fen;
     }
     return out;
   }, [tree, mainlineIds]);
@@ -1052,6 +1062,116 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     );
   }
 
+  // Small move-quality badge that matches the one drawn on the board (same
+  // colors, glyph, and icon), so the move list and board read the same.
+  function moveBadge(cls: MoveClass): React.ReactNode {
+    const Icon = MOVE_CLASS_STYLE[cls].icon;
+    return (
+      <span
+        title={MOVE_CLASS_STYLE[cls].label}
+        className="inline-flex items-center justify-center rounded-full text-white shrink-0"
+        style={{
+          background: MOVE_CLASS_STYLE[cls].badge,
+          width: 15,
+          height: 15,
+          fontSize: 9,
+          fontWeight: 800,
+          lineHeight: 1,
+          border: "1px solid rgba(255,255,255,0.85)",
+        }}
+      >
+        {Icon ? <Icon size={9} strokeWidth={2.5} fill="#fff" /> : MOVE_CLASS_STYLE[cls].symbol}
+      </span>
+    );
+  }
+
+  function moveButton(nodeId: string, node: MoveNode, isMainline: boolean): React.ReactNode {
+    const isActive = nodeId === currentNodeId;
+    const cls = isMainline && showHints ? moveClasses.get(nodeId) ?? null : null;
+    return (
+      <button
+        key={nodeId}
+        type="button"
+        onClick={() => navigateTo(nodeId)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMoveMenu({ nodeId, x: e.clientX, y: e.clientY });
+        }}
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${
+          isActive ? "bg-primary/20 font-bold" : "hover:bg-muted"
+        }`}
+        style={cls ? { color: MOVE_CLASS_STYLE[cls].badge } : undefined}
+      >
+        <span>{node.san}</span>
+        {cls && moveBadge(cls)}
+      </button>
+    );
+  }
+
+  // Mainline as chess.com-style paired rows: "1. e4 e5", "2. Nf3 Nc6", with each
+  // move carrying its quality badge. Variations break onto their own indented
+  // rows (rendered flat via renderLine).
+  function renderMainline(): React.ReactNode {
+    const rows: React.ReactNode[] = [];
+    let cur: string | null = mainlineStart;
+    let ply = 1;
+    let rowItems: React.ReactNode[] = [];
+    let rowKey = 0;
+    const numCell = (label: string, id: string) => (
+      <span key={`n${id}`} className="w-7 shrink-0 text-right text-muted-foreground tabular-nums">
+        {label}
+      </span>
+    );
+    const flush = () => {
+      if (rowItems.length) {
+        rows.push(
+          <div key={`r${rowKey++}`} className="flex items-center gap-1">
+            {rowItems}
+          </div>
+        );
+        rowItems = [];
+      }
+    };
+    while (cur) {
+      const nodeId: string = cur;
+      const node: MoveNode | undefined = tree.nodes[nodeId];
+      if (!node) break;
+      const isWhite = ply % 2 === 1;
+      const moveNum = Math.ceil(ply / 2);
+      if (isWhite) {
+        flush();
+        rowItems.push(numCell(`${moveNum}.`, nodeId));
+        rowItems.push(moveButton(nodeId, node, true));
+      } else {
+        if (rowItems.length === 0) rowItems.push(numCell(`${moveNum}…`, nodeId));
+        rowItems.push(moveButton(nodeId, node, true));
+      }
+
+      // Variation siblings: alternatives to this mainline move, on their own rows.
+      const parent = node.parentId ? tree.nodes[node.parentId] : null;
+      if (parent && parent.children[0] === nodeId && parent.children.length > 1) {
+        flush();
+        for (const sibId of parent.children.slice(1)) {
+          rows.push(
+            <div
+              key={`var-${sibId}`}
+              className="ml-7 pl-2 border-l border-border text-xs text-muted-foreground [&>button]:mr-1"
+            >
+              <span className="mr-0.5">(</span>
+              {renderLine(sibId, ply, false)}
+              <span className="ml-0.5">)</span>
+            </div>
+          );
+        }
+      }
+
+      cur = node.children[0] ?? null;
+      ply++;
+    }
+    flush();
+    return <div className="space-y-0.5">{rows}</div>;
+  }
+
   // Engine + manual/remote arrows, deduped by square pair. react-chessboard keys
   // arrows solely by start+end square; any duplicate (e.g. an engine arrow that
   // coincides with a drawn one) collides and leaves ghost arrows React can't
@@ -1319,8 +1439,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           never change the board's size. */}
       {mainlineStart && (
         <div className="w-full rounded border bg-muted/30 p-2">
-          <div className="text-sm font-mono leading-relaxed [&>button]:mr-1">
-            {renderLine(mainlineStart, 1)}
+          <div className="text-sm font-mono leading-relaxed">
+            {renderMainline()}
           </div>
         </div>
       )}
