@@ -1,19 +1,16 @@
-name: Frequent cron
+name: Frequent cron (manual fallback)
 
-# Free alternative to a sub-daily Vercel cron (Hobby tier only fires crons once
-# a day). Hits /api/cron/frequent every 15 minutes so lesson reminders, instant
-# request expiry, and no-show detection run on time.
+# The 15-minute schedule now runs as a native Vercel cron (see vercel.json),
+# which the Pro plan supports - more reliable than GitHub Actions (no 60-day
+# auto-pause, no cross-host/redirect auth pitfalls). This workflow is kept only
+# as a manual fallback to fire /api/cron/frequent on demand, e.g. to test or to
+# catch up after an outage.
 #
-# Setup: add a repository secret named CRON_SECRET (Settings -> Secrets and
-# variables -> Actions) matching the deployment's CRON_SECRET. Optionally set a
-# repository variable CRON_BASE_URL to override the default host below.
-#
-# Caveats: GitHub's scheduled runs can be delayed under load and are paused
-# after 60 days with no repo activity. Use workflow_dispatch to test on demand.
+# Setup (only for the manual run): a repository secret named CRON_SECRET
+# matching the deployment's CRON_SECRET. Optionally a repository variable
+# CRON_BASE_URL to override the default host below.
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 # Don't pile up overlapping runs if one is slow or GitHub batches delayed ticks.
