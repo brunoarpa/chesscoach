@@ -76,10 +76,11 @@ export function gameAccuracy(perMove: number[]): number {
 }
 
 // Rough estimated rating from accuracy. This is an approximation, not chess.com's
-// proprietary CAPS, and is labelled as such in the UI. Monotonic in accuracy and
-// clamped to a sane human range.
+// proprietary CAPS, and is labelled as such in the UI. Calibrated conservatively
+// (80% accuracy ~ 1200, 90% ~ 1730, 95% ~ 2000) so it doesn't read high.
+// Monotonic in accuracy and clamped to a sane human range.
 export function estimateRating(accuracy: number): number {
-  return Math.round(clamp((accuracy - 40) * 30 + 800, 250, 2900));
+  return Math.round(clamp((accuracy - 80) * 53 + 1200, 250, 2800));
 }
 
 export interface SideSummary {

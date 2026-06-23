@@ -205,6 +205,38 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Mainline node ids (root first) - used to map graph points back to moves.
   const mainlineIds = useMemo(() => mainlineNodeIds(tree), [tree]);
 
+  // Precompute each mainline move's positions once per tree. Doing this here
+  // (not per-node in render) is what keeps the move list cheap: classifying a
+  // move otherwise replays the whole game from move 1, for every move, on every
+  // render - O(moves^2) board rebuilds that made the board lag.
+  const mainlinePositions = useMemo(() => {
+    const out: { nodeId: string; fen: string; parentFen: string; moverIsWhite: boolean }[] = [];
+    const fens = mainlineIds.map((id) => fenAtNode(tree, id));
+    for (let i = 1; i < mainlineIds.length; i++) {
+      const parentFen = fens[i - 1];
+      out.push({
+        nodeId: mainlineIds[i],
+        fen: fens[i],
+        parentFen,
+        moverIsWhite: parentFen.split(" ")[1] === "w",
+      });
+    }
+    return out;
+  }, [tree, mainlineIds]);
+
+  // Classification per mainline node, recomputed only when the evals change
+  // (cheap O(moves) lookups, no board replay).
+  const moveClasses = useMemo(() => {
+    const m = new Map<string, MoveClass>();
+    for (const p of mainlinePositions) {
+      const parentBest = combinedEvals.get(p.parentFen);
+      const childBest = combinedEvals.get(p.fen);
+      if (parentBest == null || childBest == null) continue;
+      m.set(p.nodeId, classifyMove(parentBest, childBest, p.moverIsWhite));
+    }
+    return m;
+  }, [mainlinePositions, combinedEvals]);
+
   // Whole-game report card. Null until every reviewed position has an eval, so
   // accuracy/rating only appear once the background pass is complete.
   const reviewSummary = useMemo<GameReviewSummary | null>(() => {
@@ -929,11 +961,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       const prefix = isWhite ? `${moveNum}.` : needsNumber ? `${moveNum}…` : "";
       const isActive = nodeId === currentNodeId;
 
-      // Move-quality marker (mainline only, when the engine is on): color and a
-      // glyph for sub-par moves once the review has evaluated this position.
-      const cls = isMainline && showHints ? classifyMoveAtNode(nodeId) : null;
-      const flag: MoveClass | null =
-        cls === "inaccuracy" || cls === "mistake" || cls === "blunder" ? cls : null;
+      // Move-quality marker (mainline only, when the engine is on): chess.com-style
+      // color + glyph for every classified move (best/excellent/good through
+      // blunder). Read from the memoized map so the list never replays the game.
+      const cls = isMainline && showHints ? moveClasses.get(nodeId) ?? null : null;
 
       out.push(
         <button
@@ -945,11 +976,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
             setMoveMenu({ nodeId, x: e.clientX, y: e.clientY });
           }}
           className={`px-1 rounded ${isActive ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
-          style={flag ? { color: MOVE_CLASS_STYLE[flag].badge } : undefined}
+          style={cls ? { color: MOVE_CLASS_STYLE[cls].badge } : undefined}
           title={cls ? MOVE_CLASS_STYLE[cls].label : undefined}
         >
           {prefix ? `${prefix} ${node.san}` : node.san}
-          {flag ? ` ${MOVE_CLASS_STYLE[flag].symbol}` : ""}
+          {cls ? ` ${MOVE_CLASS_STYLE[cls].symbol}` : ""}
         </button>
       );
       needsNumber = false;
@@ -1119,6 +1150,56 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       )}
 
       {!editMode && (<>
+      {/* Whole-game review report card: sits above the board so the progress bar
+          and results are visible without scrolling. Runs in the background after
+          a game is imported. */}
+      {engineEnabled && reviewFens.length > 2 && (
+        <div className="w-full rounded border bg-muted/30 p-2 space-y-2 shrink-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground">Game review</p>
+            {review.running && (
+              <span className="text-xs text-muted-foreground">
+                Analyzing {review.done}/{review.total}…
+              </span>
+            )}
+          </div>
+          {review.running && (
+            <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${review.total ? (review.done / review.total) * 100 : 0}%` }}
+              />
+            </div>
+          )}
+          {reviewSummary && (
+            <>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                {([
+                  { label: "White", side: reviewSummary.white },
+                  { label: "Black", side: reviewSummary.black },
+                ] as const).map(({ label, side }) => (
+                  <div key={label} className="rounded border p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="text-xl font-bold leading-tight">{side.accuracy}%</p>
+                    <p className="text-[11px] text-muted-foreground">accuracy</p>
+                    <p className="text-xs mt-0.5">~{side.estRating} est. rating</p>
+                    <div className="flex justify-center gap-2 text-[11px] mt-1">
+                      <span style={{ color: MOVE_CLASS_STYLE.blunder.badge }}>{side.counts.blunder} ??</span>
+                      <span style={{ color: MOVE_CLASS_STYLE.mistake.badge }}>{side.counts.mistake} ?</span>
+                      <span style={{ color: MOVE_CLASS_STYLE.inaccuracy.badge }}>{side.counts.inaccuracy} ?!</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {renderEvalGraph(reviewSummary.graph)}
+              <p className="text-[10px] text-muted-foreground">
+                Accuracy and estimated rating are approximate.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
           lightbulb gates it alongside the arrows, line list, and classifications -
           unmounting it also stops the Stockfish worker while hints are off.
@@ -1127,7 +1208,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           resizes when the content below changes. */}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
         {showHints && engineEnabled && (
-          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={isMobile && review.running} />
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
         )}
         <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
           <Chessboard
@@ -1229,56 +1310,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
               Clear board
             </Button>
           </div>
-        </div>
-      )}
-
-      {/* Whole-game review report card: runs in the background after a game is
-          imported, then shows per-side accuracy, an estimated rating, the
-          mistake tally, and a clickable eval graph. */}
-      {engineEnabled && reviewFens.length > 2 && (
-        <div className="w-full rounded border bg-muted/30 p-2 space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground">Game review</p>
-            {review.running && (
-              <span className="text-xs text-muted-foreground">
-                Analyzing {review.done}/{review.total}…
-              </span>
-            )}
-          </div>
-          {review.running && (
-            <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${review.total ? (review.done / review.total) * 100 : 0}%` }}
-              />
-            </div>
-          )}
-          {reviewSummary && (
-            <>
-              <div className="grid grid-cols-2 gap-2 text-center">
-                {([
-                  { label: "White", side: reviewSummary.white },
-                  { label: "Black", side: reviewSummary.black },
-                ] as const).map(({ label, side }) => (
-                  <div key={label} className="rounded border p-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                    <p className="text-xl font-bold leading-tight">{side.accuracy}%</p>
-                    <p className="text-[11px] text-muted-foreground">accuracy</p>
-                    <p className="text-xs mt-0.5">~{side.estRating} est. rating</p>
-                    <div className="flex justify-center gap-2 text-[11px] mt-1">
-                      <span style={{ color: MOVE_CLASS_STYLE.blunder.badge }}>{side.counts.blunder} ??</span>
-                      <span style={{ color: MOVE_CLASS_STYLE.mistake.badge }}>{side.counts.mistake} ?</span>
-                      <span style={{ color: MOVE_CLASS_STYLE.inaccuracy.badge }}>{side.counts.inaccuracy} ?!</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {renderEvalGraph(reviewSummary.graph)}
-              <p className="text-[10px] text-muted-foreground">
-                Accuracy and estimated rating are approximate.
-              </p>
-            </>
-          )}
         </div>
       )}
 
