@@ -5,7 +5,7 @@ import { Chess, Square } from "chess.js";
 import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, Trash2, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, Star, Trash2, type LucideIcon } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -38,7 +38,7 @@ import {
 // the tooltip, `symbol`/`icon` for the glyph (icon wins when set), `badge` (solid)
 // and `tint` (translucent) for the colors.
 const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?: LucideIcon; badge: string; tint: string }> = {
-  best:        { label: "Best",       symbol: "★",                  badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
+  best:        { label: "Best",       symbol: "★", icon: Star,       badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
   excellent:   { label: "Excellent",  symbol: "!", icon: ThumbsUp,  badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
   good:        { label: "Good",       symbol: "✓",                  badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
   inaccuracy:  { label: "Inaccuracy", symbol: "?!",                 badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
