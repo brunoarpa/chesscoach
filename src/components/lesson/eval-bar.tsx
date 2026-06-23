@@ -22,6 +22,9 @@ interface Props {
   // bar plus the background game review don't peg a weak CPU.
   multiPv?: number;
   moveTimeMs?: number;
+  // Suspend searching without unmounting. Used to guarantee only one engine
+  // searches at a time on mobile (the background review takes priority).
+  paused?: boolean;
 }
 
 const MULTI_PV = 5;
@@ -41,14 +44,16 @@ const LINES_EMIT_THROTTLE_MS = 120;
 // much at the extremes.
 const WIN_PROB_K = 0.00368208;
 
-export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS }: Props) {
+export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS, paused = false }: Props) {
   const workerRef = useRef<Worker | null>(null);
   // Read inside the worker callbacks, which are set up once; refs keep them
   // current without re-spawning the worker when the props change.
   const multiPvRef = useRef(multiPv);
   const moveTimeRef = useRef(moveTimeMs);
+  const pausedRef = useRef(paused);
   multiPvRef.current = multiPv;
   moveTimeRef.current = moveTimeMs;
+  pausedRef.current = paused;
   const [evaluation, setEvaluation] = useState<number>(0); // in centipawns
   const [mate, setMate] = useState<number | null>(null);
   const [depth, setDepth] = useState(0);
@@ -188,7 +193,7 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiP
 
   const analyze = useCallback((position: string) => {
     const worker = workerRef.current;
-    if (!worker || !isReady) return;
+    if (!worker || !isReady || pausedRef.current) return;
 
     pendingFenRef.current = position;
 
@@ -208,15 +213,23 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiP
   }, [isReady]);
 
   useEffect(() => {
-    if (!fen || !isReady) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Paused (e.g. on mobile while the background game review is running): stop
+    // any in-flight search so two engines never search at once, and wait. When
+    // `paused` flips back to false this effect re-runs and analyzes the current
+    // position.
+    if (paused) {
+      workerRef.current?.postMessage("stop");
+      return;
+    }
+    if (!fen || !isReady) return;
     debounceRef.current = setTimeout(() => {
       analyze(fen);
     }, 200);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [fen, isReady, analyze]);
+  }, [fen, isReady, analyze, paused]);
 
   // White's share of the bar via the logistic win-probability curve. Mate is
   // pinned to a full bar for the mating side.

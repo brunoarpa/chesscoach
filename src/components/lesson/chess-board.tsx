@@ -211,8 +211,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (reviewFens.length < 3) return null;
     const evalsWhite: number[] = [];
     for (const fen of reviewFens) {
-      const v = combinedEvals.get(fen);
-      if (v == null) return null;
+      let v = combinedEvals.get(fen);
+      if (v == null) {
+        // The engine can't score a terminal position (checkmate/stalemate), so
+        // it never returns an eval for it. Fill it in directly, otherwise the
+        // report card would never complete for a game that ended in mate.
+        const g = new Chess(fen);
+        if (g.isCheckmate()) v = fen.split(" ")[1] === "w" ? -100000 : 100000;
+        else if (g.isStalemate() || g.isInsufficientMaterial() || g.isDraw()) v = 0;
+        else return null; // genuinely not analyzed yet
+      }
       evalsWhite.push(v);
     }
     const firstMoverWhite = reviewFens[0].split(" ")[1] !== "b";
@@ -1119,7 +1127,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           resizes when the content below changes. */}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
         {showHints && engineEnabled && (
-          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} />
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={isMobile && review.running} />
         )}
         <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
           <Chessboard
