@@ -197,17 +197,21 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // engine analyzes each position the user visits - feeds move classification.
   const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
   // Master engine-hint toggle (the lightbulb): gates the best-move arrows, the
-  // "Best engine moves" list, and the move classifications all together. Shared
-  // across both participants via board sync.
+  // "Best engine moves" list, and the move classifications all together. The
+  // engine is coach-only (see engineEnabled below), so this is purely local to
+  // the coach and is never shared with the student.
   const [showHints, setShowHints] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Stockfish runs in-browser, so on a phone the student's CPU would pay for
-  // the (synced) engine hints and stutter the whole lesson. Gate the engine on
-  // viewport: mobile gets no eval bar, best-move arrows, or move ratings - just
-  // a responsive board. Coaches teach from a wider screen where it runs fine.
+  // In a real lesson the engine is a coach-only teaching aid: it runs only on the
+  // coach's device and the student never sees the eval bar, best-move arrows, or
+  // move ratings (the coach explains what the engine shows). In practice/solo mode
+  // (`local`) the board is the user's own, so the engine is theirs to use. Either
+  // way it's gated off on phones - Stockfish runs in-browser, so a phone CPU would
+  // stutter the lesson. When the engine is off, the board falls back to a plain
+  // last-move highlight.
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const engineEnabled = !isMobile;
+  const engineEnabled = (isCoach || local) && !isMobile;
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
   // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
@@ -258,12 +262,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     isRemoteUpdateRef.current = false;
   }, []);
 
-  const onRemoteHints = useCallback((remoteShowHints: boolean) => {
-    isRemoteUpdateRef.current = true;
-    setShowHints(remoteShowHints);
-    isRemoteUpdateRef.current = false;
-  }, []);
-
   const onRemoteReset = useCallback(() => {
     isRemoteUpdateRef.current = true;
     const fresh = createTree();
@@ -280,7 +278,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     broadcastNavigate,
     broadcastArrows,
     broadcastHighlights,
-    broadcastHints,
     broadcastReset,
   } = useBoardSync({
     lessonId,
@@ -290,7 +287,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     onRemoteNavigate,
     onRemoteArrows,
     onRemoteHighlights,
-    onRemoteHints,
     onRemoteReset,
   });
 
@@ -508,12 +504,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   }, [hasMoves]);
 
   const toggleHints = useCallback(() => {
-    setShowHints((v) => {
-      const next = !v;
-      if (!isRemoteUpdateRef.current) broadcastHints(next);
-      return next;
-    });
-  }, [broadcastHints]);
+    // Coach-local: the engine is private to the coach, so this never syncs.
+    setShowHints((v) => !v);
+  }, []);
 
   // ---- Position editor ----
   // Seed the editor from whatever is currently on the board, so you can tweak an
