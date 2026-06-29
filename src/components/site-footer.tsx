@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 export function SiteFooter() {
   const pathname = usePathname();
 
-  // Hide the footer inside the lesson room (live lessons and the practice
-  // board). That view is a focused, full-height app surface; the footer just
-  // adds height that causes accidental scrolling, which is especially annoying
-  // on phones during a lesson.
-  if (pathname?.startsWith("/lesson/")) return null;
+  // Hide the footer on any board surface: live lessons and the practice board
+  // (/lesson/*) and the public game review (/review). These are focused,
+  // full-height app views where the board needs all the vertical space; the
+  // footer just adds height that causes accidental scrolling, especially on
+  // phones.
+  if (pathname?.startsWith("/lesson/") || pathname === "/review") return null;
 
   return (
     <footer className="border-t py-6 text-center text-sm text-muted-foreground">

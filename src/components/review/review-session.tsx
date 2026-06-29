@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChessBoard } from "@/components/lesson/chess-board";
+import { ChessBoard, type ReviewReport } from "@/components/lesson/chess-board";
 import { MOVE_CLASS_STYLE } from "@/components/lesson/move-class-style";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { MOVE_CLASSES, type GameReviewSummary } from "@/lib/game-review";
+import { MOVE_CLASSES } from "@/lib/game-review";
 
 // Public, login-free game review. Reuses the real lesson board (same engine,
 // eval bar, and per-move classification a coach uses in a lesson) so a visitor
@@ -50,24 +50,33 @@ function CtaCard({ isLoggedIn }: { isLoggedIn: boolean }) {
 
 // Per-class move breakdown (Brilliant / Great / ... / Blunder) for both sides,
 // shown in the sidebar below the CTA so the central board column stays clean.
-function ReportBreakdown({ summary }: { summary: GameReviewSummary | null }) {
-  if (!summary) return null;
-  const rows = MOVE_CLASSES.filter((c) => summary.white.counts[c] || summary.black.counts[c]);
-  if (rows.length === 0) return null;
+// Renders as soon as a game is loaded - counts are "?" until analysis completes
+// (chess.com-style), every class row is always shown, and the columns are
+// headed by the players' names.
+function ReportBreakdown({ report }: { report: ReviewReport | null }) {
+  if (!report) return null;
+  const { whiteName, blackName, summary } = report;
   return (
     <div className="px-4 pb-4">
       <div className="rounded-lg border overflow-hidden">
-        <div className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b bg-muted/40">
-          <span className="text-left">White</span>
-          <span className="text-center">Move</span>
-          <span className="text-right">Black</span>
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px] font-semibold border-b bg-muted/40">
+          <span className="flex items-center gap-1 min-w-0">
+            <span className="h-2.5 w-2.5 rounded-sm border border-border bg-white shrink-0" />
+            <span className="truncate" title={whiteName}>{whiteName}</span>
+          </span>
+          <span className="flex items-center gap-1 min-w-0 justify-end">
+            <span className="truncate" title={blackName}>{blackName}</span>
+            <span className="h-2.5 w-2.5 rounded-sm border border-border bg-zinc-800 shrink-0" />
+          </span>
         </div>
         <div className="divide-y">
-          {rows.map((c) => {
+          {MOVE_CLASSES.map((c) => {
             const s = MOVE_CLASS_STYLE[c];
+            const w = summary ? summary.white.counts[c] : null;
+            const b = summary ? summary.black.counts[c] : null;
             return (
               <div key={c} className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center px-3 py-1 text-sm">
-                <span className="text-left tabular-nums">{summary.white.counts[c]}</span>
+                <span className="text-left tabular-nums">{w ?? "?"}</span>
                 <span className="flex items-center justify-center gap-1.5 font-medium" style={{ color: s.badge }}>
                   <span
                     aria-hidden
@@ -78,7 +87,7 @@ function ReportBreakdown({ summary }: { summary: GameReviewSummary | null }) {
                   </span>
                   {s.label}
                 </span>
-                <span className="text-right tabular-nums">{summary.black.counts[c]}</span>
+                <span className="text-right tabular-nums">{b ?? "?"}</span>
               </div>
             );
           })}
@@ -90,7 +99,7 @@ function ReportBreakdown({ summary }: { summary: GameReviewSummary | null }) {
 
 export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [summary, setSummary] = useState<GameReviewSummary | null>(null);
+  const [report, setReport] = useState<ReviewReport | null>(null);
 
   return (
     <div className="flex flex-col h-full">
@@ -116,12 +125,12 @@ export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
               lessonId={REVIEW_LESSON_ID}
               userId={REVIEW_USER_ID}
               isCoach={false}
-              onReviewSummary={setSummary}
+              onReport={setReport}
             />
           </div>
           <div className="w-[360px] border-l flex flex-col min-h-0 overflow-y-auto">
             <CtaCard isLoggedIn={isLoggedIn} />
-            <ReportBreakdown summary={summary} />
+            <ReportBreakdown report={report} />
           </div>
         </div>
       ) : (
@@ -133,12 +142,12 @@ export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
               lessonId={REVIEW_LESSON_ID}
               userId={REVIEW_USER_ID}
               isCoach={false}
-              onReviewSummary={setSummary}
+              onReport={setReport}
             />
           </div>
           <div className="border-t">
             <CtaCard isLoggedIn={isLoggedIn} />
-            <ReportBreakdown summary={summary} />
+            <ReportBreakdown report={report} />
           </div>
         </div>
       )}

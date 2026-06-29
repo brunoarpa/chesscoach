@@ -5,6 +5,7 @@ import { Chess, Square } from "chess.js";
 import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, Trash2 } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
@@ -117,11 +118,33 @@ interface Props {
   // Open the import panel on mount. Used by the public game-review page so the
   // first thing a visitor sees is "paste your game" rather than a hidden button.
   startImportOpen?: boolean;
-  // Notified when the whole-game report card is (re)computed, so a parent can
-  // render the per-class breakdown elsewhere (e.g. the review page's sidebar,
-  // keeping the central board column uncluttered). Null while not yet complete.
-  onReviewSummary?: (summary: GameReviewSummary | null) => void;
+  // Notified when a game is loaded for review, so a parent can render the
+  // per-class breakdown elsewhere (e.g. the review page's sidebar, keeping the
+  // central board column uncluttered). `summary` is null while still analysing
+  // (show "?" placeholders); the whole report is null when no game is loaded.
+  onReport?: (report: ReviewReport | null) => void;
 }
+
+export interface ReviewReport {
+  whiteName: string;
+  blackName: string;
+  summary: GameReviewSummary | null;
+}
+
+// One row in the "find your Chess.com games" picker (metadata only; the PGN is
+// fetched on click). Mirrors /api/chess-com/games.
+interface CcGame {
+  url: string;
+  timeClass: string;
+  endTime: number;
+  rated: boolean;
+  white: { username: string; rating: number | null };
+  black: { username: string; rating: number | null };
+  result: "white" | "black" | "draw";
+}
+
+const CC_USERNAME_KEY = "elochaser:chesscom-username";
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function formatLineEval(line: EngineLine): string {
   if (line.mate !== null) return `${line.mate > 0 ? "+" : "-"}M${Math.abs(line.mate)}`;
@@ -139,7 +162,7 @@ function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): 
   return { tree, nodeId: endOfLine(tree, tree.rootId) };
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false, onReviewSummary }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false, onReport }: Props) {
   // Seed tree + cursor from one shared computation. Computing them in two
   // separate useState initializers would call initialTreeState twice - and for an
   // empty/PGN board that means two createTree() calls with *different* random root
@@ -152,6 +175,17 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   const [showImport, setShowImport] = useState(startImportOpen);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
+  // "Find your Chess.com games" picker state. ccUsername is remembered in
+  // localStorage so a phone user types it once. ccGames === null means the
+  // picker hasn't been searched yet (show the username form); a list (possibly
+  // empty) means show the results for ccYear/ccMonth.
+  const now = new Date();
+  const [ccUsername, setCcUsername] = useState("");
+  const [ccGames, setCcGames] = useState<CcGame[] | null>(null);
+  const [ccLoading, setCcLoading] = useState(false);
+  const [ccError, setCcError] = useState("");
+  const [ccYear, setCcYear] = useState(now.getUTCFullYear());
+  const [ccMonth, setCcMonth] = useState(now.getUTCMonth() + 1); // 1-12
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [highlightedSquares, setHighlightedSquares] = useState<Record<string, React.CSSProperties>>({});
@@ -240,29 +274,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return out;
   }, [tree, mainlineIds]);
 
-  // Classification per mainline node, recomputed only when the evals change
-  // (cheap O(moves) lookups, no board replay). Uses the next mainline position
-  // (one ply later) so sacrifice detection can see the opponent's reply.
-  const moveClasses = useMemo(() => {
-    const m = new Map<string, MoveClass>();
-    for (let i = 0; i < mainlinePositions.length; i++) {
-      const p = mainlinePositions[i];
-      const parentPE = combinedEvals.get(p.parentFen);
-      const childPE = combinedEvals.get(p.fen);
-      if (!parentPE || !childPE) continue;
-      m.set(
-        p.nodeId,
-        classifyPlayedMove(
-          { fen: p.parentFen, cp: parentPE.cp, secondCp: parentPE.secondCp, bestSan: parentPE.bestSan },
-          { fen: p.fen, cp: childPE.cp },
-        ),
-      );
-    }
-    return m;
-  }, [mainlinePositions, combinedEvals]);
-
   // Whole-game report card. Null until every reviewed position has an eval, so
-  // accuracy/rating only appear once the background pass is complete.
+  // accuracy/rating/classifications only appear once the background pass is done.
   const reviewSummary = useMemo<GameReviewSummary | null>(() => {
     if (reviewFens.length < 3) return null;
     const positions: ReviewPosition[] = [];
@@ -285,11 +298,50 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return summarizeGame(positions);
   }, [reviewFens, combinedEvals]);
 
+  // A whole-game review is queued for the imported mainline.
+  const reviewActive = engineEnabled && reviewFens.length > 2;
+  // While that review is still running, classifications and the graph must not
+  // be shown - they'd flicker (good -> excellent, etc.) as evals stream in. Only
+  // reveal them once the whole pass is complete. When no review is queued (live
+  // exploration of a variation), classifications show immediately as before.
+  const classificationsReady = !reviewActive || reviewSummary !== null;
+
+  // Classification per mainline node. Held empty until classifications are ready,
+  // so nothing changes mid-analysis; then computed once from the complete evals.
+  const moveClasses = useMemo(() => {
+    const m = new Map<string, MoveClass>();
+    if (!classificationsReady) return m;
+    for (let i = 0; i < mainlinePositions.length; i++) {
+      const p = mainlinePositions[i];
+      const parentPE = combinedEvals.get(p.parentFen);
+      const childPE = combinedEvals.get(p.fen);
+      if (!parentPE || !childPE) continue;
+      m.set(
+        p.nodeId,
+        classifyPlayedMove(
+          { fen: p.parentFen, cp: parentPE.cp, secondCp: parentPE.secondCp, bestSan: parentPE.bestSan },
+          { fen: p.fen, cp: childPE.cp },
+        ),
+      );
+    }
+    return m;
+  }, [mainlinePositions, combinedEvals, classificationsReady]);
+
   // Surface the report to a parent (the review page renders the per-class
-  // breakdown in its sidebar). Null until the background pass completes.
+  // breakdown in its sidebar). `summary` is null while still analysing, so the
+  // sidebar shows the table with "?" placeholders; null entirely when no game is
+  // loaded for review.
   useEffect(() => {
-    onReviewSummary?.(reviewSummary);
-  }, [reviewSummary, onReviewSummary]);
+    if (!reviewActive) {
+      onReport?.(null);
+      return;
+    }
+    onReport?.({
+      whiteName: gameInfo?.white || "White",
+      blackName: gameInfo?.black || "Black",
+      summary: reviewSummary,
+    });
+  }, [reviewActive, gameInfo, reviewSummary, onReport]);
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
   // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
@@ -784,6 +836,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setImportText("");
     setImportError("");
     setGameInfo(null);
+    // A hand-built / FEN position is a fresh start, not a reviewed game: drop any
+    // prior whole-game review so the graph and report disappear (like new game).
+    setReviewFens([]);
     if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, nextTree.rootId);
     return true;
   }
@@ -848,6 +903,87 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       }
     } catch {
       setImportError("Failed to fetch game from link.");
+    }
+  }
+
+  // Load the remembered Chess.com username once on mount, so phone users type it
+  // only the first time.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CC_USERNAME_KEY);
+      if (saved) setCcUsername(saved);
+    } catch {
+      // localStorage unavailable (e.g. private mode) - just don't prefill.
+    }
+  }, []);
+
+  // Fetch one month of the player's Chess.com games for the picker.
+  async function searchCcGames(year: number, month: number) {
+    const u = ccUsername.trim();
+    if (!u) {
+      setCcError("Enter your Chess.com username.");
+      return;
+    }
+    setCcLoading(true);
+    setCcError("");
+    try {
+      const res = await fetch(`/api/chess-com/games?username=${encodeURIComponent(u)}&year=${year}&month=${month}`);
+      const data = await res.json().catch(() => null);
+      setCcYear(year);
+      setCcMonth(month);
+      if (res.ok && data) {
+        setCcGames(Array.isArray(data.games) ? data.games : []);
+        try {
+          localStorage.setItem(CC_USERNAME_KEY, u);
+        } catch {
+          // ignore - remembering the name is best-effort
+        }
+      } else {
+        setCcGames(Array.isArray(data?.games) ? data.games : []);
+        setCcError(data?.error ?? "Couldn't load games. Please try again.");
+      }
+    } catch {
+      setCcGames([]);
+      setCcError("Couldn't load games. Please try again.");
+    } finally {
+      setCcLoading(false);
+    }
+  }
+
+  // Step the picker a month back (-1) or forward (+1), clamped to the current
+  // month (no future), then re-search.
+  function stepCcMonth(delta: number) {
+    let y = ccYear;
+    let m = ccMonth + delta;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    } else if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    const today = new Date();
+    if (y > today.getUTCFullYear() || (y === today.getUTCFullYear() && m > today.getUTCMonth() + 1)) return;
+    searchCcGames(y, m);
+  }
+
+  // Load a picked game's PGN (reuses the single-game proxy) into the board.
+  async function loadCcGame(url: string) {
+    setCcLoading(true);
+    setCcError("");
+    try {
+      const res = await fetch(`/api/chess-com/game?url=${encodeURIComponent(url)}`);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.pgn) {
+        loadTreeFromPgn(data.pgn); // also closes the import dialog
+        setCcGames(null);
+        return;
+      }
+      setCcError(data?.error ?? "Couldn't load that game. Please try another.");
+    } catch {
+      setCcError("Couldn't load that game. Please try another.");
+    } finally {
+      setCcLoading(false);
     }
   }
 
@@ -935,7 +1071,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return last ? { from: last.from as string, to: last.to as string } : null;
   }, [game, atRoot]);
 
-  const currentMoveClass = showHints && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
+  const currentMoveClass = showHints && !atRoot && classificationsReady ? classifyMoveAtNode(currentNodeId) : null;
 
   // Square size in px (board width / 8), so the corner badge scales with the board.
   const renderSquare: SquareRenderer = ({ square, children }) => {
@@ -1150,11 +1286,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
           {/* Black is the dark background (top); white fills up from the bottom. */}
           <path d={whiteArea} fill="#f4f4f5" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(120,120,120,0.8)" strokeWidth="0.4" strokeDasharray="2 2" />
           {curIdx >= 0 && (
             <line x1={xPct(curIdx)} y1="0" x2={xPct(curIdx)} y2="100" stroke="#f7c631" strokeWidth="0.5" />
           )}
         </svg>
+        {/* Midline as a crisp HTML overlay (a stretched SVG stroke renders too
+            faint to see). Marks the equal/50-50 line across the graph. */}
+        <div
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{ top: "50%", height: 0, borderTop: "1px dashed rgba(160,160,160,0.85)" }}
+        />
         {/* Round, solid move dots overlaid in HTML so they never distort. */}
         {graph.map((cp, i) => {
           if (i === 0) return null;
@@ -1496,19 +1637,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       {/* Player at the bottom of the board (matches the orientation). */}
       {playerStrip(boardOrientation === "white" ? "white" : "black")}
 
-      {/* Game status - check / checkmate / stalemate / draws (incl. repetition) */}
-      {gameStatus && (
-        <div
-          className={`w-full text-center text-sm font-semibold rounded-md px-3 py-1.5 ${
-            gameStatus.tone === "over"
-              ? "bg-primary/15 text-foreground"
-              : "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-          }`}
-        >
-          {gameStatus.text}
-        </div>
-      )}
-
       {/* Move navigation */}
       <div className="flex items-center gap-1 flex-wrap justify-center">
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToStart} disabled={atRoot} title="First move">
@@ -1548,6 +1676,21 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           </Button>
         )}
       </div>
+
+      {/* Game status (check / checkmate / draws) - kept BELOW the move controls
+          so the controls never shift as you step through moves and this message
+          appears or disappears (you can keep tapping "next" in the same spot). */}
+      {gameStatus && (
+        <div
+          className={`w-full text-center text-sm font-semibold rounded-md px-3 py-1.5 ${
+            gameStatus.tone === "over"
+              ? "bg-primary/15 text-foreground"
+              : "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          }`}
+        >
+          {gameStatus.text}
+        </div>
+      )}
 
       {/* Shared-board reassurance. Only in a real lesson - in practice mode the
           board is yours alone, so the note would be misleading. */}
@@ -1641,35 +1784,123 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       })()}
 
       {/* Import panel - fixed overlay so it doesn't push board around */}
-      {showImport && (
+      {showImport && (() => {
+        const closeImport = () => { setShowImport(false); setImportText(""); setImportError(""); setCcError(""); };
+        const isCurrentMonth = ccYear === now.getUTCFullYear() && ccMonth === now.getUTCMonth() + 1;
+        return (
         <>
-          <div
-            className="fixed inset-0 z-40 bg-black/30"
-            onClick={() => { setShowImport(false); setImportText(""); setImportError(""); }}
-          />
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={closeImport} />
           <div
             className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(92vw,520px)] rounded-lg border bg-background p-4 shadow-xl space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold">Upload a game</h3>
-            <p className="text-sm text-muted-foreground">
-              Paste a PGN, a FEN, or a Lichess / Chess.com game link:
-            </p>
-            <Textarea
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              placeholder="1. e4 e5 2. Nf3... or rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b ... or https://lichess.org/..."
-              rows={5}
-              className="font-mono text-sm"
-            />
-            {importError && <p className="text-sm text-destructive">{importError}</p>}
-            <div className="flex gap-2 justify-end">
-              <Button size="sm" variant="ghost" onClick={() => { setShowImport(false); setImportText(""); setImportError(""); }}>Cancel</Button>
-              <Button size="sm" onClick={handleImport}>Import</Button>
-            </div>
+            <h3 className="text-base font-semibold">Load a game</h3>
+
+            {ccGames === null ? (
+              <>
+                {/* Pick a game straight from your Chess.com account - no copying links. */}
+                <div className="rounded-md border p-3 space-y-2">
+                  <p className="text-sm font-medium">Find your Chess.com games</p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={ccUsername}
+                      onChange={(e) => setCcUsername(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") searchCcGames(ccYear, ccMonth); }}
+                      placeholder="Chess.com username"
+                      className="flex-1"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                    <Button size="sm" onClick={() => searchCcGames(ccYear, ccMonth)} disabled={ccLoading}>
+                      {ccLoading ? "Searching…" : "Search games"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tap a game to review it - no need to copy a share link. We remember your username on this device.
+                  </p>
+                  {ccError && <p className="text-sm text-destructive">{ccError}</p>}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted-foreground">or paste</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <Textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder="1. e4 e5 2. Nf3... or rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b ... or a Lichess / Chess.com game link"
+                  rows={4}
+                  className="font-mono text-sm"
+                />
+                {importError && <p className="text-sm text-destructive">{importError}</p>}
+                <div className="flex gap-2 justify-end">
+                  <Button size="sm" variant="ghost" onClick={closeImport}>Cancel</Button>
+                  <Button size="sm" onClick={handleImport}>Import</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Results for one month, tap to load. */}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium truncate">
+                    {ccUsername} <span className="text-muted-foreground">· {MONTH_NAMES[ccMonth - 1]} {ccYear}</span>
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={() => { setCcGames(null); setCcError(""); }}>Back</Button>
+                </div>
+                {ccError && <p className="text-sm text-destructive">{ccError}</p>}
+                <div className="max-h-[48vh] overflow-y-auto rounded-md border divide-y">
+                  {ccLoading ? (
+                    <p className="p-4 text-sm text-muted-foreground text-center">Loading…</p>
+                  ) : ccGames.length === 0 ? (
+                    <p className="p-4 text-sm text-muted-foreground text-center">No games found this month.</p>
+                  ) : (
+                    ccGames.map((g) => {
+                      const date = new Date(g.endTime * 1000);
+                      const resultLabel = g.result === "draw" ? "Draw" : g.result === "white" ? "White won" : "Black won";
+                      const resultColor = g.result === "draw" ? "text-amber-500" : g.result === "white" ? "text-emerald-500" : "text-sky-400";
+                      return (
+                        <button
+                          key={g.url}
+                          type="button"
+                          onClick={() => loadCcGame(g.url)}
+                          disabled={ccLoading}
+                          className="w-full text-left px-3 py-2 hover:bg-muted disabled:opacity-50"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm truncate">
+                              <span className="font-medium">{g.white.username}</span>
+                              {g.white.rating ? <span className="text-muted-foreground"> ({g.white.rating})</span> : null}
+                              <span className="text-muted-foreground"> vs </span>
+                              <span className="font-medium">{g.black.username}</span>
+                              {g.black.rating ? <span className="text-muted-foreground"> ({g.black.rating})</span> : null}
+                            </span>
+                            <span className={`text-xs font-semibold shrink-0 ${resultColor}`}>{resultLabel}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            <span>
+                              {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, {date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                            {g.timeClass && <span className="uppercase tracking-wide rounded bg-muted px-1.5 py-0.5">{g.timeClass}</span>}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Button size="sm" variant="outline" onClick={() => stepCcMonth(-1)} disabled={ccLoading}>← Prev month</Button>
+                  <Button size="sm" variant="ghost" onClick={closeImport}>Close</Button>
+                  <Button size="sm" variant="outline" onClick={() => stepCcMonth(1)} disabled={ccLoading || isCurrentMonth}>Next month →</Button>
+                </div>
+              </>
+            )}
           </div>
         </>
-      )}
+        );
+      })()}
       </>)}
     </div>
   );
