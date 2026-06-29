@@ -346,6 +346,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     onRemoteReset,
   });
 
+  // Mirror the latest tree in a ref so the mount-time self-heal can compare its
+  // size against the persisted board without re-running on every move.
+  const treeRef = useRef(tree);
+  useEffect(() => { treeRef.current = tree; }, [tree]);
+
   const game = useMemo(() => gameAtNode(tree, currentNodeId), [tree, currentNodeId]);
   const atRoot = currentNodeId === tree.rootId;
   const hasForward = mainlineForward(tree, currentNodeId) !== null;
@@ -670,6 +675,37 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [moveMenu]);
+
+  // Self-heal the board on (re)mount. The SSR props that seed this component can
+  // be stale: after the lesson page's error boundary "Try again" - or a soft
+  // navigation back into the room - React remounts the board with the *original*
+  // payload from when the room first opened (an empty board), even though many
+  // moves have since been persisted. Pull the authoritative tree from the server
+  // and adopt it whenever it holds more moves than what we mounted with, so a
+  // rejoining participant never returns to an empty board and then overwrites
+  // their partner's history with the next move they make.
+  useEffect(() => {
+    if (local) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/lesson/${lessonId}/board`);
+        if (!res.ok || cancelled) return;
+        const body = await res.json();
+        const serverTree = sanitizeTree(body.boardTree);
+        if (!serverTree || cancelled) return;
+        const localCount = Object.keys(treeRef.current.nodes).length;
+        const serverCount = Object.keys(serverTree.nodes).length;
+        if (serverCount <= localCount) return; // our board is the same or richer
+        setTree(serverTree);
+        setCurrentNodeId(endOfLine(serverTree, serverTree.rootId));
+        setSelectedSquare(null);
+      } catch {
+        // Best-effort: the next live move broadcast resyncs the board anyway.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [lessonId, local]);
 
   // Keyboard arrow navigation
   useEffect(() => {
@@ -1343,6 +1379,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
               squareStyles: squareStyles,
               squareRenderer: renderSquare,
               animationDurationInMs: 200,
+              // Animate piece slides only when the board can't be hidden. On
+              // mobile the board lives in a `display:none` tab while Chat is
+              // open; a move arriving then makes react-chessboard measure a
+              // zero-width square mid-animation and throw "Square width not
+              // found", crashing the whole lesson room. Snapping instantly on
+              // phones avoids that measurement entirely.
+              showAnimations: !isMobile,
               allowDrawingArrows: true,
               clearArrowsOnClick: true,
               clearArrowsOnPositionChange: true,
