@@ -41,9 +41,6 @@ export function MobileNav({ isLoggedIn, username, isAdmin, walletAvailable = 0 }
           <MobileLink href="/review" onClose={() => setOpen(false)}>
             Review a game
           </MobileLink>
-          <MobileLink href="/leaderboard" onClose={() => setOpen(false)}>
-            Leaderboard
-          </MobileLink>
 
           {isLoggedIn ? (
             <>

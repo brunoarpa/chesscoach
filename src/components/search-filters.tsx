@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +71,19 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
   const availableFromDefault = paramToLocalInput(searchParams.get("availableFrom"));
   const availableToDefault = paramToLocalInput(searchParams.get("availableTo"));
 
+  // The advanced filters start collapsed to keep the panel uncluttered, but open
+  // automatically when one of them is already active so a hidden filter is never
+  // silently applied.
+  const [showMore, setShowMore] = useState(() =>
+    Boolean(
+      searchParams.get("availableFrom") ||
+        searchParams.get("availableTo") ||
+        (searchParams.get("continent") && searchParams.get("continent") !== "all") ||
+        (searchParams.get("communication") && searchParams.get("communication") !== "any") ||
+        (searchParams.get("lastSeen") && searchParams.get("lastSeen") !== "any"),
+    ),
+  );
+
   function applyFilters(formData: FormData) {
     const newParams = new URLSearchParams();
     const now = new Date();
@@ -104,28 +118,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
 
   return (
     <form action={applyFilters} className="space-y-4">
-      <div className="space-y-2">
-        <Label>Available between</Label>
-        <div className="space-y-2">
-          <Input
-            type="datetime-local"
-            name="availableFrom"
-            min={bookingBounds.min}
-            max={bookingBounds.max}
-            defaultValue={availableFromDefault}
-            aria-label="Available from"
-          />
-          <Input
-            type="datetime-local"
-            name="availableTo"
-            min={bookingBounds.min}
-            max={bookingBounds.max}
-            defaultValue={availableToDefault}
-            aria-label="Available until"
-          />
-        </div>
-      </div>
-
+      {/* Primary filters: the ones most students choose a coach by. */}
       <div className="space-y-2">
         <Label>Search</Label>
         <Input
@@ -136,19 +129,24 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label>Continent</Label>
-        <Select name="continent" defaultValue={searchParams.get("continent") ?? ""}>
-          <SelectTrigger>
-            <SelectValue placeholder="All" />
-          </SelectTrigger>
-          <SelectContent>
-            {continents.map((c) => (
-              <SelectItem key={c.value || "all"} value={c.value || "all"}>
-                {c.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>Price per 30 min ($)</Label>
+        <div className="flex gap-2">
+          <Input
+            name="minPrice"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Min"
+            defaultValue={params.minPrice}
+          />
+          <Input
+            name="maxPrice"
+            type="number"
+            step="0.01"
+            placeholder="Max"
+            defaultValue={params.maxPrice}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -184,27 +182,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label>Price per 30 min ($)</Label>
-        <div className="flex gap-2">
-          <Input
-            name="minPrice"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Min"
-            defaultValue={params.minPrice}
-          />
-          <Input
-            name="maxPrice"
-            type="number"
-            step="0.01"
-            placeholder="Max"
-            defaultValue={params.maxPrice}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
         <Label>Languages</Label>
         <MultiSelect
           name="languages"
@@ -214,36 +191,87 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Communication</Label>
-        <Select name="communication" defaultValue={searchParams.get("communication") ?? ""}>
-          <SelectTrigger>
-            <SelectValue placeholder="Any" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="any">Any</SelectItem>
-            <SelectItem value="CHAT_ONLY">Chat Only</SelectItem>
-            <SelectItem value="CHAT_AND_CALL">Chat or Call</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Advanced filters: collapsed by default. Kept mounted (just hidden) so
+          their values still submit even while the section is closed. */}
+      <button
+        type="button"
+        onClick={() => setShowMore((v) => !v)}
+        className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        aria-expanded={showMore}
+      >
+        More filters
+        <ChevronDown className={`h-4 w-4 transition-transform ${showMore ? "rotate-180" : ""}`} />
+      </button>
 
+      <div className={showMore ? "space-y-4" : "hidden"}>
+        <div className="space-y-2">
+          <Label>Available between</Label>
+          <div className="space-y-2">
+            <Input
+              type="datetime-local"
+              name="availableFrom"
+              min={bookingBounds.min}
+              max={bookingBounds.max}
+              defaultValue={availableFromDefault}
+              aria-label="Available from"
+            />
+            <Input
+              type="datetime-local"
+              name="availableTo"
+              min={bookingBounds.min}
+              max={bookingBounds.max}
+              defaultValue={availableToDefault}
+              aria-label="Available until"
+            />
+          </div>
+        </div>
 
-      <div className="space-y-2">
-        <Label>Last Seen</Label>
-        <Select name="lastSeen" defaultValue={searchParams.get("lastSeen") ?? ""}>
-          <SelectTrigger>
-            <SelectValue placeholder="Any" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="any">Any</SelectItem>
-            <SelectItem value="online">Online</SelectItem>
-            <SelectItem value="1h">Last hour</SelectItem>
-            <SelectItem value="24h">Last 24 hours</SelectItem>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-2">
+          <Label>Continent</Label>
+          <Select name="continent" defaultValue={searchParams.get("continent") ?? ""}>
+            <SelectTrigger>
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              {continents.map((c) => (
+                <SelectItem key={c.value || "all"} value={c.value || "all"}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Communication</Label>
+          <Select name="communication" defaultValue={searchParams.get("communication") ?? ""}>
+            <SelectTrigger>
+              <SelectValue placeholder="Any" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              <SelectItem value="CHAT_ONLY">Chat Only</SelectItem>
+              <SelectItem value="CHAT_AND_CALL">Chat or Call</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Last Seen</Label>
+          <Select name="lastSeen" defaultValue={searchParams.get("lastSeen") ?? ""}>
+            <SelectTrigger>
+              <SelectValue placeholder="Any" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              <SelectItem value="online">Online</SelectItem>
+              <SelectItem value="1h">Last hour</SelectItem>
+              <SelectItem value="24h">Last 24 hours</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Button type="submit" className="w-full">

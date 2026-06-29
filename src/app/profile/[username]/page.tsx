@@ -25,7 +25,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-import { getActivityDotColor, getActivityLabel, getEffectiveAvailability, getRankStyle } from "@/lib/utils";
+import { getActivityDotColor, getActivityLabel, getEffectiveAvailability } from "@/lib/utils";
 
 function formatLastSeen(date: Date): string {
   const now = Date.now();
@@ -193,22 +193,6 @@ export default async function ProfilePage({
   const effectiveAvailability = getEffectiveAvailability(user.coachAvailability, user.coachChatPrice, user.coachCallPrice);
   const isCoachProfile = !!(user.coachChatPrice || user.coachCallPrice);
 
-  // Global leaderboard rank (count of qualifying coaches with a higher ELO + 1).
-  let coachRank: number | null = null;
-  if (isCoachProfile && !user.isSuspended) {
-    const higher = await prisma.user.count({
-      where: {
-        isSuspended: false,
-        OR: [
-          { coachChatPrice: { not: null } },
-          { coachCallPrice: { not: null } },
-        ],
-        coachElo: { gt: user.coachElo },
-      },
-    });
-    coachRank = higher + 1;
-  }
-
   if (isCoachProfile && effectiveAvailability === "AVAILABLE") {
     // Mirrors the paid-booking gate in createLessonRequest.
     const trialCompleted = user.paidBookingsApproved
@@ -251,18 +235,6 @@ export default async function ProfilePage({
             {user.verificationStatus === "PENDING" && (
               <Badge variant="secondary">Pending Verification</Badge>
             )}
-            {coachRank != null && (() => {
-              const { className, medal } = getRankStyle(coachRank);
-              return (
-                <Link
-                  href="/leaderboard"
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-bold tabular-nums ${className}`}
-                  title={`Ranked #${coachRank} on the coach leaderboard`}
-                >
-                  {medal && <span aria-hidden>{medal}</span>}#{coachRank}
-                </Link>
-              );
-            })()}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             {getActivityLabel(user.lastActiveAt)}
@@ -331,10 +303,6 @@ export default async function ProfilePage({
                         ? "Chat or Call"
                         : "Chat Only"}
                     </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Coach ELO:</span>{" "}
-                    <strong>{Math.round(user.coachElo)}</strong>
                   </div>
                 </div>
                 {user.languages.length > 0 && (

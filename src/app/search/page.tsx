@@ -118,8 +118,7 @@ export default async function SearchPage({
   }
 
   if (params.lastSeen && params.lastSeen !== "any") {
-     
-    const now = Date.now();
+    const now = new Date();
     const thresholds: Record<string, number> = {
       online: 5 * 60 * 1000,
       "1h": 60 * 60 * 1000,
@@ -129,7 +128,7 @@ export default async function SearchPage({
     };
     const ms = thresholds[params.lastSeen];
     if (ms) {
-      where.lastActiveAt = { gte: new Date(now - ms) };
+      where.lastActiveAt = { gte: new Date(now.getTime() - ms) };
     }
   }
 
@@ -161,7 +160,6 @@ export default async function SearchPage({
       coachChatPrice: true,
       coachCallPrice: true,
       communicationPreference: true,
-      coachElo: true,
       activityStatus: true,
       coachAvailability: true,
       acceptingFreeTrials: true,
@@ -179,30 +177,17 @@ export default async function SearchPage({
 
   const coachIds = coaches.map((c) => c.id);
 
-  // Global leaderboard ranks (ties share a rank, like the leaderboard page) and
-  // review aggregates - both computed in the database for just the 50 shown
-  // coaches, instead of shipping every coach row / review row to the app.
-  const [rankRows, reviewStats] = coachIds.length
-    ? await Promise.all([
-        prisma.$queryRaw<{ id: string; rank: bigint }[]>`
-          SELECT id, rank FROM (
-            SELECT id, RANK() OVER (ORDER BY "coachElo" DESC) AS rank
-            FROM "User"
-            WHERE "isSuspended" = false
-              AND ("coachChatPrice" IS NOT NULL OR "coachCallPrice" IS NOT NULL)
-          ) ranked
-          WHERE id IN (${Prisma.join(coachIds)})
-        `,
-        prisma.review.groupBy({
-          by: ["toUserId"],
-          where: { toUserId: { in: coachIds } },
-          _avg: { rating: true },
-          _count: { rating: true },
-        }),
-      ])
-    : [[], []];
+  // Review aggregates for just the 50 shown coaches, computed in the database
+  // instead of shipping every review row to the app.
+  const reviewStats = coachIds.length
+    ? await prisma.review.groupBy({
+        by: ["toUserId"],
+        where: { toUserId: { in: coachIds } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      })
+    : [];
 
-  const rankById = new Map(rankRows.map((r) => [r.id, Number(r.rank)]));
   const reviewsById = new Map(
     reviewStats.map((r) => [r.toUserId, { avg: r._avg.rating, count: r._count.rating }]),
   );
@@ -236,7 +221,6 @@ export default async function SearchPage({
                     coachChatPrice={coach.coachChatPrice}
                     coachCallPrice={coach.coachCallPrice}
                     communicationPreference={coach.communicationPreference}
-                    coachElo={coach.coachElo}
                     activityStatus={coach.activityStatus}
                     coachAvailability={coach.coachAvailability}
                     bookable={bookable}
@@ -250,7 +234,6 @@ export default async function SearchPage({
                     languages={coach.languages}
                     isFavourited={favouriteCoachIds.includes(coach.id)}
                     showFavourite={!!session?.user}
-                    rank={rankById.get(coach.id) ?? 0}
                   />
                 );
               })}

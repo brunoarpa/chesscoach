@@ -15,7 +15,7 @@ const continentLabels: Record<string, string> = {
   OCEANIA: "Oceania",
 };
 
-import { getActivityDotColor, getRankStyle } from "@/lib/utils";
+import { getActivityDotColor } from "@/lib/utils";
 
 function formatRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -37,7 +37,6 @@ interface Props {
   coachChatPrice: number | null;
   coachCallPrice: number | null;
   communicationPreference: string;
-  coachElo: number;
   activityStatus: string;
   coachAvailability: string;
   bookable: boolean;
@@ -51,38 +50,21 @@ interface Props {
   languages: string[];
   isFavourited?: boolean;
   showFavourite?: boolean;
-  rank?: number | null;
 }
 
 export function CoachCard(props: Props) {
   return (
-    <div className="relative">
+    <div className="relative h-full">
       {props.showFavourite && (
         <div className="absolute top-2 right-2 z-10">
           <FavouriteButton coachId={props.id} initialFavourited={props.isFavourited ?? false} />
         </div>
       )}
-      <Link href={`/profile/${props.username}`}>
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+      <Link href={`/profile/${props.username}`} className="block h-full">
+        <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold">{props.username}</h3>
-                {props.rank != null && (() => {
-                  const { className, medal } = getRankStyle(props.rank);
-                  return (
-                    <span
-                      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs font-bold tabular-nums ${className}`}
-                      title={`Ranked #${props.rank} on the coach leaderboard`}
-                    >
-                      {medal && <span aria-hidden>{medal}</span>}#{props.rank}
-                    </span>
-                  );
-                })()}
-              </div>
-              {props.coachElo > 0 && (
-                <Badge variant="outline" className={props.showFavourite ? "mr-6" : ""}>ELO {Math.round(props.coachElo)}</Badge>
-              )}
+              <h3 className="font-semibold">{props.username}</h3>
             </div>
 
             <p className="text-sm text-muted-foreground mb-3">

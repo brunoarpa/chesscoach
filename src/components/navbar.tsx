@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Trophy, Wallet, ScanSearch } from "lucide-react";
+import { Search, Wallet, ScanSearch } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
@@ -70,14 +70,6 @@ export async function Navbar() {
             >
               <ScanSearch className="h-4 w-4" />
               Review a game
-            </NavLink>
-            <NavLink
-              href="/leaderboard"
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-              activeClassName="bg-muted font-medium"
-            >
-              <Trophy className="h-4 w-4" />
-              Leaderboard
             </NavLink>
           </nav>
         </div>

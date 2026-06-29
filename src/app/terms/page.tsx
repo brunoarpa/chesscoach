@@ -33,7 +33,7 @@ export default function TermsOfServicePage() {
             <li>You are responsible for keeping your account credentials secure.</li>
             <li>One account per person. Creating multiple accounts to exploit free trials, evade restrictions, or otherwise abuse the Platform is prohibited.</li>
             <li>You must be at least 13 years old. Users under 18 must have parental consent.</li>
-            <li>Neither booking lessons nor offering them requires a chess.com account. Verifying your chess.com account is optional and adds a trust badge to your profile and leaderboard entry.</li>
+            <li>Neither booking lessons nor offering them requires a chess.com account. Verifying your chess.com account is optional and adds a trust badge to your profile.</li>
           </ul>
         </section>
 
@@ -65,7 +65,7 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-3">6. Coach Verification (optional)</h2>
           <p className="leading-relaxed">
-            Coaches may optionally verify their identity by linking a chess.com account. Verification is reviewed by our admin team and adds a badge to your profile and leaderboard entry. EloChaser does not guarantee the quality, qualifications, or conduct of any individual coach, verified or otherwise.
+            Coaches may optionally verify their identity by linking a chess.com account. Verification is reviewed by our admin team and adds a badge to your profile. EloChaser does not guarantee the quality, qualifications, or conduct of any individual coach, verified or otherwise.
           </p>
         </section>
 
