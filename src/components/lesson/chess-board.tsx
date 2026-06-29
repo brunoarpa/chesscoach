@@ -5,7 +5,7 @@ import { Chess, Square } from "chess.js";
 import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandlerArgs, type Arrow, type SquareRenderer } from "react-chessboard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, ThumbsUp, Star, Trash2, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, Trash2 } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -30,29 +30,13 @@ import {
   type MoveClass,
   type PosEval,
   type ReviewPosition,
-  MOVE_CLASSES,
   classifyPlayedMove,
   cpToExpectedPoints,
   evalToCp,
   summarizeGame,
   type GameReviewSummary,
 } from "@/lib/game-review";
-
-// Per-class presentation for the on-board chess.com-style markers: `label` for
-// the tooltip, `symbol`/`icon` for the glyph (icon wins when set), `badge` (solid)
-// and `tint` (translucent) for the colors. Colors mirror chess.com's palette.
-const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?: LucideIcon; badge: string; tint: string }> = {
-  brilliant:   { label: "Brilliant",  symbol: "!!",                 badge: "#1baca6", tint: "rgba(27,172,166,0.45)" },
-  great:       { label: "Great move",  symbol: "!",                 badge: "#5c8bb0", tint: "rgba(92,139,176,0.45)" },
-  best:        { label: "Best",        symbol: "★", icon: Star,     badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
-  excellent:   { label: "Excellent",   symbol: "!", icon: ThumbsUp, badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
-  good:        { label: "Good",        symbol: "✓",                 badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
-  forced:      { label: "Forced",      symbol: "□",                 badge: "#9b9b9b", tint: "rgba(155,155,155,0.40)" },
-  inaccuracy:  { label: "Inaccuracy",  symbol: "?!",                badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
-  miss:        { label: "Miss",        symbol: "✗",                 badge: "#e06c5a", tint: "rgba(224,108,90,0.45)" },
-  mistake:     { label: "Mistake",     symbol: "?",                 badge: "#ffa459", tint: "rgba(255,164,89,0.45)" },
-  blunder:     { label: "Blunder",     symbol: "??",                badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
-};
+import { MOVE_CLASS_STYLE } from "./move-class-style";
 
 // Plain last-move highlight used when the engine is off (chess.com-style yellow),
 // so both players can always see the most recent move and whose turn it is.
@@ -133,6 +117,10 @@ interface Props {
   // Open the import panel on mount. Used by the public game-review page so the
   // first thing a visitor sees is "paste your game" rather than a hidden button.
   startImportOpen?: boolean;
+  // Notified when the whole-game report card is (re)computed, so a parent can
+  // render the per-class breakdown elsewhere (e.g. the review page's sidebar,
+  // keeping the central board column uncluttered). Null while not yet complete.
+  onReviewSummary?: (summary: GameReviewSummary | null) => void;
 }
 
 function formatLineEval(line: EngineLine): string {
@@ -151,7 +139,7 @@ function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): 
   return { tree, nodeId: endOfLine(tree, tree.rootId) };
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false, onReviewSummary }: Props) {
   // Seed tree + cursor from one shared computation. Computing them in two
   // separate useState initializers would call initialTreeState twice - and for an
   // empty/PGN board that means two createTree() calls with *different* random root
@@ -262,13 +250,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       const parentPE = combinedEvals.get(p.parentFen);
       const childPE = combinedEvals.get(p.fen);
       if (!parentPE || !childPE) continue;
-      const next = mainlinePositions[i + 1];
       m.set(
         p.nodeId,
         classifyPlayedMove(
           { fen: p.parentFen, cp: parentPE.cp, secondCp: parentPE.secondCp, bestSan: parentPE.bestSan },
           { fen: p.fen, cp: childPE.cp },
-          next ? { fen: next.fen } : null,
         ),
       );
     }
@@ -298,6 +284,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     }
     return summarizeGame(positions);
   }, [reviewFens, combinedEvals]);
+
+  // Surface the report to a parent (the review page renders the per-class
+  // breakdown in its sidebar). Null until the background pass completes.
+  useEffect(() => {
+    onReviewSummary?.(reviewSummary);
+  }, [reviewSummary, onReviewSummary]);
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
   // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
@@ -928,12 +920,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     const parentPE = combinedEvals.get(parentFen);
     const childPE = combinedEvals.get(childFen);
     if (!parentPE || !childPE) return null;
-    const nextId = mainlineForward(tree, nodeId);
-    const nextFen = nextId ? fenAtNode(tree, nextId) : null;
     return classifyPlayedMove(
       { fen: parentFen, cp: parentPE.cp, secondCp: parentPE.secondCp, bestSan: parentPE.bestSan },
       { fen: childFen, cp: childPE.cp },
-      nextFen ? { fen: nextFen } : null,
     );
   }, [tree, combinedEvals]);
 
@@ -1135,21 +1124,18 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   // chess.com-style eval graph. White fills up from the BOTTOM and black is the
   // dark area at the TOP (matching the eval bar), with the boundary tracing each
-  // position's win probability. Notable moves get a colored dot. Clicking a point
-  // jumps to that move; a marker tracks the current position.
+  // position's win probability. The area/line live in a stretched SVG; the move
+  // dots are HTML circles overlaid on top so they stay perfectly round (a
+  // stretched SVG would squash <circle> into ovals) and clearly visible.
   function renderEvalGraph(graph: number[]): React.ReactNode {
     const n = graph.length;
     if (n < 2) return null;
-    const W = 300;
-    const H = 80;
-    const px = (i: number) => (i / (n - 1)) * W;
-    // White's share at each ply via the logistic win curve; white winning pushes
-    // the boundary up so the white area (from the bottom) grows.
-    const yAt = (cp: number) => H * (1 - cpToExpectedPoints(cp));
-    const curvePts = graph.map((cp, i) => `${px(i).toFixed(1)},${yAt(cp).toFixed(1)}`);
-    const whiteArea = `M0,${H} L ${curvePts.join(" L ")} L${W},${H} Z`;
+    // SVG uses a 0..100 box stretched to fill; positions map to percentages.
+    const xPct = (i: number) => (i / (n - 1)) * 100;
+    const yPct = (cp: number) => (1 - cpToExpectedPoints(cp)) * 100;
+    const curvePts = graph.map((cp, i) => `${xPct(i).toFixed(2)},${yPct(cp).toFixed(2)}`);
+    const whiteArea = `M0,100 L ${curvePts.join(" L ")} L100,100 Z`;
     const curIdx = mainlineIds.indexOf(currentNodeId);
-    const band = W / (n - 1);
     // Only the notable classes get a dot (chess.com leaves best/good moves bare).
     const DOTTED: Partial<Record<MoveClass, boolean>> = {
       brilliant: true,
@@ -1160,34 +1146,52 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       blunder: true,
     };
     return (
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-20 rounded bg-zinc-900">
-        {/* Black is the dark background (top); white fills up from the bottom. */}
-        <path d={whiteArea} fill="#f4f4f5" />
-        <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="rgba(127,127,127,0.7)" strokeWidth="0.5" strokeDasharray="2 2" />
+      <div className="relative w-full h-20 rounded overflow-hidden bg-zinc-900">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+          {/* Black is the dark background (top); white fills up from the bottom. */}
+          <path d={whiteArea} fill="#f4f4f5" />
+          <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(120,120,120,0.8)" strokeWidth="0.4" strokeDasharray="2 2" />
+          {curIdx >= 0 && (
+            <line x1={xPct(curIdx)} y1="0" x2={xPct(curIdx)} y2="100" stroke="#f7c631" strokeWidth="0.5" />
+          )}
+        </svg>
+        {/* Round, solid move dots overlaid in HTML so they never distort. */}
         {graph.map((cp, i) => {
           if (i === 0) return null;
           const cls = moveClasses.get(mainlineIds[i]);
           if (!cls || !DOTTED[cls]) return null;
           return (
-            <circle key={`dot-${i}`} cx={px(i)} cy={yAt(cp)} r={2.6} fill={MOVE_CLASS_STYLE[cls].badge} stroke="#fff" strokeWidth="0.6" />
+            <span
+              key={`dot-${i}`}
+              title={MOVE_CLASS_STYLE[cls].label}
+              className="absolute rounded-full"
+              style={{
+                left: `${xPct(i)}%`,
+                top: `${yPct(cp)}%`,
+                width: 9,
+                height: 9,
+                transform: "translate(-50%, -50%)",
+                background: MOVE_CLASS_STYLE[cls].badge,
+                border: "1.5px solid #fff",
+                boxShadow: "0 0 2px rgba(0,0,0,0.5)",
+                pointerEvents: "none",
+              }}
+            />
           );
         })}
-        {curIdx >= 0 && (
-          <line x1={px(curIdx)} y1="0" x2={px(curIdx)} y2={H} stroke="#f7c631" strokeWidth="1" />
-        )}
-        {graph.map((_, i) => (
-          <rect
-            key={i}
-            x={px(i) - band / 2}
-            y="0"
-            width={band}
-            height={H}
-            fill="transparent"
-            className="cursor-pointer"
-            onClick={() => mainlineIds[i] && navigateTo(mainlineIds[i])}
-          />
-        ))}
-      </svg>
+        {/* Click anywhere along the width to jump to that move. */}
+        <div className="absolute inset-0 flex">
+          {graph.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Go to move ${i}`}
+              className="flex-1 h-full cursor-pointer"
+              onClick={() => mainlineIds[i] && navigateTo(mainlineIds[i])}
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -1437,27 +1441,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
                     <p className="text-xs mt-0.5">~{side.estRating} est. rating</p>
                   </div>
                 ))}
-              </div>
-
-              {/* Per-class breakdown, chess.com-style: White count · label · Black count.
-                  Rows with no occurrences on either side are hidden to stay compact. */}
-              <div className="rounded border divide-y text-xs">
-                {MOVE_CLASSES.map((c) => {
-                  const w = reviewSummary.white.counts[c];
-                  const b = reviewSummary.black.counts[c];
-                  if (!w && !b) return null;
-                  const style = MOVE_CLASS_STYLE[c];
-                  return (
-                    <div key={c} className="grid grid-cols-[2rem_1fr_2rem] items-center px-2 py-0.5">
-                      <span className="text-left tabular-nums">{w}</span>
-                      <span className="flex items-center justify-center gap-1 font-medium" style={{ color: style.badge }}>
-                        <span aria-hidden>{style.symbol}</span>
-                        {style.label}
-                      </span>
-                      <span className="text-right tabular-nums">{b}</span>
-                    </div>
-                  );
-                })}
               </div>
 
               {renderEvalGraph(reviewSummary.graph)}

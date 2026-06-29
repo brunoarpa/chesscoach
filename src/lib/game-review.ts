@@ -3,7 +3,7 @@
 // inspection) so it is unit-testable and shared between the live board markers
 // and the whole-game report card.
 
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
 
 // Move quality classification (chess.com-style labels). The first three are the
 // "special good" labels, then the neutral/forced, then the plain quality ladder.
@@ -102,8 +102,11 @@ const GREAT_SECOND_BEST_GAP = 0.12; // how much worse the 2nd-best move must be
 const MISS_WINNING_BEFORE = 0.75;
 const MISS_AFTER_MIN = 0.45;
 const MISS_AFTER_MAX = 0.62;
-const BRILLIANT_MIN_EP_AFTER = 0.5; // you're not losing after the sacrifice
-const BRILLIANT_MAX_EP_BEFORE = 0.97; // and weren't already completely winning
+// Brilliant (chess.com's definition): a good piece sacrifice that is the best or
+// near-best move, leaves you NOT in a bad position, and that you needed - i.e.
+// you would NOT already be completely winning if you hadn't found it.
+const BRILLIANT_MIN_EP_AFTER = 0.5; // not in a bad position after
+const COMPLETELY_WINNING = 0.85; // "completely winning" cutoff (win prob)
 
 // Full classification using the richer context. Priority mirrors chess.com:
 // forced (no choice) > brilliant/great (special good) > miss > plain ladder.
@@ -122,9 +125,14 @@ export function classifyDetailed(ctx: MoveContext): MoveClass {
   // pick (exactly best, or within a hair of it).
   const playedWellEnough = playedIsBest || loss <= 0.02;
   if (playedWellEnough) {
-    // Brilliant: a sound piece sacrifice, made from a not-already-won position,
-    // that still leaves you at least equal.
-    if (isSacrifice && epBest < BRILLIANT_MAX_EP_BEFORE && epAfter >= BRILLIANT_MIN_EP_AFTER) {
+    // Brilliant: a sound piece sacrifice that you actually needed. You must not
+    // be in a bad position after it, and you must NOT already be completely
+    // winning without it - judged by the second-best move (your alternative had
+    // you not found this one). Falls back to the position eval if 2nd-best is
+    // unknown, in which case we only flag when the position wasn't already won.
+    const alreadyWinningAnyway =
+      secondBestCp !== null ? cpToExpectedPoints(sign * secondBestCp) >= COMPLETELY_WINNING : epBest >= COMPLETELY_WINNING;
+    if (isSacrifice && epAfter >= BRILLIANT_MIN_EP_AFTER && !alreadyWinningAnyway) {
       return "brilliant";
     }
     // Great: the only good move - the second-best was clearly worse, and the
@@ -153,37 +161,104 @@ export function classifyDetailed(ctx: MoveContext): MoveClass {
 
 // ---- Material / position inspection (for the special labels) ----
 
-const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
 
-function materialFor(fen: string, white: boolean): number {
-  const board = fen.split(" ")[0];
-  let sum = 0;
-  for (const ch of board) {
-    if (white && ch >= "A" && ch <= "Z") sum += PIECE_VALUE[ch.toLowerCase()] ?? 0;
-    else if (!white && ch >= "a" && ch <= "z") sum += PIECE_VALUE[ch] ?? 0;
+// Static exchange evaluation on `square`: the material the side to move can win
+// by initiating captures there, assuming both sides recapture with their least
+// valuable piece and either side can stop when ahead. Used to tell a real
+// sacrifice from a safe move or an even trade.
+export function staticExchangeEval(fen: string, square: string): number {
+  let g: Chess;
+  try {
+    g = new Chess(fen);
+  } catch {
+    return 0;
   }
-  return sum;
+  const victim = g.get(square as Square);
+  if (!victim) return 0;
+  const gains: number[] = [];
+  let onSquareValue = PIECE_VALUE[victim.type] ?? 0;
+  // Play the least valuable attacker's capture onto `square`, repeatedly.
+  for (let iter = 0; iter < 32; iter++) {
+    let caps;
+    try {
+      caps = g.moves({ verbose: true }).filter((m) => m.to === square && m.captured);
+    } catch {
+      break;
+    }
+    if (caps.length === 0) break;
+    caps.sort((a, b) => (PIECE_VALUE[a.piece] ?? 0) - (PIECE_VALUE[b.piece] ?? 0));
+    const cap = caps[0];
+    gains.push(onSquareValue); // this side captures the piece currently on the square
+    onSquareValue = PIECE_VALUE[cap.piece] ?? 0; // the capturer now occupies the square
+    try {
+      g.move(cap);
+    } catch {
+      break;
+    }
+  }
+  // Negamax the swap-off back to front: at each step a side captures only if it
+  // comes out ahead.
+  let value = 0;
+  for (let i = gains.length - 1; i >= 0; i--) value = Math.max(0, gains[i] - value);
+  return value;
 }
 
-// The mover's material minus the opponent's, in pawns, at a given position.
-function moverNet(fen: string, moverIsWhite: boolean): number {
-  return moverIsWhite ? materialFor(fen, true) - materialFor(fen, false) : materialFor(fen, false) - materialFor(fen, true);
+// The verbose move that turns `parentFen` into `childFen` (or null). Used to
+// recover the played move's destination square and what it captured.
+function findPlayedMove(parentFen: string, childFen: string) {
+  let g: Chess;
+  try {
+    g = new Chess(parentFen);
+  } catch {
+    return null;
+  }
+  let moves;
+  try {
+    moves = g.moves({ verbose: true });
+  } catch {
+    return null;
+  }
+  for (const m of moves) {
+    const t = new Chess(parentFen);
+    try {
+      t.move(m);
+    } catch {
+      continue;
+    }
+    if (t.fen() === childFen) return m;
+  }
+  return null;
 }
 
-// A move is a sacrifice if, once the opponent has had a chance to capture (the
-// position one ply later, when available), the mover ends up materially down by
-// at least ~2 points (an exchange / minor piece) relative to before the move.
-export function isSacrificeMove(
-  parentFen: string,
-  childFen: string,
-  nextFen: string | null,
-  moverIsWhite: boolean,
-): boolean {
-  const before = moverNet(parentFen, moverIsWhite);
-  const afterChild = moverNet(childFen, moverIsWhite);
-  const afterNext = nextFen ? moverNet(nextFen, moverIsWhite) : afterChild;
-  const lowest = Math.min(afterChild, afterNext);
-  return before - lowest >= 2;
+// FEN-only facts about a played move: how many legal moves the mover had, and
+// whether the move is a genuine *net* sacrifice (the opponent can win >= ~2
+// points of material on the destination beyond whatever the move itself
+// captured - so an even trade or a defended move is not a sacrifice). Cached by
+// the (parent, child) FEN pair since these never change for a given move.
+const factsCache = new Map<string, { legalMoveCount: number; isSacrifice: boolean }>();
+
+function fenFacts(parentFen: string, childFen: string): { legalMoveCount: number; isSacrifice: boolean } {
+  const key = `${parentFen}|${childFen}`;
+  const hit = factsCache.get(key);
+  if (hit) return hit;
+  let legalMoveCount = 99;
+  try {
+    legalMoveCount = new Chess(parentFen).moves().length;
+  } catch {
+    /* unknown: treat as "many" so we never mislabel as forced */
+  }
+  const move = findPlayedMove(parentFen, childFen);
+  let isSacrifice = false;
+  if (move) {
+    const captured = move.captured ? PIECE_VALUE[move.captured] ?? 0 : 0;
+    const see = staticExchangeEval(childFen, move.to);
+    isSacrifice = see - captured >= 2;
+  }
+  const facts = { legalMoveCount, isSacrifice };
+  if (factsCache.size > 5000) factsCache.clear();
+  factsCache.set(key, facts);
+  return facts;
 }
 
 // Did `bestSan` (the engine's top move at the parent) reproduce the position the
@@ -197,14 +272,6 @@ function playedTheBest(parentFen: string, bestSan: string | null, childFen: stri
     return g.fen() === childFen;
   } catch {
     return false;
-  }
-}
-
-function legalMoveCount(fen: string): number {
-  try {
-    return new Chess(fen).moves().length;
-  } catch {
-    return 99; // unknown: treat as "many" so we never mislabel as forced
   }
 }
 
@@ -224,23 +291,23 @@ export interface ReviewPosition {
   bestSan?: string | null; // engine's best move SAN at this position
 }
 
-// Classify one played move from the position before it (`parent`), the position
-// it reached (`child`), and the position one ply later (`next`, for sacrifice
-// detection). Does the chess.js work, then defers to classifyDetailed.
+// Classify one played move from the position before it (`parent`) and the
+// position it reached (`child`). Does the chess.js work, then defers to
+// classifyDetailed.
 export function classifyPlayedMove(
   parent: ReviewPosition,
   child: Pick<ReviewPosition, "fen" | "cp">,
-  next: Pick<ReviewPosition, "fen"> | null,
 ): MoveClass {
   const moverIsWhite = parent.fen.split(" ")[1] !== "b";
+  const { legalMoveCount, isSacrifice } = fenFacts(parent.fen, child.fen);
   return classifyDetailed({
     parentBestCp: parent.cp,
     playedCp: child.cp,
     secondBestCp: parent.secondCp ?? null,
     moverIsWhite,
-    legalMoveCount: legalMoveCount(parent.fen),
+    legalMoveCount,
     playedIsBest: playedTheBest(parent.fen, parent.bestSan ?? null, child.fen),
-    isSacrifice: isSacrificeMove(parent.fen, child.fen, next?.fen ?? null, moverIsWhite),
+    isSacrifice,
   });
 }
 
@@ -321,7 +388,7 @@ export function summarizeGame(positions: ReviewPosition[]): GameReviewSummary {
     if (!Number.isFinite(parent.cp) || !Number.isFinite(child.cp)) continue;
     const moverIsWhite = parent.fen.split(" ")[1] !== "b";
     const sign = moverIsWhite ? 1 : -1;
-    const cls = classifyPlayedMove(parent, child, positions[i + 1] ?? null);
+    const cls = classifyPlayedMove(parent, child);
     const acc = moveAccuracy(winChance(sign * parent.cp), winChance(sign * child.cp));
     const side = moverIsWhite ? white : black;
     side.counts[cls] += 1;

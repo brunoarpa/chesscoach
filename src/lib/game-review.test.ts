@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import {
   classifyMove,
   classifyDetailed,
-  isSacrificeMove,
+  staticExchangeEval,
   evalToCp,
   winChance,
   moveAccuracy,
@@ -75,9 +75,16 @@ describe("classifyDetailed", () => {
     ).toBe("brilliant");
   });
 
-  it("does not call a sacrifice brilliant when already completely winning", () => {
-    // +900 before => already won, so a sac here is not 'brilliant'.
-    const cls = classifyDetailed({ ...base, parentBestCp: 2000, playedCp: 1900, isSacrifice: true });
+  it("does not call a sacrifice brilliant when winning anyway", () => {
+    // The 2nd-best move was already completely winning (+1800), so the sac
+    // wasn't needed -> not brilliant.
+    const cls = classifyDetailed({
+      ...base,
+      parentBestCp: 2000,
+      playedCp: 1900,
+      secondBestCp: 1800,
+      isSacrifice: true,
+    });
     expect(cls).not.toBe("brilliant");
   });
 
@@ -132,19 +139,22 @@ describe("classifyDetailed", () => {
   });
 });
 
-describe("isSacrificeMove", () => {
-  it("detects giving up a piece that the opponent then wins", () => {
-    // White to move, even material. White plays a move; one ply later White is
-    // down a knight (net -3). That's a sacrifice.
-    const parent = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    const child = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"; // even
-    const next = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKB1R w KQkq - 0 2"; // white lost a knight
-    expect(isSacrificeMove(parent, child, next, true)).toBe(true);
+describe("staticExchangeEval", () => {
+  it("wins the full value of an undefended piece", () => {
+    // Black to move; the c6 pawn can take an undefended white queen on d5.
+    const fen = "4k3/8/2p5/3Q4/8/8/8/4K3 b - - 0 1";
+    expect(staticExchangeEval(fen, "d5")).toBe(9);
   });
 
-  it("does not flag an even position as a sacrifice", () => {
-    const even = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    expect(isSacrificeMove(even, even, even, true)).toBe(false);
+  it("is zero when the target is defended (an even trade)", () => {
+    // Black to move; taking the e5 pawn is met by the d4 pawn recapture.
+    const fen = "4k3/8/3p4/4P3/3P4/8/8/4K3 b - - 0 1";
+    expect(staticExchangeEval(fen, "e5")).toBe(0);
+  });
+
+  it("returns 0 for an empty square", () => {
+    const fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
+    expect(staticExchangeEval(fen, "d5")).toBe(0);
   });
 });
 
