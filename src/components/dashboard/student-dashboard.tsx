@@ -192,7 +192,7 @@ export function StudentDashboard({
       {/* Reviewable lesson (compact prompt) */}
       {lastReviewable && (
         <Card>
-          <CardContent className="pt-4">
+          <CardContent>
             <ReviewBlock request={lastReviewable} />
           </CardContent>
         </Card>
