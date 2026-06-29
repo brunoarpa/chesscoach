@@ -22,12 +22,18 @@ export async function GET(request: Request) {
   }
 
   // SSRF prevention: only allow chess.com URLs, and only pull the numeric id.
-  const match = url.match(/chess\.com\/(?:game\/(?:live|daily)|live|daily)\/(\d+)/);
+  // chess.com links come in many shapes, all carrying a "(live|daily)/<id>"
+  // segment somewhere after the host:
+  //   chess.com/game/live/123          chess.com/live/game/123
+  //   chess.com/analysis/game/live/123/review
+  //   chess.com/game/daily/123         chess.com/daily/123
+  // Match the host, then the kind + id anywhere after it.
+  const match = url.match(/chess\.com\/[^?#]*?(?:game\/)?(live|daily)\/(\d+)/);
   if (!match) {
     return NextResponse.json({ error: "Invalid Chess.com game URL" }, { status: 400 });
   }
 
-  const gameId = match[1];
+  const gameId = match[2];
 
   // chess.com has no public single-game PGN endpoint, so use the callback
   // endpoint (returns TCN-encoded moves) and rebuild the PGN ourselves. A live

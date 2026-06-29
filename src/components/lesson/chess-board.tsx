@@ -28,7 +28,11 @@ import {
 } from "@/lib/chess-tree";
 import {
   type MoveClass,
-  classifyMove,
+  type PosEval,
+  type ReviewPosition,
+  MOVE_CLASSES,
+  classifyPlayedMove,
+  cpToExpectedPoints,
   evalToCp,
   summarizeGame,
   type GameReviewSummary,
@@ -36,14 +40,18 @@ import {
 
 // Per-class presentation for the on-board chess.com-style markers: `label` for
 // the tooltip, `symbol`/`icon` for the glyph (icon wins when set), `badge` (solid)
-// and `tint` (translucent) for the colors.
+// and `tint` (translucent) for the colors. Colors mirror chess.com's palette.
 const MOVE_CLASS_STYLE: Record<MoveClass, { label: string; symbol: string; icon?: LucideIcon; badge: string; tint: string }> = {
-  best:        { label: "Best",       symbol: "★", icon: Star,       badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
-  excellent:   { label: "Excellent",  symbol: "!", icon: ThumbsUp,  badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
-  good:        { label: "Good",       symbol: "✓",                  badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
-  inaccuracy:  { label: "Inaccuracy", symbol: "?!",                 badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
-  mistake:     { label: "Mistake",    symbol: "?",                  badge: "#ffa459", tint: "rgba(255,164,89,0.45)" },
-  blunder:     { label: "Blunder",    symbol: "??",                 badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
+  brilliant:   { label: "Brilliant",  symbol: "!!",                 badge: "#1baca6", tint: "rgba(27,172,166,0.45)" },
+  great:       { label: "Great move",  symbol: "!",                 badge: "#5c8bb0", tint: "rgba(92,139,176,0.45)" },
+  best:        { label: "Best",        symbol: "★", icon: Star,     badge: "#81b64c", tint: "rgba(129,182,76,0.45)" },
+  excellent:   { label: "Excellent",   symbol: "!", icon: ThumbsUp, badge: "#81b64c", tint: "rgba(129,182,76,0.40)" },
+  good:        { label: "Good",        symbol: "✓",                 badge: "#95b776", tint: "rgba(149,183,118,0.40)" },
+  forced:      { label: "Forced",      symbol: "□",                 badge: "#9b9b9b", tint: "rgba(155,155,155,0.40)" },
+  inaccuracy:  { label: "Inaccuracy",  symbol: "?!",                badge: "#f7c631", tint: "rgba(247,198,49,0.45)" },
+  miss:        { label: "Miss",        symbol: "✗",                 badge: "#e06c5a", tint: "rgba(224,108,90,0.45)" },
+  mistake:     { label: "Mistake",     symbol: "?",                 badge: "#ffa459", tint: "rgba(255,164,89,0.45)" },
+  blunder:     { label: "Blunder",     symbol: "??",                badge: "#fa412d", tint: "rgba(250,65,45,0.45)" },
 };
 
 // Plain last-move highlight used when the engine is off (chess.com-style yellow),
@@ -166,12 +174,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // and only ever render arrows/the line list when it matches the shown position,
   // so stale best-move arrows can't linger on the new board.
   const [engineLinesFen, setEngineLinesFen] = useState<string>("");
-  // Eval cache: best eval (cp, white perspective) keyed by FEN. Populated as the
-  // engine analyzes each position the user visits - feeds move classification.
-  const [evalCache, setEvalCache] = useState<Map<string, number>>(new Map());
+  // Eval cache: engine read-out (best/2nd-best/best move, white perspective)
+  // keyed by FEN. Populated as the live engine analyzes each position the user
+  // visits - feeds move classification.
+  const [evalCache, setEvalCache] = useState<Map<string, PosEval>>(new Map());
   // Mainline positions queued for the whole-game review (set when a game is
   // imported). Empty means no review is running.
   const [reviewFens, setReviewFens] = useState<string[]>([]);
+  // Player names/ratings parsed from an imported PGN's headers, so a reviewer
+  // can see who was White/Black and their ratings. Null for hand-entered FENs.
+  const [gameInfo, setGameInfo] = useState<{
+    white: string;
+    black: string;
+    whiteElo: string;
+    blackElo: string;
+    result: string;
+  } | null>(null);
   // Master engine-hint toggle (the lightbulb): gates the best-move arrows, the
   // "Best engine moves" list, and the move classifications all together. The
   // engine is coach-only (see engineEnabled below), so this is purely local to
@@ -194,10 +212,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Background whole-game review: evaluates every imported mainline position so
   // the move list and report card can be filled in while the user explores.
   const review = useGameReview(reviewFens, engineEnabled, isMobile ? 250 : 350);
-  // Best-eval lookup, white perspective. The live deep analysis of the current
-  // position (evalCache) takes precedence over the shallower review pass.
+  // Per-FEN engine read-out, white perspective. The live deep analysis of the
+  // current position (evalCache) takes precedence over the shallower review pass.
   const combinedEvals = useMemo(() => {
-    const m = new Map(review.evals);
+    const m = new Map<string, PosEval>(review.evals);
     for (const [k, v] of evalCache) m.set(k, v);
     return m;
   }, [review.evals, evalCache]);
@@ -235,14 +253,24 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   }, [tree, mainlineIds]);
 
   // Classification per mainline node, recomputed only when the evals change
-  // (cheap O(moves) lookups, no board replay).
+  // (cheap O(moves) lookups, no board replay). Uses the next mainline position
+  // (one ply later) so sacrifice detection can see the opponent's reply.
   const moveClasses = useMemo(() => {
     const m = new Map<string, MoveClass>();
-    for (const p of mainlinePositions) {
-      const parentBest = combinedEvals.get(p.parentFen);
-      const childBest = combinedEvals.get(p.fen);
-      if (parentBest == null || childBest == null) continue;
-      m.set(p.nodeId, classifyMove(parentBest, childBest, p.moverIsWhite));
+    for (let i = 0; i < mainlinePositions.length; i++) {
+      const p = mainlinePositions[i];
+      const parentPE = combinedEvals.get(p.parentFen);
+      const childPE = combinedEvals.get(p.fen);
+      if (!parentPE || !childPE) continue;
+      const next = mainlinePositions[i + 1];
+      m.set(
+        p.nodeId,
+        classifyPlayedMove(
+          { fen: p.parentFen, cp: parentPE.cp, secondCp: parentPE.secondCp, bestSan: parentPE.bestSan },
+          { fen: p.fen, cp: childPE.cp },
+          next ? { fen: next.fen } : null,
+        ),
+      );
     }
     return m;
   }, [mainlinePositions, combinedEvals]);
@@ -251,22 +279,24 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // accuracy/rating only appear once the background pass is complete.
   const reviewSummary = useMemo<GameReviewSummary | null>(() => {
     if (reviewFens.length < 3) return null;
-    const evalsWhite: number[] = [];
+    const positions: ReviewPosition[] = [];
     for (const fen of reviewFens) {
-      let v = combinedEvals.get(fen);
-      if (v == null) {
-        // The engine can't score a terminal position (checkmate/stalemate), so
-        // it never returns an eval for it. Fill it in directly, otherwise the
-        // report card would never complete for a game that ended in mate.
-        const g = new Chess(fen);
-        if (g.isCheckmate()) v = fen.split(" ")[1] === "w" ? -100000 : 100000;
-        else if (g.isStalemate() || g.isInsufficientMaterial() || g.isDraw()) v = 0;
-        else return null; // genuinely not analyzed yet
+      const pe = combinedEvals.get(fen);
+      if (pe) {
+        positions.push({ fen, cp: pe.cp, secondCp: pe.secondCp, bestSan: pe.bestSan });
+        continue;
       }
-      evalsWhite.push(v);
+      // The engine can't score a terminal position (checkmate/stalemate), so it
+      // never returns an eval for it. Fill it in directly, otherwise the report
+      // card would never complete for a game that ended in mate.
+      const g = new Chess(fen);
+      let cp: number | null = null;
+      if (g.isCheckmate()) cp = fen.split(" ")[1] === "w" ? -100000 : 100000;
+      else if (g.isStalemate() || g.isInsufficientMaterial() || g.isDraw()) cp = 0;
+      if (cp === null) return null; // genuinely not analyzed yet
+      positions.push({ fen, cp, secondCp: null, bestSan: null });
     }
-    const firstMoverWhite = reviewFens[0].split(" ")[1] !== "b";
-    return summarizeGame(evalsWhite, firstMoverWhite);
+    return summarizeGame(positions);
   }, [reviewFens, combinedEvals]);
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
@@ -326,6 +356,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setArrows([]);
     setSelectedSquare(null);
     setHighlightedSquares({});
+    setGameInfo(null);
     isRemoteUpdateRef.current = false;
   }, []);
 
@@ -557,6 +588,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setHighlightedSquares({});
     setShowResetConfirm(false);
     setReviewFens([]);
+    setGameInfo(null);
     if (!isRemoteUpdateRef.current) broadcastReset();
   }, [broadcastReset]);
 
@@ -724,6 +756,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   function loadTreeFromPgn(pgn: string) {
     const nextTree = pgnToTree(pgn);
     const endId = endOfLine(nextTree, nextTree.rootId);
+    // Pull player names/ratings from the PGN tags (pgnToTree keeps only moves).
+    try {
+      const meta = new Chess();
+      meta.loadPgn(pgn);
+      const h = meta.header() as Record<string, string>;
+      const info = {
+        white: h.White ?? "",
+        black: h.Black ?? "",
+        whiteElo: h.WhiteElo ?? "",
+        blackElo: h.BlackElo ?? "",
+        result: h.Result ?? "",
+      };
+      setGameInfo(info.white || info.black || info.whiteElo || info.blackElo ? info : null);
+    } catch {
+      setGameInfo(null);
+    }
     setTree(nextTree);
     setCurrentNodeId(endId);
     setShowImport(false);
@@ -743,6 +791,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setShowImport(false);
     setImportText("");
     setImportError("");
+    setGameInfo(null);
     if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, nextTree.rootId);
     return true;
   }
@@ -814,11 +863,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setEngineLines(lines);
     setEngineLinesFen(fen);
     if (lines.length > 0) {
-      const bestCp = evalToCp(lines[0]);
+      const cp = evalToCp(lines[0]);
+      const secondCp = lines.length > 1 ? evalToCp(lines[1]) : null;
+      const bestSan = lines[0].san[0] ?? null;
       setEvalCache((prev) => {
-        if (prev.get(fen) === bestCp) return prev;
+        const existing = prev.get(fen);
+        if (existing && existing.cp === cp && existing.secondCp === secondCp && existing.bestSan === bestSan) {
+          return prev;
+        }
         const next = new Map(prev);
-        next.set(fen, bestCp);
+        next.set(fen, { cp, secondCp, bestSan });
         return next;
       });
     }
@@ -864,17 +918,23 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return out;
   }, [engineLines, engineLinesFen, currentFen, showHints]);
 
-  // Classify a played move based on cached evals (parent best vs node best).
+  // Classify a played move based on cached evals (parent vs node), using the
+  // mainline continuation as the "next" position for sacrifice detection.
   const classifyMoveAtNode = useCallback((nodeId: string): MoveClass | null => {
     const node = tree.nodes[nodeId];
     if (!node || node.parentId === null) return null;
     const parentFen = fenAtNode(tree, node.parentId);
     const childFen = fenAtNode(tree, nodeId);
-    const parentBest = combinedEvals.get(parentFen);
-    const childBest = combinedEvals.get(childFen);
-    if (parentBest == null || childBest == null) return null;
-    const parentTurn = parentFen.split(" ")[1];
-    return classifyMove(parentBest, childBest, parentTurn === "w");
+    const parentPE = combinedEvals.get(parentFen);
+    const childPE = combinedEvals.get(childFen);
+    if (!parentPE || !childPE) return null;
+    const nextId = mainlineForward(tree, nodeId);
+    const nextFen = nextId ? fenAtNode(tree, nextId) : null;
+    return classifyPlayedMove(
+      { fen: parentFen, cp: parentPE.cp, secondCp: parentPE.secondCp, bestSan: parentPE.bestSan },
+      { fen: childFen, cp: childPE.cp },
+      nextFen ? { fen: nextFen } : null,
+    );
   }, [tree, combinedEvals]);
 
   // Destination/source squares of the move that produced the currently displayed
@@ -1057,28 +1117,61 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   const mainlineStart = mainlineForward(tree, tree.rootId);
 
-  // chess.com-style eval graph: white-perspective advantage across the game.
-  // Clicking a point jumps to that move; a marker tracks the current position.
+  // A name/rating bar for one side, shown above/below the board when a PGN with
+  // player tags was imported (chess.com-style). The swatch matches the piece color.
+  function playerStrip(side: "white" | "black"): React.ReactNode {
+    if (!gameInfo) return null;
+    const name = side === "white" ? gameInfo.white : gameInfo.black;
+    const elo = side === "white" ? gameInfo.whiteElo : gameInfo.blackElo;
+    if (!name && !elo) return null;
+    return (
+      <div className="w-full flex items-center gap-2 px-1 text-sm">
+        <span className={`inline-block h-3.5 w-3.5 rounded-sm border border-border ${side === "white" ? "bg-white" : "bg-zinc-800"}`} />
+        <span className="font-medium truncate">{name || (side === "white" ? "White" : "Black")}</span>
+        {elo ? <span className="text-xs text-muted-foreground">({elo})</span> : null}
+      </div>
+    );
+  }
+
+  // chess.com-style eval graph. White fills up from the BOTTOM and black is the
+  // dark area at the TOP (matching the eval bar), with the boundary tracing each
+  // position's win probability. Notable moves get a colored dot. Clicking a point
+  // jumps to that move; a marker tracks the current position.
   function renderEvalGraph(graph: number[]): React.ReactNode {
     const n = graph.length;
     if (n < 2) return null;
     const W = 300;
-    const H = 60;
-    const mid = H / 2;
+    const H = 80;
     const px = (i: number) => (i / (n - 1)) * W;
-    const py = (cp: number) => mid - (Math.max(-1000, Math.min(1000, cp)) / 1000) * mid;
-    const linePts = graph.map((cp, i) => `${px(i).toFixed(1)},${py(cp).toFixed(1)}`).join(" ");
-    const areaPath =
-      `M0,${mid} L ` +
-      graph.map((cp, i) => `${px(i).toFixed(1)},${py(cp).toFixed(1)}`).join(" L ") +
-      ` L${W},${mid} Z`;
+    // White's share at each ply via the logistic win curve; white winning pushes
+    // the boundary up so the white area (from the bottom) grows.
+    const yAt = (cp: number) => H * (1 - cpToExpectedPoints(cp));
+    const curvePts = graph.map((cp, i) => `${px(i).toFixed(1)},${yAt(cp).toFixed(1)}`);
+    const whiteArea = `M0,${H} L ${curvePts.join(" L ")} L${W},${H} Z`;
     const curIdx = mainlineIds.indexOf(currentNodeId);
     const band = W / (n - 1);
+    // Only the notable classes get a dot (chess.com leaves best/good moves bare).
+    const DOTTED: Partial<Record<MoveClass, boolean>> = {
+      brilliant: true,
+      great: true,
+      inaccuracy: true,
+      miss: true,
+      mistake: true,
+      blunder: true,
+    };
     return (
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-14 rounded bg-zinc-800">
-        <line x1="0" y1={mid} x2={W} y2={mid} stroke="rgba(255,255,255,0.25)" strokeWidth="0.5" />
-        <path d={areaPath} fill="rgba(129,182,76,0.35)" />
-        <polyline points={linePts} fill="none" stroke="#e2e8f0" strokeWidth="1" />
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-20 rounded bg-zinc-900">
+        {/* Black is the dark background (top); white fills up from the bottom. */}
+        <path d={whiteArea} fill="#f4f4f5" />
+        <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="rgba(127,127,127,0.7)" strokeWidth="0.5" strokeDasharray="2 2" />
+        {graph.map((cp, i) => {
+          if (i === 0) return null;
+          const cls = moveClasses.get(mainlineIds[i]);
+          if (!cls || !DOTTED[cls]) return null;
+          return (
+            <circle key={`dot-${i}`} cx={px(i)} cy={yAt(cp)} r={2.6} fill={MOVE_CLASS_STYLE[cls].badge} stroke="#fff" strokeWidth="0.6" />
+          );
+        })}
         {curIdx >= 0 && (
           <line x1={px(curIdx)} y1="0" x2={px(curIdx)} y2={H} stroke="#f7c631" strokeWidth="1" />
         )}
@@ -1331,22 +1424,42 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
             <>
               <div className="grid grid-cols-2 gap-2 text-center">
                 {([
-                  { label: "White", side: reviewSummary.white },
-                  { label: "Black", side: reviewSummary.black },
-                ] as const).map(({ label, side }) => (
-                  <div key={label} className="rounded border p-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  { key: "white", label: "White", side: reviewSummary.white, name: gameInfo?.white, elo: gameInfo?.whiteElo },
+                  { key: "black", label: "Black", side: reviewSummary.black, name: gameInfo?.black, elo: gameInfo?.blackElo },
+                ] as const).map(({ key, label, side, name, elo }) => (
+                  <div key={key} className="rounded border p-2">
+                    <p className="text-[11px] font-medium truncate" title={name || label}>
+                      {name || label}
+                      {elo ? <span className="text-muted-foreground"> ({elo})</span> : null}
+                    </p>
                     <p className="text-xl font-bold leading-tight">{side.accuracy}%</p>
                     <p className="text-[11px] text-muted-foreground">accuracy</p>
                     <p className="text-xs mt-0.5">~{side.estRating} est. rating</p>
-                    <div className="flex justify-center gap-2 text-[11px] mt-1">
-                      <span style={{ color: MOVE_CLASS_STYLE.blunder.badge }}>{side.counts.blunder} ??</span>
-                      <span style={{ color: MOVE_CLASS_STYLE.mistake.badge }}>{side.counts.mistake} ?</span>
-                      <span style={{ color: MOVE_CLASS_STYLE.inaccuracy.badge }}>{side.counts.inaccuracy} ?!</span>
-                    </div>
                   </div>
                 ))}
               </div>
+
+              {/* Per-class breakdown, chess.com-style: White count · label · Black count.
+                  Rows with no occurrences on either side are hidden to stay compact. */}
+              <div className="rounded border divide-y text-xs">
+                {MOVE_CLASSES.map((c) => {
+                  const w = reviewSummary.white.counts[c];
+                  const b = reviewSummary.black.counts[c];
+                  if (!w && !b) return null;
+                  const style = MOVE_CLASS_STYLE[c];
+                  return (
+                    <div key={c} className="grid grid-cols-[2rem_1fr_2rem] items-center px-2 py-0.5">
+                      <span className="text-left tabular-nums">{w}</span>
+                      <span className="flex items-center justify-center gap-1 font-medium" style={{ color: style.badge }}>
+                        <span aria-hidden>{style.symbol}</span>
+                        {style.label}
+                      </span>
+                      <span className="text-right tabular-nums">{b}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
               {renderEvalGraph(reviewSummary.graph)}
               <p className="text-[10px] text-muted-foreground">
                 Accuracy and estimated rating are approximate.
@@ -1362,6 +1475,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           Fixed height (shrink-0): the board is sized to the measured square
           (boardPx) from the column, not from leftover flex space, so it never
           resizes when the content below changes. */}
+      {/* Player at the top of the board (the side opposite the orientation). */}
+      {playerStrip(boardOrientation === "white" ? "black" : "white")}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
         {showHints && engineEnabled && (
           <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
@@ -1395,6 +1510,8 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           {renderPromotionPicker()}
         </div>
       </div>
+      {/* Player at the bottom of the board (matches the orientation). */}
+      {playerStrip(boardOrientation === "white" ? "white" : "black")}
 
       {/* Game status - check / checkmate / stalemate / draws (incl. repetition) */}
       {gameStatus && (

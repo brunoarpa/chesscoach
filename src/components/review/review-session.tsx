@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChessBoard } from "@/components/lesson/chess-board";
 import { Button } from "@/components/ui/button";
-import { Info, Search, UserPlus } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 // Public, login-free game review. Reuses the real lesson board (same engine,
@@ -20,15 +20,6 @@ const REVIEW_USER_ID = "review-user";
 function CtaCard({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-start gap-2 text-xs text-muted-foreground">
-        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-        <p>
-          Paste a PGN, FEN, or a Lichess/Chess.com game link above, then step through your
-          moves. The engine marks every <strong>blunder</strong>, <strong>mistake</strong>, and{" "}
-          <strong>best move</strong>, just like a coach would. Best viewed on a computer.
-        </p>
-      </div>
-
       <div className="rounded-lg border p-4 space-y-3">
         <h2 className="font-semibold text-base">See a mistake you keep making?</h2>
         <p className="text-sm text-muted-foreground">
