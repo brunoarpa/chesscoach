@@ -24,6 +24,12 @@
 .DS_Store
 *.pem
 
+# local tooling (Claude Code config + agent worktrees)
+.claude/
+
+# local-only image asset (not used by the app)
+/favicon-image.png
+
 # debug
 npm-debug.log*
 yarn-debug.log*
