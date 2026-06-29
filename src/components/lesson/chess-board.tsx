@@ -123,6 +123,13 @@ interface Props {
   // central board column uncluttered). `summary` is null while still analysing
   // (show "?" placeholders); the whole report is null when no game is loaded.
   onReport?: (report: ReviewReport | null) => void;
+  // The review page uses a 3-column desktop layout (report | board | move list)
+  // and a mobile layout with a horizontal move strip. Lessons keep the single
+  // stacked column (multiPane stays false).
+  multiPane?: boolean;
+  // Content for the left column beneath the report card (the move-type table and
+  // the Find-a-coach CTA), supplied by the review page.
+  leftPanel?: React.ReactNode;
 }
 
 export interface ReviewReport {
@@ -162,7 +169,7 @@ function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): 
   return { tree, nodeId: endOfLine(tree, tree.rootId) };
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false, onReport }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false, onReport, multiPane = false, leftPanel }: Props) {
   // Seed tree + cursor from one shared computation. Computing them in two
   // separate useState initializers would call initialTreeState twice - and for an
   // empty/PGN board that means two createTree() calls with *different* random root
@@ -356,6 +363,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Right-click context menu on a move in the list (promote / delete variation).
   const [moveMenu, setMoveMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The board column whose width drives the board size in multi-pane (review)
+  // mode, where the outer container spans all three columns.
+  const boardColRef = useRef<HTMLDivElement>(null);
+  // The horizontal mobile move strip, kept scrolled to the active move.
+  const moveStripRef = useRef<HTMLDivElement>(null);
 
   // One square is an eighth of the board; drives the on-board move badges and
   // the promotion picker geometry.
@@ -730,19 +742,38 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // the board keeps its size when the move list grows or the best-moves box
   // appears/disappears. Those flow below and the column scrolls to reach them.
   useEffect(() => {
-    const root = containerRef.current;
-    const col = root?.parentElement;
-    if (!root || !col) return;
+    // Width comes from the board's own column: the outer container in the
+    // single-column layout, or the center column in multi-pane (review) mode
+    // where the outer spans all three columns. Height is the visible scroll
+    // column (single column) or the viewport below the board (multi-pane, where
+    // the column is content-sized so measuring it would feed back).
+    const widthEl = multiPane ? boardColRef.current : containerRef.current;
+    if (!widthEl) return;
+    const scrollCol = containerRef.current?.parentElement ?? null;
     const update = () => {
-      const w = root.clientWidth - (showHints && engineEnabled ? EVAL_BAR_RESERVE : 0);
-      const h = col.clientHeight - COLUMN_PADDING - BOARD_BOTTOM_RESERVE;
-      setBoardPx(Math.max(MIN_BOARD, Math.floor(Math.min(w, h))));
+      const evalReserve = showHints && engineEnabled ? EVAL_BAR_RESERVE : 0;
+      const w = widthEl.clientWidth - evalReserve;
+      const h = multiPane
+        ? window.innerHeight - widthEl.getBoundingClientRect().top - BOARD_BOTTOM_RESERVE - COLUMN_PADDING
+        : (scrollCol?.clientHeight ?? w) - COLUMN_PADDING - BOARD_BOTTOM_RESERVE;
+      setBoardPx(Math.max(MIN_BOARD, Math.min(Math.floor(Math.min(w, h)), 760)));
     };
     update();
     const ro = new ResizeObserver(update);
-    ro.observe(col);
-    return () => ro.disconnect();
-  }, [showHints, engineEnabled]);
+    ro.observe(widthEl);
+    if (!multiPane && scrollCol) ro.observe(scrollCol);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [showHints, engineEnabled, multiPane, editMode]);
+
+  // Keep the mobile move strip scrolled to the current move as you navigate.
+  useEffect(() => {
+    const active = moveStripRef.current?.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [currentNodeId]);
 
   // Dismiss the move context menu on any outside click.
   useEffect(() => {
@@ -1242,6 +1273,46 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   const mainlineStart = mainlineForward(tree, tree.rootId);
 
+  // Horizontal, scrollable move strip (chess.com-style) for the mobile review
+  // layout: the mainline moves in one scrollable row, each with its move-quality
+  // badge, the active move highlighted. Keeps moves out of the way on a phone.
+  function renderMoveStrip(): React.ReactNode {
+    if (!mainlineStart) return null;
+    const items: React.ReactNode[] = [];
+    let cur: string | null = mainlineStart;
+    let ply = 1;
+    while (cur) {
+      const nodeId: string = cur;
+      const node: MoveNode | undefined = tree.nodes[nodeId];
+      if (!node) break;
+      const isWhite = ply % 2 === 1;
+      const moveNum = Math.ceil(ply / 2);
+      const cls = showHints ? moveClasses.get(nodeId) ?? null : null;
+      const isActive = nodeId === currentNodeId;
+      items.push(
+        <button
+          key={nodeId}
+          type="button"
+          data-active={isActive}
+          onClick={() => navigateTo(nodeId)}
+          className={`inline-flex items-center gap-1 px-1.5 py-1 rounded shrink-0 text-sm ${isActive ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
+          style={cls ? { color: MOVE_CLASS_STYLE[cls].badge } : undefined}
+        >
+          {isWhite && <span className="text-muted-foreground">{moveNum}.</span>}
+          <span>{node.san}</span>
+          {cls && moveBadge(cls)}
+        </button>
+      );
+      cur = node.children[0] ?? null;
+      ply++;
+    }
+    return (
+      <div ref={moveStripRef} className="w-full overflow-x-auto flex items-center gap-0.5 rounded border bg-muted/30 p-1">
+        {items}
+      </div>
+    );
+  }
+
   // A name/rating bar for one side, shown above/below the board when a PGN with
   // player tags was imported (chess.com-style). The swatch matches the piece color.
   function playerStrip(side: "white" | "black"): React.ReactNode {
@@ -1463,9 +1534,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   })();
 
   return (
-    <div ref={containerRef} className="flex flex-col items-center gap-2 w-full max-w-[600px]" tabIndex={-1}>
+    <div ref={containerRef} className={`flex flex-col items-center gap-2 w-full ${multiPane ? "" : "max-w-[600px]"}`} tabIndex={-1}>
       {editMode && (
-        <div className="flex flex-col items-center gap-2 w-full">
+        <div ref={boardColRef} className="flex flex-col items-center gap-2 w-full max-w-[600px] mx-auto">
           {/* Editor board: free placement, no legality. Click a palette piece then
               squares to stamp it; drag pieces to move them, or off-board to remove. */}
           <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
@@ -1544,6 +1615,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       )}
 
       {!editMode && (<>
+      {/* Layout: single stacked column for lessons; 3-column grid (report | board
+          | move list) on desktop review, stacking on mobile. `contents` makes the
+          wrappers transparent in the single-column case so lessons are unchanged. */}
+      <div className={multiPane ? "w-full grid grid-cols-1 lg:grid-cols-[minmax(230px,290px)_minmax(0,1fr)_minmax(220px,300px)] gap-3 items-start" : "contents"}>
+      {/* LEFT column: report card, then (review) the move-type table + Find-a-coach. */}
+      <div className={multiPane ? "w-full min-w-0 space-y-2 order-2 lg:order-1" : "contents"}>
       {/* Whole-game review report card: sits above the board so the progress bar
           and results are visible without scrolling. Runs in the background after
           a game is imported. */}
@@ -1592,6 +1669,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           )}
         </div>
       )}
+      {leftPanel}
+      </div>
+      {/* CENTER column: the board, its controls, and the game status. */}
+      <div ref={boardColRef} className={multiPane ? "w-full min-w-0 flex flex-col items-center gap-2 order-1 lg:order-2" : "contents"}>
 
       {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
           lightbulb gates it alongside the arrows, line list, and classifications -
@@ -1719,6 +1800,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
+      {/* Mobile review: horizontal move strip lives in the center column, below
+          the controls (chess.com-style). Desktop uses the right column instead. */}
+      {multiPane && <div className="w-full lg:hidden">{renderMoveStrip()}</div>}
+      </div>
+      {/* RIGHT column: the full vertical move list, scrolls when long. */}
+      <div className={multiPane ? "w-full min-w-0 flex flex-col gap-2 order-3 hidden lg:flex lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" : "contents"}>
+
       {/* Move list - main line plus indented variations; right-click a move for
           promote / delete. Past moves sit above the engine's best moves. These
           flow normally and the board column scrolls to reach them, so they
@@ -1752,6 +1840,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           </div>
         </div>
       )}
+
+      </div>
+      </div>
 
       {/* Move context menu (promote / delete a variation) */}
       {moveMenu && (() => {

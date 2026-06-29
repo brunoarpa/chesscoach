@@ -252,8 +252,13 @@ function fenFacts(parentFen: string, childFen: string): { legalMoveCount: number
   let isSacrifice = false;
   if (move) {
     const captured = move.captured ? PIECE_VALUE[move.captured] ?? 0 : 0;
+    // A promotion creates material (pawn -> queen). Even if the new piece is then
+    // captured (e.g. queening to force a rook to take it), you didn't give up a
+    // piece - so credit the promotion gain. Otherwise SEE sees the full queen
+    // value being won and mislabels a common promotion as a sacrifice.
+    const promotionGain = move.promotion ? (PIECE_VALUE[move.promotion] ?? 0) - PIECE_VALUE.p : 0;
     const see = staticExchangeEval(childFen, move.to);
-    isSacrifice = see - captured >= 2;
+    isSacrifice = see - captured - promotionGain >= 2;
   }
   const facts = { legalMoveCount, isSacrifice };
   if (factsCache.size > 5000) factsCache.clear();

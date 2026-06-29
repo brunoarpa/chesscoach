@@ -6,7 +6,6 @@ import { ChessBoard, type ReviewReport } from "@/components/lesson/chess-board";
 import { MOVE_CLASS_STYLE } from "@/components/lesson/move-class-style";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus } from "lucide-react";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { MOVE_CLASSES } from "@/lib/game-review";
 
 // Public, login-free game review. Reuses the real lesson board (same engine,
@@ -22,7 +21,7 @@ const REVIEW_USER_ID = "review-user";
 
 function CtaCard({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
-    <div className="space-y-4 p-4">
+    <div>
       <div className="rounded-lg border p-4 space-y-3">
         <h2 className="font-semibold text-base">See a mistake you keep making?</h2>
         <p className="text-sm text-muted-foreground">
@@ -57,7 +56,7 @@ function ReportBreakdown({ report }: { report: ReviewReport | null }) {
   if (!report) return null;
   const { whiteName, blackName, summary } = report;
   return (
-    <div className="px-4 pb-4">
+    <div>
       <div className="rounded-lg border overflow-hidden">
         <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px] font-semibold border-b bg-muted/40">
           <span className="flex items-center gap-1 min-w-0">
@@ -70,7 +69,7 @@ function ReportBreakdown({ report }: { report: ReviewReport | null }) {
           </span>
         </div>
         <div className="divide-y">
-          {MOVE_CLASSES.map((c) => {
+          {MOVE_CLASSES.filter((c) => c !== "forced").map((c) => {
             const s = MOVE_CLASS_STYLE[c];
             const w = summary ? summary.white.counts[c] : null;
             const b = summary ? summary.black.counts[c] : null;
@@ -98,8 +97,15 @@ function ReportBreakdown({ report }: { report: ReviewReport | null }) {
 }
 
 export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
-  const isDesktop = useMediaQuery("(min-width: 768px)");
   const [report, setReport] = useState<ReviewReport | null>(null);
+
+  // Left column (under the board's report card): move-type table, then the CTA.
+  const leftPanel = (
+    <>
+      <ReportBreakdown report={report} />
+      <CtaCard isLoggedIn={isLoggedIn} />
+    </>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -116,41 +122,21 @@ export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
         </Button>
       </div>
 
-      {isDesktop ? (
-        <div className="flex flex-1 min-h-0">
-          <div className="flex-1 min-w-0 flex justify-center items-start p-4 overflow-y-auto min-h-0">
-            <ChessBoard
-              local
-              startImportOpen
-              lessonId={REVIEW_LESSON_ID}
-              userId={REVIEW_USER_ID}
-              isCoach={false}
-              onReport={setReport}
-            />
-          </div>
-          <div className="w-[360px] border-l flex flex-col min-h-0 overflow-y-auto">
-            <CtaCard isLoggedIn={isLoggedIn} />
-            <ReportBreakdown report={report} />
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-1 min-h-0 flex-col overflow-y-auto">
-          <div className="p-2 flex justify-center items-start">
-            <ChessBoard
-              local
-              startImportOpen
-              lessonId={REVIEW_LESSON_ID}
-              userId={REVIEW_USER_ID}
-              isCoach={false}
-              onReport={setReport}
-            />
-          </div>
-          <div className="border-t">
-            <CtaCard isLoggedIn={isLoggedIn} />
-            <ReportBreakdown report={report} />
-          </div>
-        </div>
-      )}
+      {/* ChessBoard owns the responsive layout: 3 columns on desktop
+          (report+table+coach | board | move list), stacked on mobile with a
+          horizontal move strip. */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3">
+        <ChessBoard
+          local
+          startImportOpen
+          multiPane
+          lessonId={REVIEW_LESSON_ID}
+          userId={REVIEW_USER_ID}
+          isCoach={false}
+          onReport={setReport}
+          leftPanel={leftPanel}
+        />
+      </div>
     </div>
   );
 }

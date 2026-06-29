@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import {
   classifyMove,
   classifyDetailed,
+  classifyPlayedMove,
   staticExchangeEval,
   evalToCp,
   winChance,
@@ -155,6 +156,22 @@ describe("staticExchangeEval", () => {
   it("returns 0 for an empty square", () => {
     const fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
     expect(staticExchangeEval(fen, "d5")).toBe(0);
+  });
+});
+
+describe("classifyPlayedMove - promotions are not sacrifices", () => {
+  it("does not call a queening move that forces a rook capture 'brilliant'", () => {
+    // White Ke1, Pa7; Black Ke8, Rh8. a8=Q+ forces Rxa8 - a pawn becomes a queen
+    // that gets traded for a rook: a material GAIN, not a sacrifice.
+    const parentFen = "4k2r/P7/8/8/8/8/8/4K3 w k - 0 1";
+    const g = new Chess(parentFen);
+    const mv = g.move("a8=Q");
+    const childFen = g.fen();
+    const cls = classifyPlayedMove(
+      { fen: parentFen, cp: 800, secondCp: 600, bestSan: mv.san },
+      { fen: childFen, cp: 800 },
+    );
+    expect(cls).not.toBe("brilliant");
   });
 });
 
