@@ -37,6 +37,17 @@ export function WithdrawForm({
       .catch(() => setConnectStatus({ connected: false }));
   }, []);
 
+  // The withdrawal reloads the page to refresh balances, which would wipe the
+  // success toast before it's readable. We stash the message and replay it once
+  // the page comes back so the "1-2 business days" note actually gets seen.
+  useEffect(() => {
+    const msg = sessionStorage.getItem("withdrawSuccess");
+    if (msg) {
+      sessionStorage.removeItem("withdrawSuccess");
+      toast.success(msg, { duration: 8000 });
+    }
+  }, []);
+
   const pendingDollars = pendingEarnings / 100;
   // Withdrawable excludes earnings held pending a no-show dispute - mirrors the
   // server-side hold so the form never offers money the API will refuse.
@@ -77,7 +88,8 @@ export function WithdrawForm({
       const data = await res.json();
 
       if (data.success) {
-        toast.success(
+        sessionStorage.setItem(
+          "withdrawSuccess",
           `$${(data.net / 100).toFixed(2)} sent to your payout account - funds typically arrive in your bank in 1-2 business days.`,
         );
         window.location.reload();
