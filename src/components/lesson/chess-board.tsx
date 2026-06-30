@@ -237,6 +237,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Lighter live-engine settings on phones; the desktop defaults stay full.
   const evalMultiPv = isMobile ? 2 : 5;
   const evalMoveTimeMs = isMobile ? 300 : 500;
+  // On phones in review, the eval bar goes horizontal at the top (chess.com
+  // style) rather than vertical beside the board.
+  const horizontalBar = multiPane && isMobile;
 
   // Background whole-game review: evaluates every imported mainline position so
   // the move list and report card can be filled in while the user explores.
@@ -307,17 +310,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   // A whole-game review is queued for the imported mainline.
   const reviewActive = engineEnabled && reviewFens.length > 2;
-  // While that review is still running, classifications and the graph must not
-  // be shown - they'd flicker (good -> excellent, etc.) as evals stream in. Only
-  // reveal them once the whole pass is complete. When no review is queued (live
-  // exploration of a variation), classifications show immediately as before.
-  const classificationsReady = !reviewActive || reviewSummary !== null;
 
-  // Classification per mainline node. Held empty until classifications are ready,
-  // so nothing changes mid-analysis; then computed once from the complete evals.
+  // Classification per mainline node. Computed incrementally as evals stream in,
+  // so each move classifies one-by-one (in order) while the review runs - the
+  // review worker analyzes positions in order and the live eval bar is paused
+  // during it, so a move never flips classification once set. (The graph and the
+  // report-card accuracy still wait for the full pass; they need every eval.)
   const moveClasses = useMemo(() => {
     const m = new Map<string, MoveClass>();
-    if (!classificationsReady) return m;
     for (let i = 0; i < mainlinePositions.length; i++) {
       const p = mainlinePositions[i];
       const parentPE = combinedEvals.get(p.parentFen);
@@ -332,7 +332,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       );
     }
     return m;
-  }, [mainlinePositions, combinedEvals, classificationsReady]);
+  }, [mainlinePositions, combinedEvals]);
 
   // Surface the report to a parent (the review page renders the per-class
   // breakdown in its sidebar). `summary` is null while still analysing, so the
@@ -751,7 +751,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!widthEl) return;
     const scrollCol = containerRef.current?.parentElement ?? null;
     const update = () => {
-      const evalReserve = showHints && engineEnabled ? EVAL_BAR_RESERVE : 0;
+      // Only the vertical bar (beside the board) eats into width; the horizontal
+      // phone bar sits above the board, so it needs no width reserve.
+      const evalReserve = showHints && engineEnabled && !horizontalBar ? EVAL_BAR_RESERVE : 0;
       const w = widthEl.clientWidth - evalReserve;
       const h = multiPane
         ? window.innerHeight - widthEl.getBoundingClientRect().top - BOARD_BOTTOM_RESERVE - COLUMN_PADDING
@@ -767,7 +769,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [showHints, engineEnabled, multiPane, editMode]);
+  }, [showHints, engineEnabled, multiPane, editMode, horizontalBar]);
 
   // Keep the mobile move strip scrolled to the current move as you navigate.
   useEffect(() => {
@@ -1102,7 +1104,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return last ? { from: last.from as string, to: last.to as string } : null;
   }, [game, atRoot]);
 
-  const currentMoveClass = showHints && !atRoot && classificationsReady ? classifyMoveAtNode(currentNodeId) : null;
+  const currentMoveClass = showHints && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
 
   // Square size in px (board width / 8), so the corner badge scales with the board.
   const renderSquare: SquareRenderer = ({ square, children }) => {
@@ -1680,10 +1682,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           Fixed height (shrink-0): the board is sized to the measured square
           (boardPx) from the column, not from leftover flex space, so it never
           resizes when the content below changes. */}
+      {/* Phone review: horizontal eval bar at the top (chess.com-style). */}
+      {showHints && engineEnabled && horizontalBar && (
+        <div className="shrink-0" style={{ width: boardPx || undefined }}>
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} horizontal widthPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
+        </div>
+      )}
       {/* Player at the top of the board (the side opposite the orientation). */}
       {playerStrip(boardOrientation === "white" ? "black" : "white")}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
-        {showHints && engineEnabled && (
+        {showHints && engineEnabled && !horizontalBar && (
           <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
         )}
         <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
@@ -1723,10 +1731,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToStart} disabled={atRoot} title="First move">
           <ChevronsLeft className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goBack} disabled={atRoot} title="Previous move">
+        {/* On mobile review the single-step arrows live beside the move strip
+            (below), so hide them here to avoid duplication. */}
+        <Button variant="ghost" size="icon" className={`h-9 w-9 ${multiPane ? "max-lg:hidden" : ""}`} onClick={goBack} disabled={atRoot} title="Previous move">
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goForward} disabled={!hasForward} title="Next move">
+        <Button variant="ghost" size="icon" className={`h-9 w-9 ${multiPane ? "max-lg:hidden" : ""}`} onClick={goForward} disabled={!hasForward} title="Next move">
           <ChevronRight className="h-5 w-5" />
         </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToEnd} disabled={!hasForward} title="Latest move">
@@ -1736,9 +1746,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setBoardOrientation((o) => o === "white" ? "black" : "white")} title="Flip board">
           <ArrowDownUp className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={requestReset} title="New game (clears the board)">
-          <FilePlus className="h-5 w-5" />
-        </Button>
+        {/* "New game" (clear) is redundant in review - import or Set up replace
+            the board - so it's only offered in a real lesson. */}
+        {!multiPane && (
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={requestReset} title="New game (clears the board)">
+            <FilePlus className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowImport(!showImport)} title="Upload PGN, FEN, or game link">
           <Upload className="h-5 w-5" />
         </Button>
@@ -1800,9 +1814,20 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
-      {/* Mobile review: horizontal move strip lives in the center column, below
-          the controls (chess.com-style). Desktop uses the right column instead. */}
-      {multiPane && <div className="w-full lg:hidden">{renderMoveStrip()}</div>}
+      {/* Mobile review: horizontal move strip in the center column, below the
+          controls (chess.com-style), with the single-step arrows on its sides.
+          Desktop uses the right-column vertical list instead. */}
+      {multiPane && (
+        <div className="w-full lg:hidden flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={goBack} disabled={atRoot} title="Previous move">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">{renderMoveStrip()}</div>
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={goForward} disabled={!hasForward} title="Next move">
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
       </div>
       {/* RIGHT column: the full vertical move list, scrolls when long. */}
       <div className={multiPane ? "w-full min-w-0 flex flex-col gap-2 order-3 hidden lg:flex lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" : "contents"}>

@@ -25,6 +25,10 @@ interface Props {
   // Suspend searching without unmounting. Used to guarantee only one engine
   // searches at a time on mobile (the background review takes priority).
   paused?: boolean;
+  // Render a horizontal bar (above the board) instead of the vertical one beside
+  // it - used on phones in review, chess.com-style. `widthPx` matches the board.
+  horizontal?: boolean;
+  widthPx?: number;
 }
 
 const MULTI_PV = 5;
@@ -44,7 +48,7 @@ const LINES_EMIT_THROTTLE_MS = 120;
 // much at the extremes.
 const WIN_PROB_K = 0.00368208;
 
-export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS, paused = false }: Props) {
+export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS, paused = false, horizontal = false, widthPx }: Props) {
   const workerRef = useRef<Worker | null>(null);
   // Read inside the worker callbacks, which are set up once; refs keep them
   // current without re-spawning the worker when the props change.
@@ -247,6 +251,33 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiP
     : Math.abs(evaluation / 100).toFixed(1);
   // The number sits at the leading side's end of the bar (chess.com style).
   const leaderAtBottom = leaderIsWhite ? whiteAtBottom : !whiteAtBottom;
+
+  // Horizontal bar (phone, above the board): the vertical bar rotated - white
+  // sits on the right (board not flipped), black on the left, number at the
+  // leader's end. chess.com-style.
+  if (horizontal) {
+    const whiteAtRight = boardOrientation === "white";
+    const leaderAtRight = leaderIsWhite ? whiteAtRight : !whiteAtRight;
+    return (
+      <div
+        className="relative h-5 w-full rounded-sm overflow-hidden border border-border bg-zinc-800 select-none"
+        style={{ width: widthPx ?? "100%" }}
+      >
+        <div
+          className="absolute top-0 bottom-0 bg-white transition-all duration-300 ease-out"
+          style={{ width: `${whitePercent}%`, ...(whiteAtRight ? { right: 0 } : { left: 0 }) }}
+        />
+        <div
+          className={`absolute top-0 bottom-0 flex items-center px-1.5 text-[10px] font-mono font-bold leading-none ${
+            leaderIsWhite ? "text-zinc-900" : "text-white"
+          }`}
+          style={{ [leaderAtRight ? "right" : "left"]: 0 }}
+        >
+          {evalMagnitude}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
