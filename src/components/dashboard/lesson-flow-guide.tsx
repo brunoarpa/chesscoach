@@ -53,7 +53,9 @@ export function LessonFlowGuide() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  if (pathname?.startsWith("/lesson/")) {
+  // Hidden on board surfaces (lesson rooms, practice, game review) - it's a
+  // distraction there and overlaps the controls.
+  if (pathname?.startsWith("/lesson/") || pathname === "/review") {
     return null;
   }
 

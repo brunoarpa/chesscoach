@@ -1726,6 +1726,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       {/* Player at the bottom of the board (matches the orientation). */}
       {playerStrip(boardOrientation === "white" ? "white" : "black")}
 
+      {/* Mobile review: horizontal move strip sits ABOVE the other controls
+          (chess.com-style), with the single-step arrows on its sides. Placing it
+          here (and the game status below the controls) means the strip's arrows
+          stay put as you step forward. Desktop uses the right-column list. */}
+      {multiPane && (
+        <div className="w-full lg:hidden flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={goBack} disabled={atRoot} title="Previous move">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">{renderMoveStrip()}</div>
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={goForward} disabled={!hasForward} title="Next move">
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
+
       {/* Move navigation */}
       <div className="flex items-center gap-1 flex-wrap justify-center">
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={goToStart} disabled={atRoot} title="First move">
@@ -1814,20 +1830,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         </div>
       )}
 
-      {/* Mobile review: horizontal move strip in the center column, below the
-          controls (chess.com-style), with the single-step arrows on its sides.
-          Desktop uses the right-column vertical list instead. */}
-      {multiPane && (
-        <div className="w-full lg:hidden flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={goBack} disabled={atRoot} title="Previous move">
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div className="min-w-0 flex-1">{renderMoveStrip()}</div>
-          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={goForward} disabled={!hasForward} title="Next move">
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
       </div>
       {/* RIGHT column: the full vertical move list, scrolls when long. */}
       <div className={multiPane ? "w-full min-w-0 flex flex-col gap-2 order-3 hidden lg:flex lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" : "contents"}>
@@ -1975,8 +1977,26 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
                   ) : (
                     ccGames.map((g) => {
                       const date = new Date(g.endTime * 1000);
-                      const resultLabel = g.result === "draw" ? "Draw" : g.result === "white" ? "White won" : "Black won";
-                      const resultColor = g.result === "draw" ? "text-amber-500" : g.result === "white" ? "text-emerald-500" : "text-sky-400";
+                      // Show the result from the searched player's perspective
+                      // (Win / Loss / Draw) rather than which colour won.
+                      const u = ccUsername.trim().toLowerCase();
+                      const playerIsWhite = g.white.username.toLowerCase() === u;
+                      const playerIsBlack = g.black.username.toLowerCase() === u;
+                      const playerSide = playerIsWhite ? "white" : playerIsBlack ? "black" : null;
+                      const resultLabel =
+                        g.result === "draw"
+                          ? "Draw"
+                          : playerSide
+                            ? g.result === playerSide ? "Win" : "Loss"
+                            : g.result === "white" ? "White won" : "Black won";
+                      const resultColor =
+                        resultLabel === "Draw"
+                          ? "text-amber-500"
+                          : resultLabel === "Win"
+                            ? "text-emerald-500"
+                            : resultLabel === "Loss"
+                              ? "text-rose-500"
+                              : "text-muted-foreground";
                       return (
                         <button
                           key={g.url}
