@@ -12,6 +12,7 @@ import type { NextConfig } from "next";
 //  - object-src 'none'       -> no <object>/<embed>/Flash injection
 //  - base-uri 'self'         -> blocks <base> tag hijacking of relative URLs
 //  - script-src allowlist    -> blocks loading external <script src> payloads
+//    (allows Stripe + Google Analytics/gtag, which load real <script src>)
 //
 // 'unsafe-inline'/'unsafe-eval' are required: Next's App Router emits inline
 // hydration scripts (no nonce by default) and Stockfish instantiates WASM in a
@@ -19,7 +20,7 @@ import type { NextConfig } from "next";
 // worker-src, so it must list blob: too). A future hardening step is a
 // nonce-based policy that drops 'unsafe-inline'.
 const csp = [
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://js.stripe.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://js.stripe.com https://www.googletagmanager.com",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
