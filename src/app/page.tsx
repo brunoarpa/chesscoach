@@ -19,65 +19,48 @@ export default async function Home() {
   const hasTrials = trialsRemaining > 0;
 
   return (
-    <div className="flex flex-col items-center px-4 pt-16 pb-20 gap-14">
-      {/* Hero */}
-      <div className="text-center space-y-6 max-w-2xl">
-        <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter text-balance">
-          Stuck at the same{" "}
-          <span className="text-emerald-600 dark:text-emerald-400">rating?</span>
+    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-10 px-4 pt-12 pb-16">
+      <div className="text-center space-y-5 max-w-2xl">
+        <h1 className="text-6xl sm:text-7xl font-bold tracking-tighter text-balance">
+          ♝ EloChaser
         </h1>
-        <p className="text-lg sm:text-2xl text-muted-foreground text-balance">
-          Review any game for free, then play through your mistakes live with a
-          coach until they stop happening.
+        <p className="text-lg sm:text-xl font-medium text-muted-foreground text-balance">
+          Stuck at the same rating? Review your game free, then fix your
+          mistakes live with a coach.
         </p>
-
         {hasTrials && (
-          <p className="text-xl sm:text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
-            Your first {trialsRemaining} lesson{trialsRemaining === 1 ? "" : "s"} {trialsRemaining === 1 ? "is" : "are"} on the house.
+          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">
+            Your first {trialsRemaining} lesson{trialsRemaining === 1 ? "" : "s"} free.
           </p>
         )}
-
-        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-          <Link href="/review">
-            <Button size="lg" className="w-full sm:w-auto text-base">
-              Review your game free
-            </Button>
-          </Link>
-          <Link href="/search">
-            <Button size="lg" variant="outline" className="w-full sm:w-auto text-base">
-              Find a coach
-            </Button>
-          </Link>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          No sign-up needed to review a game.
-        </p>
       </div>
 
-      {/* Three pillars */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl w-full">
-        <div className="space-y-2 p-6 rounded-xl border bg-card text-center">
-          <div className="text-3xl">🔍</div>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Link href="/review">
+          <Button size="lg" className="w-full sm:w-auto">Review your game free</Button>
+        </Link>
+        <Link href="/search">
+          <Button size="lg" variant="outline" className="w-full sm:w-auto">Find a coach</Button>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 max-w-4xl w-full">
+        <div className="space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Free game review</h3>
-          <p className="text-sm text-muted-foreground">
-            Paste any game and see every blunder in seconds, powered by the same
-            engine your coach uses.
+          <p className="text-base text-muted-foreground">
+            Spot every blunder in seconds, no sign-up needed.
           </p>
         </div>
-        <div className="space-y-2 p-6 rounded-xl border bg-card text-center">
-          <div className="text-3xl">🎁</div>
+        <div className="space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Free trial lessons</h3>
-          <p className="text-sm text-muted-foreground">
-            Try coaches with zero risk. You only pay once you have found one
-            worth keeping.
+          <p className="text-base text-muted-foreground">
+            Try any coach at no cost before you pay.
           </p>
         </div>
-        <div className="space-y-2 p-6 rounded-xl border bg-card text-center">
-          <div className="text-3xl">♟️</div>
+        <div className="space-y-2 p-6 rounded-lg border">
           <h3 className="font-semibold text-lg">Affordable coaches</h3>
-          <p className="text-sm text-muted-foreground">
-            Top up one wallet and spend it with any coach. No checkout, no
-            PayPal-ing strangers before every lesson.
+          <p className="text-base text-muted-foreground">
+            One wallet, every coach. No checkout each time.
           </p>
         </div>
       </div>
