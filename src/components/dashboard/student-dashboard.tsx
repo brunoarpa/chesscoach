@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cancelLessonRequest, declineAcceptedLesson, submitReview, disputeLesson, confirmLessonCompletion } from "@/lib/actions/lessons";
+import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -564,6 +565,7 @@ function ReviewBlock({ request }: { request: Request }) {
     const result = await submitReview(formData);
     if (result.error) toast.error(result.error);
     else {
+      track("review_left", { rating: Number(formData.get("rating")) || undefined });
       toast.success("Review submitted!");
       setSaved(true);
       setShowReview(false);

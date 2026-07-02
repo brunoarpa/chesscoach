@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { signUpWithPassword } from "@/lib/actions/password-auth";
+import { track } from "@/lib/analytics";
 
 export function SignupForm() {
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export function SignupForm() {
             setError(result.error);
             return;
           }
+          track("sign_up", { method: "password" });
           setSentTo(emailValue);
         });
       }}

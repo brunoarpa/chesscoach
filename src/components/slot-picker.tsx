@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { createLessonRequest } from "@/lib/actions/lessons";
+import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 import { Calendar, CheckCircle2, Clock } from "lucide-react";
 
@@ -115,6 +116,13 @@ export function SlotPicker({
       toast.error(result.error);
     } else {
       const bookedSlot = localSlots.find((s) => s.id === selectedSlotId);
+      const lessonType = isTrial ? "trial" : commMethod === "CALL" ? "call" : "chat";
+      track("booking_created", { lesson_type: lessonType, value: slotPrice / 100, currency: "USD" });
+      // Paid bookings commit the student's money (reserved from wallet now,
+      // debited on completion) - the revenue-intent step of the funnel.
+      if (!isTrial) {
+        track("lesson_paid", { lesson_type: lessonType, value: slotPrice / 100, currency: "USD" });
+      }
       toast.success(isTrial ? "Free trial request sent!" : "Lesson request sent!");
       if (bookedSlot) {
         setLastBookedSlot({ startTime: bookedSlot.startTime, isTrial });
