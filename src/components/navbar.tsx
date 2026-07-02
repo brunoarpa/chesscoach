@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Wallet, ScanSearch } from "lucide-react";
+import { Search, ScanSearch } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
@@ -79,14 +79,6 @@ export async function Navbar() {
           {/* Desktop account zone */}
           {session?.user ? (
             <div className="hidden md:flex items-center gap-2">
-              <NavLink
-                href="/wallet"
-                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full hover:bg-muted transition-colors"
-                activeClassName="bg-muted font-medium"
-              >
-                <Wallet className="h-4 w-4" />
-                ${(walletAvailable / 100).toFixed(2)}
-              </NavLink>
               {session.user.id && (
                 <NotificationBell
                   userId={session.user.id}

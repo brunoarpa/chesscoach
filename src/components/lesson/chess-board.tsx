@@ -1658,14 +1658,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
                     </p>
                     <p className="text-xl font-bold leading-tight">{side.accuracy}%</p>
                     <p className="text-[11px] text-muted-foreground">accuracy</p>
-                    <p className="text-xs mt-0.5">~{side.estRating} est. rating</p>
                   </div>
                 ))}
               </div>
 
               {renderEvalGraph(reviewSummary.graph)}
               <p className="text-[10px] text-muted-foreground">
-                Accuracy and estimated rating are approximate.
+                Accuracy is approximate.
               </p>
             </>
           )}

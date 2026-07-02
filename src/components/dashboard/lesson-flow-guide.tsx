@@ -9,44 +9,44 @@ import { Button } from "@/components/ui/button";
 const steps = [
   {
     number: 1,
-    title: "Request a Lesson",
-    description: "Pick an open time slot on a coach's profile, choose chat or audio call, and tell them what you want to work on. The coach is emailed the moment you book, so they'll see it even if they aren't online. The lesson price is reserved from your wallet.",
+    title: "Request a lesson",
+    description: "Pick a slot on a coach's profile, choose chat or audio, and say what you want to work on. The price is held from your wallet.",
   },
   {
     number: 2,
-    title: "Coach Accepts",
-    description: "The coach reviews and accepts or declines. If they decline, the reserved funds are released back to your wallet.",
+    title: "Coach accepts",
+    description: "They accept or decline. A decline refunds your wallet instantly.",
   },
   {
     number: 3,
-    title: "Join the Lesson Room",
-    description: "The in-app lesson room unlocks 5 minutes before the scheduled time, so you can both settle in early. The lesson itself runs over its booked time slot.",
+    title: "Join the room",
+    description: "The lesson room opens 5 minutes before your start time.",
   },
   {
     number: 4,
-    title: "Have the Lesson",
-    description: "Work through positions together on a shared, live chess board while you talk over the built-in chat or audio call. Everything happens right here, no outside apps needed.",
+    title: "Have the lesson",
+    description: "Work through positions on a shared live board over chat or audio. No outside apps.",
   },
   {
     number: 5,
-    title: "Lesson Completes",
-    description: "After the lesson ends, the student can Confirm to release payment to the coach right away, otherwise it transfers automatically 24 hours after the scheduled end. If something went wrong, the student can Report Issue during that window for admin review.",
+    title: "Lesson completes",
+    description: "Confirm to pay your coach, or it transfers automatically 24h later. Something went wrong? Report Issue in that window.",
   },
   {
     number: 6,
-    title: "Leave Reviews",
-    description: "Rate each other 1 to 5 stars to help the community.",
+    title: "Leave reviews",
+    description: "Rate each other 1 to 5 stars.",
   },
 ];
 
 // What actually happens once you're in the room - sets student expectations so
 // they come in with a goal rather than wondering what a lesson "is".
 const activities = [
-  "Review your own games together and find where they went wrong",
-  "Have positions and ideas explained on a live, shared board",
-  "Work through tactics and endgame puzzles",
-  "Play practice games against each other",
-  "Talk through openings, plans, and where to improve next",
+  "Review your games and find where they went wrong",
+  "See positions and ideas on a live board",
+  "Drill tactics and endgames",
+  "Play practice games",
+  "Talk openings, plans, and what to improve next",
 ];
 
 export function LessonFlowGuide() {
@@ -114,7 +114,7 @@ export function LessonFlowGuide() {
           <div className="mt-6">
             <p className="text-sm font-medium">What happens in a lesson?</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Tell your coach what you want (endgames, a game review, tactical or positional play) and you can:
+              Tell your coach what to focus on, then:
             </p>
             <ul className="mt-2 space-y-1.5">
               {activities.map((item) => (
@@ -125,7 +125,7 @@ export function LessonFlowGuide() {
               ))}
             </ul>
             <p className="text-xs text-muted-foreground mt-2">
-              The board is shared live, so every move, arrow, and highlight shows up for both of you instantly. A built-in Stockfish 18 engine (around 3600 Elo) backs the analysis and move ratings.
+              The board updates live for both of you, backed by Stockfish 18 (~3600 Elo).
             </p>
           </div>
 
@@ -133,7 +133,7 @@ export function LessonFlowGuide() {
           <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <p className="text-sm font-medium">Want to try it first?</p>
             <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-              Open a free practice room with the real board and tools, just for you. No booking, nothing saved.
+              Open a free practice room with the real board and tools. No booking.
             </p>
             <Button asChild size="sm" className="w-full gap-2">
               <Link href="/lesson/practice" onClick={() => setOpen(false)}>
