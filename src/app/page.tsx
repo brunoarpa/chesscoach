@@ -19,82 +19,65 @@ export default async function Home() {
   const hasTrials = trialsRemaining > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-10 px-4 pt-12 pb-16">
-      <div className="text-center space-y-5 max-w-2xl">
-        <h1 className="text-6xl sm:text-7xl font-bold tracking-tighter text-balance">
-          ♝ EloChaser
+    <div className="flex flex-col items-center px-4 pt-16 pb-20 gap-14">
+      {/* Hero */}
+      <div className="text-center space-y-6 max-w-2xl">
+        <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter text-balance">
+          Stuck at the same{" "}
+          <span className="text-emerald-600 dark:text-emerald-400">rating?</span>
         </h1>
-        <p className="text-lg sm:text-xl font-medium text-muted-foreground text-balance">
-          Stuck at the same rating? Review your game free, then play through it
-          with a coach on a live board until the mistakes stop.
+        <p className="text-lg sm:text-2xl text-muted-foreground text-balance">
+          Review any game for free, then play through your mistakes live with a
+          coach until they stop happening.
         </p>
-        {hasTrials ? (
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 text-balance">
-            You have {trialsRemaining} completely free trial lesson{trialsRemaining === 1 ? "" : "s"}.
-          </p>
-        ) : (
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">
-            Ready for your next lesson? Pick a coach and book in seconds.
+
+        {hasTrials && (
+          <p className="text-xl sm:text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
+            Your first {trialsRemaining} lesson{trialsRemaining === 1 ? "" : "s"} {trialsRemaining === 1 ? "is" : "are"} on the house.
           </p>
         )}
-      </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Link href="/review">
-          <Button size="lg" className="w-full sm:w-auto">Review your game free</Button>
-        </Link>
-        <Link href="/search">
-          <Button size="lg" variant="outline" className="w-full sm:w-auto">Find a Coach</Button>
-        </Link>
-        {session?.user ? (
-          session.user.needsUsername ? (
-            <Link href="/setup-username">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                Set Up Your Profile →
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/dashboard">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                Dashboard
-              </Button>
-            </Link>
-          )
-        ) : (
-          <Link href="/login">
-            <Button size="lg" variant="outline" className="w-full sm:w-auto">
-              Sign up free
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <Link href="/review">
+            <Button size="lg" className="w-full sm:w-auto text-base">
+              Review your game free
             </Button>
           </Link>
-        )}
+          <Link href="/search">
+            <Button size="lg" variant="outline" className="w-full sm:w-auto text-base">
+              Find a coach
+            </Button>
+          </Link>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          No sign-up needed to review a game.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 max-w-4xl w-full">
-        <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">One wallet, every coach</h3>
-          <p className="text-base text-muted-foreground">
-            Top up once and spend it with any coach on the platform. No re-entering your
-            card, no PayPal-ing strangers, no checkout before every lesson.
+      {/* Three pillars */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl w-full">
+        <div className="space-y-2 p-6 rounded-xl border bg-card text-center">
+          <div className="text-3xl">🔍</div>
+          <h3 className="font-semibold text-lg">Free game review</h3>
+          <p className="text-sm text-muted-foreground">
+            Paste any game and see every blunder in seconds, powered by the same
+            engine your coach uses.
           </p>
         </div>
-        <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Try it before you pay</h3>
-          <p className="text-base text-muted-foreground">
-            <Link href="/review" className="underline underline-offset-2 hover:text-foreground">
-              Review your game free
-            </Link>{" "}
-            with the same engine your coach uses, or{" "}
-            <Link href="/lesson/practice" className="underline underline-offset-2 hover:text-foreground">
-              explore the lesson room
-            </Link>{" "}
-            in a private sandbox. No sign-up needed.
+        <div className="space-y-2 p-6 rounded-xl border bg-card text-center">
+          <div className="text-3xl">🎁</div>
+          <h3 className="font-semibold text-lg">Free trial lessons</h3>
+          <p className="text-sm text-muted-foreground">
+            Try coaches with zero risk. You only pay once you have found one
+            worth keeping.
           </p>
         </div>
-        <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Coaches you can trust</h3>
-          <p className="text-base text-muted-foreground">
-            Ratings are built from real completed lessons, not self-reported claims.
-            Coaches can add a verified chess.com badge for extra proof.
+        <div className="space-y-2 p-6 rounded-xl border bg-card text-center">
+          <div className="text-3xl">♟️</div>
+          <h3 className="font-semibold text-lg">Affordable coaches</h3>
+          <p className="text-sm text-muted-foreground">
+            Top up one wallet and spend it with any coach. No checkout, no
+            PayPal-ing strangers before every lesson.
           </p>
         </div>
       </div>

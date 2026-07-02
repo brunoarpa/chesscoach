@@ -14,7 +14,6 @@ import { FavouriteButton } from "@/components/favourite-button";
 import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const continentLabels: Record<string, string> = {
   AFRICA: "Africa",
@@ -140,22 +139,15 @@ export default async function ProfilePage({
   const session = await auth();
   const isOwnProfile = session?.user?.id === user.id;
 
-  // Separate reviews: as coach (from students) vs as student (from coaches)
+  // Reviews shown on profiles are coach reviews (from students). Student-facing
+  // ratings (coaches reviewing students) are hidden for now.
   const coachReviews = user.reviewsReceived.filter(
     (r) => r.lesson.coachId === user.id
-  );
-  const studentReviews = user.reviewsReceived.filter(
-    (r) => r.lesson.studentId === user.id
   );
 
   const avgCoachRating =
     coachReviews.length > 0
       ? coachReviews.reduce((sum, r) => sum + r.rating, 0) / coachReviews.length
-      : null;
-
-  const avgStudentRating =
-    studentReviews.length > 0
-      ? studentReviews.reduce((sum, r) => sum + r.rating, 0) / studentReviews.length
       : null;
 
   // Fetch student wallet balance and free trials for lesson request form
@@ -346,25 +338,15 @@ export default async function ProfilePage({
           <Separator />
 
           <div>
-            <Tabs defaultValue="coach-reviews">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Reviews</h2>
-                <TabsList>
-                  <TabsTrigger value="coach-reviews">
-                    As Coach {avgCoachRating !== null && `(${avgCoachRating.toFixed(1)} ★)`}
-                  </TabsTrigger>
-                  <TabsTrigger value="student-reviews">
-                    As Student {avgStudentRating !== null && `(${avgStudentRating.toFixed(1)} ★)`}
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="coach-reviews">
-                <ReviewList reviews={coachReviews} />
-              </TabsContent>
-              <TabsContent value="student-reviews">
-                <ReviewList reviews={studentReviews} />
-              </TabsContent>
-            </Tabs>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Reviews</h2>
+              {avgCoachRating !== null && (
+                <span className="text-muted-foreground text-sm">
+                  {avgCoachRating.toFixed(1)} ★
+                </span>
+              )}
+            </div>
+            <ReviewList reviews={coachReviews} />
           </div>
         </div>
 
@@ -385,12 +367,6 @@ export default async function ProfilePage({
                 <div>
                   <span className="text-muted-foreground">Coach Rating:</span>{" "}
                   {avgCoachRating.toFixed(1)} ★ ({coachReviews.length} reviews)
-                </div>
-              )}
-              {avgStudentRating !== null && (
-                <div>
-                  <span className="text-muted-foreground">Student Rating:</span>{" "}
-                  {avgStudentRating.toFixed(1)} ★ ({studentReviews.length} reviews)
                 </div>
               )}
               <div>
