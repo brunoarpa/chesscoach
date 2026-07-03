@@ -274,9 +274,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     result: string;
   } | null>(null);
   // Two independent engine toggles (chess.com-style):
-  //   showEval  - the eval bar beside the board.
-  //   showLines - the best-move arrows, the "Best engine moves" box, and the
-  //               per-move classification badges.
+  //   showEval  - the eval bar beside the board, plus the per-move
+  //               classification badges (Brilliant / Blunder / ...).
+  //   showLines - the best-move arrows and the "Best engine moves" box.
   // Either can be off while the other stays on. The engine is coach-only (see
   // engineEnabled below), so these are purely local to the coach and never sync.
   const [showEval, setShowEval] = useState(true);
@@ -371,9 +371,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   // A whole-game review is queued for the imported mainline.
   const reviewActive = engineEnabled && reviewFens.length > 2;
-  // The multi-pane left column exists only when there is something to put in it:
-  // a caller-supplied panel (review's report + CTA) or an active game review.
-  const leftColActive = multiPane && (leftPanel != null || reviewActive);
+  // The multi-pane left column (whole-game review card + report/CTA) belongs to
+  // the game-review room only, which is the caller that passes a leftPanel. The
+  // lesson room passes none, so it never grows a left column - importing a game
+  // there fills the right-hand move/engine column but shows no accuracy card.
+  const leftColActive = multiPane && leftPanel != null;
 
   // Classification per mainline node. Computed incrementally as evals stream in,
   // so each move classifies one-by-one (in order) while the review runs - the
@@ -1165,7 +1167,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return last ? { from: last.from as string, to: last.to as string } : null;
   }, [game, atRoot]);
 
-  const currentMoveClass = showLines && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
+  const currentMoveClass = showEval && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
 
   // Square size in px (board width / 8), so the corner badge scales with the board.
   const renderSquare: SquareRenderer = ({ square, children }) => {
@@ -1289,7 +1291,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       // Move-quality marker (mainline only, when the engine is on): chess.com-style
       // color + glyph for every classified move (best/excellent/good through
       // blunder). Read from the memoized map so the list never replays the game.
-      const cls = isMainline && showLines ? moveClasses.get(nodeId) ?? null : null;
+      const cls = isMainline && showEval ? moveClasses.get(nodeId) ?? null : null;
 
       out.push(
         <button
@@ -1350,7 +1352,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       if (!node) break;
       const isWhite = ply % 2 === 1;
       const moveNum = Math.ceil(ply / 2);
-      const cls = showLines ? moveClasses.get(nodeId) ?? null : null;
+      const cls = showEval ? moveClasses.get(nodeId) ?? null : null;
       const isActive = nodeId === currentNodeId;
       items.push(
         <button
@@ -1516,7 +1518,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   function moveButton(nodeId: string, node: MoveNode, isMainline: boolean): React.ReactNode {
     const isActive = nodeId === currentNodeId;
-    const cls = isMainline && showLines ? moveClasses.get(nodeId) ?? null : null;
+    const cls = isMainline && showEval ? moveClasses.get(nodeId) ?? null : null;
     return (
       <button
         key={nodeId}
