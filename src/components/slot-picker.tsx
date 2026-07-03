@@ -217,20 +217,28 @@ export function SlotPicker({
         <div className="space-y-3">
           {/* Trial option */}
           {freeTrialsRemaining > 0 && coachAcceptingFreeTrials && (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  setIsTrial(!isTrial);
-                  if (!isTrial) setCommMethod("");
-                }}
-                className="bg-green-600 text-white hover:bg-green-700"
-              >
-                {isTrial ? "Free Trial ✓" : "Use Free Trial"}
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {freeTrialsRemaining} trial{freeTrialsRemaining !== 1 ? "s" : ""} left
-              </span>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setIsTrial(!isTrial);
+                    if (!isTrial) setCommMethod("");
+                  }}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  {isTrial ? "Free Trial ✓" : "Use Free Trial"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {freeTrialsRemaining} trial{freeTrialsRemaining !== 1 ? "s" : ""} left
+                </span>
+              </div>
+              {isTrial && (
+                <p className="text-xs text-muted-foreground">
+                  Your free trial is a text (chat) lesson.
+                  {canCall ? " Voice calls unlock when you book a paid lesson." : ""}
+                </p>
+              )}
             </div>
           )}
 
