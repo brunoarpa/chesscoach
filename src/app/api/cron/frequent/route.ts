@@ -35,9 +35,13 @@ export async function GET(request: Request) {
   const results = await Promise.allSettled(named.map(([, p]) => p));
 
   const failures: { task: string; error: string }[] = [];
+  // Per-task resolved values, so a manual hit of this endpoint shows what each
+  // sweep actually did (e.g. sendLessonReminders: { day, hour }). This is how
+  // you tell "cron ran, matched nothing" apart from "cron never ran".
+  const outcomes: Record<string, unknown> = {};
   results.forEach((r, i) => {
+    const task = named[i][0];
     if (r.status === "rejected") {
-      const task = named[i][0];
       const error = r.reason instanceof Error ? r.reason.message : String(r.reason);
       console.error(`Frequent cron task "${task}" failed:`, r.reason);
       // Report to Sentry so the failure is actually visible (console.error alone
@@ -45,6 +49,8 @@ export async function GET(request: Request) {
       // reminders silently stopped). Tag with the sweep name for grouping.
       Sentry.captureException(r.reason, { tags: { cron: "frequent", task } });
       failures.push({ task, error });
+    } else {
+      outcomes[task] = r.value ?? null;
     }
   });
 
@@ -58,6 +64,7 @@ export async function GET(request: Request) {
     {
       success: failures.length === 0,
       timestamp: new Date().toISOString(),
+      outcomes,
       failures,
     },
     { status: allFailed ? 500 : 200 },

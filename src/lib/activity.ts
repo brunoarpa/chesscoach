@@ -91,10 +91,15 @@ export async function updateActivityStatuses() {
  * frequent cron (see /api/cron/frequent) so the 1-hour reminder lands on time;
  * the exact cadence only affects how close to the target the email arrives.
  */
-export async function sendLessonReminders() {
+// Returns how many reminders it sent, so the cron response makes it obvious
+// whether the sweep is actually firing (a run that matched no lessons and a
+// run that never executed look identical otherwise).
+export async function sendLessonReminders(): Promise<{ day: number; hour: number }> {
   const now = new Date();
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const in1h = new Date(now.getTime() + 60 * 60 * 1000);
+  let day = 0;
+  let hour = 0;
 
   const include = {
     student: { select: { email: true, username: true, timezone: true } },
@@ -117,6 +122,7 @@ export async function sendLessonReminders() {
     });
     if (claimed.count === 0) continue;
     await sendReminderPair(lesson, "day");
+    day++;
   }
 
   // 1-hour-before: accepted scheduled lessons starting within the next hour.
@@ -135,7 +141,10 @@ export async function sendLessonReminders() {
     });
     if (claimed.count === 0) continue;
     await sendReminderPair(lesson, "hour");
+    hour++;
   }
+
+  return { day, hour };
 }
 
 type ReminderParty = { email: string | null; username: string | null; timezone: string | null };
@@ -891,4 +900,92 @@ export async function purgeExpiredLessonData() {
       },
     }),
   ]);
+}
+
+/**
+ * Daily nudge for people who received direct messages they haven't read.
+ *
+ * A recipient is only emailed when at least one unread message arrived in the
+ * last 24h (the daily window). That does two things the user asked for: it
+ * sends nothing at all on days with no new DMs, and it stops the digest from
+ * re-nagging someone forever about the same message they keep ignoring - each
+ * new message batch triggers at most one digest. The count in the email is the
+ * recipient's *total* unread across all threads, so it reads truthfully even
+ * when only some of those messages are from today.
+ *
+ * Returns how many digests it sent, for cron visibility.
+ */
+export async function sendUnreadMessageDigests(): Promise<{ sent: number }> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // New unread messages in the window. The recipient is the conversation
+  // participant who is not the sender. Bounded by one day of DMs, so small.
+  const recent = await prisma.directMessage.findMany({
+    where: { readAt: null, createdAt: { gte: since } },
+    select: {
+      senderId: true,
+      conversation: { select: { participantAId: true, participantBId: true } },
+    },
+  });
+
+  const recipientIds = new Set<string>();
+  for (const m of recent) {
+    const { participantAId, participantBId } = m.conversation;
+    recipientIds.add(m.senderId === participantAId ? participantBId : participantAId);
+  }
+  if (recipientIds.size === 0) return { sent: 0 };
+
+  let sent = 0;
+  for (const recipientId of recipientIds) {
+    // Total unread addressed to this recipient (all threads, not just today's),
+    // plus how many distinct people are waiting on a reply.
+    const unreadWhere: Prisma.DirectMessageWhereInput = {
+      readAt: null,
+      senderId: { not: recipientId },
+      conversation: {
+        OR: [{ participantAId: recipientId }, { participantBId: recipientId }],
+      },
+    };
+
+    const [totalUnread, threads, recipient] = await Promise.all([
+      prisma.directMessage.count({ where: unreadWhere }),
+      prisma.directMessage.findMany({
+        where: unreadWhere,
+        select: { conversationId: true },
+        distinct: ["conversationId"],
+      }),
+      prisma.user.findUnique({
+        where: { id: recipientId },
+        select: { email: true },
+      }),
+    ]);
+
+    // The message could have been read between the window query and now, or the
+    // account may have no email - either way, nothing to send.
+    if (totalUnread === 0 || !recipient?.email) continue;
+
+    const threadCount = threads.length;
+    const msgLabel = totalUnread === 1 ? "1 unread message" : `${totalUnread} unread messages`;
+    const fromLabel =
+      threadCount > 1 ? ` from ${threadCount} conversations` : "";
+    const subject = `You have ${msgLabel} on EloChaser`;
+    const bodyHtml = `<p>You have <strong>${msgLabel}</strong>${fromLabel} waiting on EloChaser.</p>
+      <p>Open your messages to read and reply.</p>`;
+
+    try {
+      await sendNotificationEmail({
+        to: recipient.email,
+        subject,
+        heading: "You have unread messages",
+        bodyHtml,
+        link: "/messages",
+        cta: "Open messages",
+      });
+      sent++;
+    } catch (err) {
+      console.error("unread message digest email failed", err);
+    }
+  }
+
+  return { sent };
 }

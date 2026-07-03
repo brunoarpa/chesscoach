@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { recalculateAllElos } from "@/lib/elo";
-import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes, detectNoShows, autoCompleteLessons, purgeExpiredLessonData } from "@/lib/activity";
+import { updateActivityStatuses, expirePendingRequests, detectConfirmationDisputes, detectNoShows, autoCompleteLessons, purgeExpiredLessonData, sendUnreadMessageDigests } from "@/lib/activity";
 import { refreshAllChessComRatings } from "@/lib/chess-com";
 import { prisma } from "@/lib/prisma";
 import { generateUpcomingSlots } from "@/lib/actions/timeslots";
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
     detectNoShows(),
     autoCompleteLessons(),
     purgeExpiredLessonData(),
+    sendUnreadMessageDigests(),
     prisma.rateLimitEntry.deleteMany({ where: { resetAt: { lt: new Date() } } }),
     // Housekeeping: spent/expired auth tokens are dead weight (consumeToken
     // treats missing rows as invalid), and notifications older than 90 days
