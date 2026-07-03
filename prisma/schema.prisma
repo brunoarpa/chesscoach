@@ -94,6 +94,7 @@ enum AbuseFlagType {
   LESSON_DISPUTE
   COACH_NO_SHOW
   STUDENT_NO_SHOW
+  MESSAGE_ABUSE
 }
 
 enum AbuseFlagSeverity {
@@ -118,6 +119,7 @@ enum NotificationType {
   STUDENT_NO_SHOW
   REVIEW_RECEIVED
   COACH_UNAVAILABLE
+  NEW_MESSAGE
 }
 
 model User {
@@ -216,6 +218,9 @@ model User {
   chatMessagesSent  ChatMessage[]
   verificationTokens VerificationToken[]
   notifications     Notification[]
+  conversationsAsCoach   Conversation[]  @relation("ConvCoach")
+  conversationsAsStudent Conversation[]  @relation("ConvStudent")
+  directMessagesSent     DirectMessage[] @relation("DMSender")
 
   @@index([coachElo(sort: Desc)])
   @@index([lastActiveAt])
@@ -587,4 +592,47 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+// Persistent 1:1 direct message thread between a student and a coach. Unlike the
+// lesson ChatMessage (tied to a booking, purged after 30 days), these are kept
+// indefinitely. Only a student may start a thread; the coach can only reply.
+model Conversation {
+  id        String @id @default(cuid())
+
+  coachId   String
+  coach     User   @relation("ConvCoach", fields: [coachId], references: [id])
+
+  studentId String
+  student   User   @relation("ConvStudent", fields: [studentId], references: [id])
+
+  lastMessageAt      DateTime  @default(now()) // inbox ordering
+  blockedByStudentAt DateTime?                 // student muted this coach (coach-side block reuses the global Block model)
+
+  messages  DirectMessage[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([coachId, studentId])
+  @@index([coachId])
+  @@index([studentId])
+  @@index([lastMessageAt])
+}
+
+model DirectMessage {
+  id             String       @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  senderId       String
+  sender         User         @relation("DMSender", fields: [senderId], references: [id])
+
+  content        String
+  readAt         DateTime?
+
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }

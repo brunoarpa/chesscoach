@@ -18,9 +18,16 @@ interface MobileNavProps {
   username?: string;
   isAdmin?: boolean;
   walletAvailable?: number;
+  unreadMessages?: number;
 }
 
-export function MobileNav({ isLoggedIn, username, isAdmin, walletAvailable = 0 }: MobileNavProps) {
+export function MobileNav({
+  isLoggedIn,
+  username,
+  isAdmin,
+  walletAvailable = 0,
+  unreadMessages = 0,
+}: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -48,6 +55,16 @@ export function MobileNav({ isLoggedIn, username, isAdmin, walletAvailable = 0 }
               <div className="border-t my-2" />
               <MobileLink href="/dashboard" onClose={() => setOpen(false)}>
                 Dashboard
+              </MobileLink>
+              <MobileLink href="/messages" onClose={() => setOpen(false)}>
+                <span className="flex items-center justify-between gap-2">
+                  Messages
+                  {unreadMessages > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                </span>
               </MobileLink>
               <MobileLink href="/wallet" onClose={() => setOpen(false)}>
                 <span className="flex items-center justify-between gap-2">

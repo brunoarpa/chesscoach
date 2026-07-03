@@ -11,6 +11,7 @@ import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
 import { getAvailableSlots } from "@/lib/actions/timeslots";
 import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { FavouriteButton } from "@/components/favourite-button";
+import { MessageCoachButton } from "@/components/messages/message-coach-button";
 import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -239,7 +240,10 @@ export default async function ProfilePage({
           </Link>
         )}
         {!isOwnProfile && session?.user && (
-          <FavouriteButton coachId={user.id} initialFavourited={isFavourited} />
+          <div className="flex items-center gap-2">
+            {isCoachProfile && !isBlocked && <MessageCoachButton coachId={user.id} />}
+            <FavouriteButton coachId={user.id} initialFavourited={isFavourited} />
+          </div>
         )}
       </div>
 

@@ -8,23 +8,27 @@ import { NavLink } from "@/components/nav-link";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationBell, type NotificationItem } from "@/components/notification-bell";
 import { getNotifications } from "@/lib/actions/notifications";
+import { getUnreadMessageCount } from "@/lib/actions/messages";
 
 export async function Navbar() {
   const session = await auth();
 
   let notifications: NotificationItem[] = [];
   let unreadCount = 0;
+  let unreadMessages = 0;
   let walletAvailable = 0;
   if (session?.user?.id) {
-    const [user, notifData] = await Promise.all([
+    const [user, notifData, msgCount] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
         select: { lastActiveAt: true, walletBalance: true, reservedBalance: true },
       }),
       getNotifications(),
+      getUnreadMessageCount(),
     ]);
     notifications = notifData.notifications;
     unreadCount = notifData.unreadCount;
+    unreadMessages = msgCount;
 
     if (user) {
       walletAvailable = user.walletBalance - user.reservedBalance;
@@ -86,7 +90,13 @@ export async function Navbar() {
                   initialUnreadCount={unreadCount}
                 />
               )}
-              <AccountMenu username={username} image={image} isAdmin={isAdmin} />
+              <AccountMenu
+                userId={session.user.id}
+                username={username}
+                image={image}
+                isAdmin={isAdmin}
+                initialUnreadMessages={unreadMessages}
+              />
             </div>
           ) : (
             <div className="hidden md:flex items-center gap-2">
@@ -117,6 +127,7 @@ export async function Navbar() {
               username={username ?? undefined}
               isAdmin={isAdmin}
               walletAvailable={walletAvailable}
+              unreadMessages={unreadMessages}
             />
           </div>
         </div>

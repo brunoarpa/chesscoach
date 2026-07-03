@@ -30,6 +30,19 @@ export const depositSchema = z.object({
   amount: z.coerce.number().min(500, "Minimum deposit is $5.00"), // cents
 });
 
+/** Max characters for a single direct message. Kept generous since this is
+ * persistent messaging, not the throwaway 100-char lesson chat. */
+export const MAX_DIRECT_MESSAGE_LENGTH = 2000;
+
+export const directMessageSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, "Message can't be empty")
+    .max(MAX_DIRECT_MESSAGE_LENGTH, `Message must be at most ${MAX_DIRECT_MESSAGE_LENGTH} characters`),
+});
+
+export type DirectMessageInput = z.infer<typeof directMessageSchema>;
 export type UsernameInput = z.infer<typeof usernameSchema>;
 export type LessonRequestInput = z.infer<typeof lessonRequestSchema>;
 export type ReviewInput = z.infer<typeof reviewSchema>;

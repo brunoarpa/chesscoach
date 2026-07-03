@@ -8,3 +8,10 @@ export function userChannel(userId: string): string {
 }
 
 export const NOTIFICATION_NEW_EVENT = "notification:new";
+
+// Direct-messaging events, delivered on the same personal channel so we don't
+// need a separate Pusher channel (or auth rule) per conversation.
+/** A new direct message arrived; pushed to the recipient's personal channel. */
+export const MESSAGE_NEW_EVENT = "message:new";
+/** The recipient read your messages; pushed to the sender's personal channel. */
+export const MESSAGE_READ_EVENT = "message:read";
