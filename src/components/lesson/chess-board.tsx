@@ -6,7 +6,7 @@ import { Chessboard, defaultPieces, type PieceDropHandlerArgs, type SquareHandle
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Lightbulb, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowDownUp, FilePlus, Upload, Trash2 } from "lucide-react";
 import { EvalBar, type EngineLine } from "./eval-bar";
 import { useBoardSync } from "@/hooks/use-board-sync";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -53,6 +53,60 @@ const BOARD_BOTTOM_RESERVE = 64; // move controls + gap kept under the board
 const COLUMN_PADDING = 32; // p-4 (16px top + bottom) on the board column
 const EVAL_BAR_RESERVE = 32; // eval bar (~28px) + gap, only when hints are on
 const MIN_BOARD = 200;
+
+// ---- Captured-material readout (chess.com-style) ----
+// Counts pieces missing from the board vs the starting set to show what each
+// side has captured, plus the net point advantage. Promotions can make this a
+// rough approximation (a promoted queen reads as a "missing" pawn + extra
+// queen), which is the same simplification chess.com's capture strip uses.
+const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+const START_COUNT: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+const CAPTURE_ORDER = ["q", "r", "b", "n", "p"] as const;
+// Solid glyphs for captured black pieces, outline glyphs for captured white
+// pieces, so the two colours read distinctly even in one neutral text colour.
+const GLYPH_BLACK: Record<string, string> = { p: "♟", n: "♞", b: "♝", r: "♜", q: "♛" };
+const GLYPH_WHITE: Record<string, string> = { p: "♙", n: "♘", b: "♗", r: "♖", q: "♕" };
+
+// Small chess.com-style pill switch for the Evaluation / Lines toggles.
+function ToggleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground select-none"
+    >
+      <span>{label}</span>
+      <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${checked ? "bg-green-500" : "bg-muted-foreground/30"}`}>
+        <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${checked ? "translate-x-3.5" : "translate-x-0.5"}`} />
+      </span>
+    </button>
+  );
+}
+
+function capturedMaterial(fen: string) {
+  const placement = fen.split(" ")[0];
+  const on = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } };
+  for (const ch of placement) {
+    const lower = ch.toLowerCase();
+    if (lower in PIECE_VALUE) {
+      const color = ch === ch.toUpperCase() ? "w" : "b";
+      on[color][lower as keyof typeof on.w] += 1;
+    }
+  }
+  const byWhite: Record<string, number> = {}; // black pieces white captured
+  const byBlack: Record<string, number> = {}; // white pieces black captured
+  let whiteMat = 0;
+  let blackMat = 0;
+  for (const t of CAPTURE_ORDER) {
+    byWhite[t] = Math.max(0, START_COUNT[t] - on.b[t]);
+    byBlack[t] = Math.max(0, START_COUNT[t] - on.w[t]);
+    whiteMat += on.w[t] * PIECE_VALUE[t];
+    blackMat += on.b[t] * PIECE_VALUE[t];
+  }
+  return { byWhite, byBlack, adv: whiteMat - blackMat };
+}
 
 // Promotion picker piece options, queen-first (nearest the promotion square).
 const PROMOTION_PIECES: Array<{ type: "q" | "r" | "b" | "n"; key: string }> = [
@@ -219,11 +273,14 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     blackElo: string;
     result: string;
   } | null>(null);
-  // Master engine-hint toggle (the lightbulb): gates the best-move arrows, the
-  // "Best engine moves" list, and the move classifications all together. The
-  // engine is coach-only (see engineEnabled below), so this is purely local to
-  // the coach and is never shared with the student.
-  const [showHints, setShowHints] = useState(true);
+  // Two independent engine toggles (chess.com-style):
+  //   showEval  - the eval bar beside the board.
+  //   showLines - the best-move arrows, the "Best engine moves" box, and the
+  //               per-move classification badges.
+  // Either can be off while the other stays on. The engine is coach-only (see
+  // engineEnabled below), so these are purely local to the coach and never sync.
+  const [showEval, setShowEval] = useState(true);
+  const [showLines, setShowLines] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // In a real lesson the engine is a coach-only teaching aid: it runs only on the
@@ -234,6 +291,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // so the in-browser Stockfish doesn't stutter on a weak CPU.
   const isMobile = useMediaQuery("(max-width: 767px)");
   const engineEnabled = isCoach || local;
+  // The Stockfish worker lives in the EvalBar, which is the source of both the
+  // eval and the line list. Keep it mounted whenever either toggle is on so the
+  // "Lines" box still gets data when the eval bar itself is hidden.
+  const engineRunning = engineEnabled && (showEval || showLines);
   // Lighter live-engine settings on phones; the desktop defaults stay full.
   const evalMultiPv = isMobile ? 2 : 5;
   const evalMoveTimeMs = isMobile ? 300 : 500;
@@ -310,6 +371,9 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   // A whole-game review is queued for the imported mainline.
   const reviewActive = engineEnabled && reviewFens.length > 2;
+  // The multi-pane left column exists only when there is something to put in it:
+  // a caller-supplied panel (review's report + CTA) or an active game review.
+  const leftColActive = multiPane && (leftPanel != null || reviewActive);
 
   // Classification per mainline node. Computed incrementally as evals stream in,
   // so each move classifies one-by-one (in order) while the review runs - the
@@ -653,11 +717,6 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setShowResetConfirm(true);
   }, [hasMoves]);
 
-  const toggleHints = useCallback(() => {
-    // Coach-local: the engine is private to the coach, so this never syncs.
-    setShowHints((v) => !v);
-  }, []);
-
   // ---- Position editor ----
   // Seed the editor from whatever is currently on the board, so you can tweak an
   // existing position rather than always starting from scratch.
@@ -753,7 +812,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     const update = () => {
       // Only the vertical bar (beside the board) eats into width; the horizontal
       // phone bar sits above the board, so it needs no width reserve.
-      const evalReserve = showHints && engineEnabled && !horizontalBar ? EVAL_BAR_RESERVE : 0;
+      const evalReserve = showEval && engineEnabled && !horizontalBar ? EVAL_BAR_RESERVE : 0;
       const w = widthEl.clientWidth - evalReserve;
       const h = multiPane
         ? window.innerHeight - widthEl.getBoundingClientRect().top - BOARD_BOTTOM_RESERVE - COLUMN_PADDING
@@ -769,7 +828,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [showHints, engineEnabled, multiPane, editMode, horizontalBar]);
+  }, [showEval, engineEnabled, multiPane, editMode, horizontalBar]);
 
   // Keep the mobile move strip scrolled to the current move as you navigate.
   useEffect(() => {
@@ -1042,10 +1101,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // Engine arrows for the position currently displayed: bright green for the
   // best move, lighter green for any other line within ~2cp ("excellent").
   const currentFen = game.fen();
+  // Captured pieces + net advantage for the on-board strips (chess.com-style).
+  const capInfo = useMemo(() => capturedMaterial(currentFen), [currentFen]);
   const engineArrows = useMemo<Arrow[]>(() => {
     // Only draw for the position the lines actually belong to - never replay a
     // previous position's best move onto the current board.
-    if (!showHints || engineLines.length === 0 || engineLinesFen !== currentFen) return [];
+    if (!showLines || engineLines.length === 0 || engineLinesFen !== currentFen) return [];
     const bestCp = evalToCp(engineLines[0]);
     const sideToMove: "w" | "b" = currentFen.split(" ")[1] === "b" ? "b" : "w";
     const out: Arrow[] = [];
@@ -1077,7 +1138,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       }
     }
     return out;
-  }, [engineLines, engineLinesFen, currentFen, showHints]);
+  }, [engineLines, engineLinesFen, currentFen, showLines]);
 
   // Classify a played move based on cached evals (parent vs node), using the
   // mainline continuation as the "next" position for sacrifice detection.
@@ -1104,7 +1165,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     return last ? { from: last.from as string, to: last.to as string } : null;
   }, [game, atRoot]);
 
-  const currentMoveClass = showHints && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
+  const currentMoveClass = showLines && !atRoot ? classifyMoveAtNode(currentNodeId) : null;
 
   // Square size in px (board width / 8), so the corner badge scales with the board.
   const renderSquare: SquareRenderer = ({ square, children }) => {
@@ -1228,7 +1289,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       // Move-quality marker (mainline only, when the engine is on): chess.com-style
       // color + glyph for every classified move (best/excellent/good through
       // blunder). Read from the memoized map so the list never replays the game.
-      const cls = isMainline && showHints ? moveClasses.get(nodeId) ?? null : null;
+      const cls = isMainline && showLines ? moveClasses.get(nodeId) ?? null : null;
 
       out.push(
         <button
@@ -1289,7 +1350,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       if (!node) break;
       const isWhite = ply % 2 === 1;
       const moveNum = Math.ceil(ply / 2);
-      const cls = showHints ? moveClasses.get(nodeId) ?? null : null;
+      const cls = showLines ? moveClasses.get(nodeId) ?? null : null;
       const isActive = nodeId === currentNodeId;
       items.push(
         <button
@@ -1315,18 +1376,39 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     );
   }
 
-  // A name/rating bar for one side, shown above/below the board when a PGN with
-  // player tags was imported (chess.com-style). The swatch matches the piece color.
+  // A name/rating + captured-material bar for one side (chess.com-style). The
+  // swatch matches the piece colour; the glyphs are the opponent pieces this
+  // side has captured, with a "+N" point lead shown on whichever side is ahead.
+  // Renders whenever there is a name (imported PGN) or something captured, so it
+  // shows in live lessons too, not only for imported games.
   function playerStrip(side: "white" | "black"): React.ReactNode {
-    if (!gameInfo) return null;
-    const name = side === "white" ? gameInfo.white : gameInfo.black;
-    const elo = side === "white" ? gameInfo.whiteElo : gameInfo.blackElo;
-    if (!name && !elo) return null;
+    const name = gameInfo ? (side === "white" ? gameInfo.white : gameInfo.black) : "";
+    const elo = gameInfo ? (side === "white" ? gameInfo.whiteElo : gameInfo.blackElo) : "";
+    // White's strip shows the black pieces White captured, and vice versa.
+    const captured = side === "white" ? capInfo.byWhite : capInfo.byBlack;
+    const glyphs = side === "white" ? GLYPH_BLACK : GLYPH_WHITE;
+    const hasCaptures = CAPTURE_ORDER.some((t) => captured[t] > 0);
+    const advForSide = side === "white" ? capInfo.adv : -capInfo.adv;
+    if (!gameInfo && !hasCaptures) return null;
     return (
       <div className="w-full flex items-center gap-2 px-1 text-sm">
-        <span className={`inline-block h-3.5 w-3.5 rounded-sm border border-border ${side === "white" ? "bg-white" : "bg-zinc-800"}`} />
+        <span className={`inline-block h-3.5 w-3.5 rounded-sm border border-border shrink-0 ${side === "white" ? "bg-white" : "bg-zinc-800"}`} />
         <span className="font-medium truncate">{name || (side === "white" ? "White" : "Black")}</span>
-        {elo ? <span className="text-xs text-muted-foreground">({elo})</span> : null}
+        {elo ? <span className="text-xs text-muted-foreground shrink-0">({elo})</span> : null}
+        {(hasCaptures || advForSide > 0) && (
+          <span className="flex items-center gap-1 text-muted-foreground/80 leading-none">
+            <span className="flex items-center text-[15px]" aria-label="captured pieces">
+              {CAPTURE_ORDER.flatMap((t) =>
+                Array.from({ length: captured[t] }, (_, i) => (
+                  <span key={`${t}-${i}`}>{glyphs[t]}</span>
+                )),
+              )}
+            </span>
+            {advForSide > 0 && (
+              <span className="text-xs font-semibold text-foreground">+{advForSide}</span>
+            )}
+          </span>
+        )}
       </div>
     );
   }
@@ -1434,7 +1516,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   function moveButton(nodeId: string, node: MoveNode, isMainline: boolean): React.ReactNode {
     const isActive = nodeId === currentNodeId;
-    const cls = isMainline && showHints ? moveClasses.get(nodeId) ?? null : null;
+    const cls = isMainline && showLines ? moveClasses.get(nodeId) ?? null : null;
     return (
       <button
         key={nodeId}
@@ -1617,11 +1699,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       )}
 
       {!editMode && (<>
-      {/* Layout: single stacked column for lessons; 3-column grid (report | board
-          | move list) on desktop review, stacking on mobile. `contents` makes the
-          wrappers transparent in the single-column case so lessons are unchanged. */}
-      <div className={multiPane ? "w-full grid grid-cols-1 lg:grid-cols-[minmax(230px,290px)_minmax(0,1fr)_minmax(220px,300px)] gap-3 items-start" : "contents"}>
-      {/* LEFT column: report card, then (review) the move-type table + Find-a-coach. */}
+      {/* Layout: single stacked column for the plain board; multi-pane splits
+          into board + move/engine columns, optionally with a left panel. Review
+          passes a `leftPanel` (report + Find-a-coach) so it gets 3 columns; the
+          lesson room keeps its chat outside this component and gets 2 columns
+          (board | engine+moves). `contents` makes the wrappers transparent in the
+          single-column case. */}
+      <div className={multiPane ? `w-full grid grid-cols-1 gap-3 items-start ${leftColActive ? "lg:grid-cols-[minmax(230px,290px)_minmax(0,1fr)_minmax(220px,300px)]" : "lg:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]"}` : "contents"}>
+      {/* LEFT column: report card, then (review) the move-type table + Find-a-coach.
+          Omitted entirely in the lesson room, where chat takes this space. */}
+      {leftColActive && (
       <div className={multiPane ? "w-full min-w-0 space-y-2 order-2 lg:order-1" : "contents"}>
       {/* Whole-game review report card: sits above the board so the progress bar
           and results are visible without scrolling. Runs in the background after
@@ -1672,26 +1759,27 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       )}
       {leftPanel}
       </div>
+      )}
       {/* CENTER column: the board, its controls, and the game status. */}
       <div ref={boardColRef} className={multiPane ? "w-full min-w-0 flex flex-col items-center gap-2 order-1 lg:order-2" : "contents"}>
 
-      {/* Board + Eval Bar. The eval bar is part of the engine-hint bundle, so the
-          lightbulb gates it alongside the arrows, line list, and classifications -
-          unmounting it also stops the Stockfish worker while hints are off.
-          Fixed height (shrink-0): the board is sized to the measured square
-          (boardPx) from the column, not from leftover flex space, so it never
-          resizes when the content below changes. */}
+      {/* Board + Eval Bar. The EvalBar owns the Stockfish worker that feeds both
+          the eval and the Lines box, so we mount it whenever either toggle is on
+          (engineRunning) and only visually hide it when the eval bar itself is
+          off (hidden={!showEval}). That keeps the Lines box fed with the eval bar
+          switched off. Fixed height (shrink-0): the board is sized to the measured
+          square (boardPx), so it never resizes when the content below changes. */}
       {/* Phone review: horizontal eval bar at the top (chess.com-style). */}
-      {showHints && engineEnabled && horizontalBar && (
+      {engineRunning && horizontalBar && (
         <div className="shrink-0" style={{ width: boardPx || undefined }}>
-          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} horizontal widthPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} hidden={!showEval} horizontal widthPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
         </div>
       )}
       {/* Player at the top of the board (the side opposite the orientation). */}
       {playerStrip(boardOrientation === "white" ? "black" : "white")}
       <div className="flex gap-1 w-full shrink-0 items-start justify-center">
-        {showHints && engineEnabled && !horizontalBar && (
-          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
+        {engineRunning && !horizontalBar && (
+          <EvalBar fen={game.fen()} boardOrientation={boardOrientation} onLinesChange={handleLines} hidden={!showEval} heightPx={boardPx > 0 ? boardPx : undefined} multiPv={evalMultiPv} moveTimeMs={evalMoveTimeMs} paused={review.running} />
         )}
         <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
           <Chessboard
@@ -1774,18 +1862,19 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <Button variant="ghost" size="sm" className="h-9 px-2.5 text-xs font-medium" onClick={enterEditMode} title="Set up a position (place pieces by hand)">
           Set up
         </Button>
-        {engineEnabled && (
-          <Button
-            variant={showHints ? "default" : "ghost"}
-            size="icon"
-            className="h-9 w-9"
-            onClick={toggleHints}
-            title={showHints ? "Hide engine hints (eval bar, best moves & move ratings)" : "Show engine hints (eval bar, best moves & move ratings)"}
-          >
-            <Lightbulb className="h-5 w-5" />
-          </Button>
-        )}
+        {/* Engine visibility is controlled by the Evaluation / Lines switches in
+            the move/engine column, not from here. */}
       </div>
+
+      {/* Mobile multi-pane (review / narrow lesson): the engine column that holds
+          the switches is hidden below lg, so surface the toggles here instead.
+          Non-multi-pane phones already show them in the move-list flow below. */}
+      {multiPane && engineEnabled && (
+        <div className="lg:hidden flex items-center gap-4 justify-center">
+          <ToggleSwitch label="Evaluation" checked={showEval} onChange={() => setShowEval((v) => !v)} />
+          <ToggleSwitch label="Lines" checked={showLines} onChange={() => setShowLines((v) => !v)} />
+        </div>
+      )}
 
       {/* Game status (check / checkmate / draws) - kept BELOW the move controls
           so the controls never shift as you step through moves and this message
@@ -1830,39 +1919,52 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       )}
 
       </div>
-      {/* RIGHT column: the full vertical move list, scrolls when long. */}
+      {/* RIGHT column: engine controls + best moves pinned on top, then the full
+          move list scrolling beneath them. The column itself is the scroll
+          container, so the sticky engine header stays put while the move list
+          scrolls in a long game. */}
       <div className={multiPane ? "w-full min-w-0 flex flex-col gap-2 order-3 hidden lg:flex lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto" : "contents"}>
 
+      {/* Sticky engine header: the Evaluation / Lines switches and the best-move
+          box. Coach-only in lessons (engineEnabled). The switches render even
+          when both are off so the engine can be turned back on. */}
+      {engineEnabled && (
+        <div className={multiPane ? "sticky top-0 z-10 bg-background flex flex-col gap-2 pb-1" : "w-full flex flex-col gap-2"}>
+          <div className="flex items-center gap-4 px-0.5">
+            <ToggleSwitch label="Evaluation" checked={showEval} onChange={() => setShowEval((v) => !v)} />
+            <ToggleSwitch label="Lines" checked={showLines} onChange={() => setShowLines((v) => !v)} />
+          </div>
+
+          {/* Best engine moves - eval + principal variation for each line. */}
+          {showLines && engineLines.length > 0 && engineLinesFen === currentFen && (
+            <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Best engine moves <span className="font-normal">· Stockfish 18 (~3600 Elo)</span>
+              </p>
+              <div className="space-y-1">
+                {engineLines.map((line) => (
+                  <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
+                    <span className="text-xs font-bold text-muted-foreground w-12 shrink-0">
+                      {formatLineEval(line)}
+                    </span>
+                    <span className="truncate text-sm">
+                      {line.san.slice(0, 6).join(" ")}
+                      {line.san.length > 6 && " …"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Move list - main line plus indented variations; right-click a move for
-          promote / delete. Past moves sit above the engine's best moves. These
-          flow normally and the board column scrolls to reach them, so they
-          never change the board's size. */}
+          promote / delete. Scrolls beneath the sticky engine header. */}
       {mainlineStart && (
         <div className="w-full rounded border bg-muted/30 p-2">
           <div className="text-sm font-mono leading-relaxed">
             {renderMainline()}
-          </div>
-        </div>
-      )}
-
-      {/* Top engine lines - eval + principal variation for each (hidden when hints off) */}
-      {showHints && engineLines.length > 0 && engineLinesFen === currentFen && (
-        <div className="w-full rounded border bg-muted/30 p-2 space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground">
-            Best engine moves <span className="font-normal">· Stockfish 18 (~3600 Elo)</span>
-          </p>
-          <div className="space-y-1">
-            {engineLines.map((line) => (
-              <div key={line.rank} className="flex items-baseline gap-2 text-sm font-mono">
-                <span className="text-xs font-bold text-muted-foreground w-12 shrink-0">
-                  {formatLineEval(line)}
-                </span>
-                <span className="truncate text-sm">
-                  {line.san.slice(0, 6).join(" ")}
-                  {line.san.length > 6 && " …"}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       )}

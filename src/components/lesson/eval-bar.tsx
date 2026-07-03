@@ -29,6 +29,9 @@ interface Props {
   // it - used on phones in review, chess.com-style. `widthPx` matches the board.
   horizontal?: boolean;
   widthPx?: number;
+  // Keep the engine running but render nothing. Used when the "Evaluation" toggle
+  // is off but "Lines" is on: the worker still feeds the Lines box, no bar shows.
+  hidden?: boolean;
 }
 
 const MULTI_PV = 5;
@@ -48,7 +51,7 @@ const LINES_EMIT_THROTTLE_MS = 120;
 // much at the extremes.
 const WIN_PROB_K = 0.00368208;
 
-export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS, paused = false, horizontal = false, widthPx }: Props) {
+export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiPv = MULTI_PV, moveTimeMs = MOVE_TIME_MS, paused = false, horizontal = false, widthPx, hidden = false }: Props) {
   const workerRef = useRef<Worker | null>(null);
   // Read inside the worker callbacks, which are set up once; refs keep them
   // current without re-spawning the worker when the props change.
@@ -251,6 +254,11 @@ export function EvalBar({ fen, boardOrientation, onLinesChange, heightPx, multiP
     : Math.abs(evaluation / 100).toFixed(1);
   // The number sits at the leading side's end of the bar (chess.com style).
   const leaderAtBottom = leaderIsWhite ? whiteAtBottom : !whiteAtBottom;
+
+  // Hidden: the worker (set up in the effects above, which always run) keeps
+  // analyzing and emitting lines, but we render no bar. All hooks have already
+  // run, so this early return is safe.
+  if (hidden) return null;
 
   // Horizontal bar (phone, above the board): the vertical bar rotated - white
   // sits on the right (board not flipped), black on the left, number at the

@@ -48,7 +48,7 @@ export function PracticeSession() {
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <p>
           This is a private sandbox, nothing here is saved or shared. Make moves for{" "}
-          <strong>both sides</strong>, try the eval bar, engine hints (the bulb), flip the board, or
+          <strong>both sides</strong>, toggle the Evaluation and Lines switches, flip the board, or
           import a game. A real lesson works exactly like this (call lessons add audio).
         </p>
       </div>
@@ -57,15 +57,9 @@ export function PracticeSession() {
           real lesson room so each child mounts exactly once. */}
       {isDesktop ? (
         <div className="flex flex-1 min-h-0">
-          <div className="flex-1 min-w-0 flex justify-center items-start p-4 overflow-y-auto min-h-0">
-            <ChessBoard
-              local
-              lessonId={PRACTICE_LESSON_ID}
-              userId={PRACTICE_USER_ID}
-              isCoach={false}
-            />
-          </div>
-          <div className="w-[360px] border-l flex flex-col min-h-0">
+          {/* Chat on the LEFT, board + engine/move column on the RIGHT - mirrors
+              the real lesson room. */}
+          <div className="w-[360px] border-r flex flex-col min-h-0">
             <div className="flex-1 min-h-0">
               <ChatPanel
                 local
@@ -75,6 +69,15 @@ export function PracticeSession() {
                 initialMessages={[]}
               />
             </div>
+          </div>
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 min-h-0">
+            <ChessBoard
+              local
+              multiPane
+              lessonId={PRACTICE_LESSON_ID}
+              userId={PRACTICE_USER_ID}
+              isCoach={false}
+            />
           </div>
         </div>
       ) : (

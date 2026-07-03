@@ -311,14 +311,10 @@ export function LessonSession({
           channel - breaking board/chat/presence sync for everyone. */}
       {isDesktop ? (
         <div className="flex flex-1 min-h-0">
-          {/* Board. The board fills this column's visible height; the move list
-              and best-moves box flow below, so the column scrolls to reach them. */}
-          <div className="flex-1 min-w-0 flex justify-center items-start p-4 overflow-y-auto min-h-0">
-            <ChessBoard lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} initialBoardTree={initialBoardTree} />
-          </div>
-
-          {/* Side panel */}
-          <div className="w-[360px] border-l flex flex-col min-h-0">
+          {/* Chat / call on the LEFT (chess.com-style: conversation beside the
+              board). Kept mounted once here so the shared Pusher/PeerJS
+              connections are never torn down by a layout swap. */}
+          <div className="w-[360px] border-r flex flex-col min-h-0">
             {isCall && (
               <div className="border-b">
                 <AudioCall
@@ -338,6 +334,13 @@ export function LessonSession({
                 initialMessages={initialMessages}
               />
             </div>
+          </div>
+
+          {/* Board in the CENTER with the engine + move list column on the RIGHT.
+              multiPane makes ChessBoard render its own board | moves grid; no
+              leftPanel, so it stays two columns (the chat above is the left). */}
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 min-h-0">
+            <ChessBoard multiPane lessonId={lessonId} userId={userId} isCoach={isCoach} initialBoardPgn={initialBoardPgn} initialBoardTree={initialBoardTree} />
           </div>
         </div>
       ) : (
