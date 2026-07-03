@@ -83,12 +83,23 @@ export async function createLessonRequest(formData: FormData) {
     return { error: "This coach is not currently accepting students" };
   }
 
-  // Check if coach has blocked this student
-  const blocked = await prisma.block.findUnique({
-    where: { coachId_studentId: { coachId, studentId: session.user.id } },
+  // A block in either direction (coach blocked student, or student blocked coach)
+  // stops bookings between the two.
+  const blocked = await prisma.block.findFirst({
+    where: {
+      OR: [
+        { blockerId: coachId, blockedId: session.user.id },
+        { blockerId: session.user.id, blockedId: coachId },
+      ],
+    },
   });
   if (blocked) {
-    return { error: "This coach has blocked you from requesting lessons." };
+    return {
+      error:
+        blocked.blockerId === coachId
+          ? "This coach has blocked you from requesting lessons."
+          : "You've blocked this coach. Unblock them to request a lesson.",
+    };
   }
 
   // Validate communication method against coach preference
@@ -1048,30 +1059,40 @@ export async function toggleFavourite(coachId: string) {
 }
 
 /**
- * Coach blocks a student. Also cancels any pending requests from that student.
+ * Block another user. Symmetric: works for the coach dashboard (coach blocks a
+ * student) and for in-chat blocking (either party). Also declines any pending
+ * lesson requests in either direction between the two.
  */
-export async function blockStudent(studentId: string) {
+export async function blockUser(targetId: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
+  const me = session.user.id;
 
-  if (studentId === session.user.id) return { error: "You cannot block yourself" };
+  if (targetId === me) return { error: "You cannot block yourself" };
 
   const existing = await prisma.block.findUnique({
-    where: { coachId_studentId: { coachId: session.user.id, studentId } },
+    where: { blockerId_blockedId: { blockerId: me, blockedId: targetId } },
   });
-  if (existing) return { error: "Student is already blocked" };
+  if (existing) return { error: "Already blocked" };
 
-  // Block and decline any pending requests from this student. Each decline is
-  // guarded on the PENDING status so a request the coach accepts (or that
-  // expires) concurrently isn't double-processed: we only refund the reserved
-  // hold and release the booked slot for requests we actually flip here.
+  // Decline any pending requests between us. Each decline is guarded on the
+  // PENDING status so a request accepted (or expired) concurrently isn't
+  // double-processed: we only refund the reserved hold and release the booked
+  // slot for requests we actually flip here. The reserved hold always belongs to
+  // the request's student, whichever direction the request went.
   const pendingRequests = await prisma.lessonRequest.findMany({
-    where: { coachId: session.user.id, studentId, status: "PENDING" },
+    where: {
+      status: "PENDING",
+      OR: [
+        { coachId: me, studentId: targetId },
+        { coachId: targetId, studentId: me },
+      ],
+    },
   });
 
   await prisma.$transaction(async (tx) => {
     await tx.block.create({
-      data: { coachId: session.user.id, studentId },
+      data: { blockerId: me, blockedId: targetId },
     });
     for (const r of pendingRequests) {
       const declined = await tx.lessonRequest.updateMany({
@@ -1081,7 +1102,7 @@ export async function blockStudent(studentId: string) {
       if (declined.count === 0) continue;
       if (!r.isTrial) {
         await tx.user.update({
-          where: { id: studentId },
+          where: { id: r.studentId },
           data: { reservedBalance: { decrement: r.estimatedCost } },
         });
       }
@@ -1096,21 +1117,23 @@ export async function blockStudent(studentId: string) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/messages");
   return { success: true };
 }
 
 /**
- * Coach unblocks a student.
+ * Lift a block the current user placed on another user.
  */
-export async function unblockStudent(studentId: string) {
+export async function unblockUser(targetId: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
   await prisma.block.deleteMany({
-    where: { coachId: session.user.id, studentId },
+    where: { blockerId: session.user.id, blockedId: targetId },
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/messages");
   return { success: true };
 }
 

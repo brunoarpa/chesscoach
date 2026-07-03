@@ -11,7 +11,7 @@ import { fetchChessComRating, fetchChessComProfile } from "@/lib/chess-com";
 import { getAvailableSlots } from "@/lib/actions/timeslots";
 import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { FavouriteButton } from "@/components/favourite-button";
-import { MessageCoachButton } from "@/components/messages/message-coach-button";
+import { MessageUserButton } from "@/components/messages/message-user-button";
 import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -173,8 +173,13 @@ export default async function ProfilePage({
       prisma.favourite.findUnique({
         where: { userId_coachId: { userId: session.user.id, coachId: user.id } },
       }),
-      prisma.block.findUnique({
-        where: { coachId_studentId: { coachId: user.id, studentId: session.user.id } },
+      prisma.block.findFirst({
+        where: {
+          OR: [
+            { blockerId: user.id, blockedId: session.user.id },
+            { blockerId: session.user.id, blockedId: user.id },
+          ],
+        },
       }),
     ]);
     isFavourited = !!fav;
@@ -241,7 +246,7 @@ export default async function ProfilePage({
         )}
         {!isOwnProfile && session?.user && (
           <div className="flex items-center gap-2">
-            {isCoachProfile && !isBlocked && <MessageCoachButton coachId={user.id} />}
+            {!isBlocked && <MessageUserButton userId={user.id} />}
             <FavouriteButton coachId={user.id} initialFavourited={isFavourited} />
           </div>
         )}
@@ -427,7 +432,7 @@ export default async function ProfilePage({
           {!isOwnProfile && isBlocked && session?.user && (
             <Card>
               <CardContent className="pt-6 text-center text-sm text-destructive">
-                This coach has blocked you from requesting lessons.
+                You can&apos;t request lessons with this coach while a block is in place.
               </CardContent>
             </Card>
           )}

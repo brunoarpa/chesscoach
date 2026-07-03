@@ -211,15 +211,15 @@ model User {
   abuseFlagsRelated AbuseFlag[]     @relation("RelatedUser")
   favourites        Favourite[]     @relation("FavouriteUser")
   favouritedBy      Favourite[]     @relation("FavouriteCoach")
-  blockedStudents   Block[]         @relation("BlockingCoach")
-  blockedByCoaches  Block[]         @relation("BlockedStudent")
+  blocksGiven       Block[]         @relation("Blocker")
+  blocksReceived    Block[]         @relation("Blocked")
   timeSlotTemplates TimeSlotTemplate[]
   timeSlots         TimeSlot[]
   chatMessagesSent  ChatMessage[]
   verificationTokens VerificationToken[]
   notifications     Notification[]
-  conversationsAsCoach   Conversation[]  @relation("ConvCoach")
-  conversationsAsStudent Conversation[]  @relation("ConvStudent")
+  conversationsA         Conversation[]  @relation("ConvA")
+  conversationsB         Conversation[]  @relation("ConvB")
   directMessagesSent     DirectMessage[] @relation("DMSender")
 
   @@index([coachElo(sort: Desc)])
@@ -499,20 +499,24 @@ model Favourite {
   @@index([coachId])
 }
 
+// A one-directional "I don't want to interact with this person" record. Used for
+// both the coach dashboard's block-a-student action and in-chat blocking. A block
+// in EITHER direction freezes their conversation and stops bookings between them;
+// only the blocker can lift their own block.
 model Block {
   id        String @id @default(cuid())
-  
-  coachId   String
-  coach     User   @relation("BlockingCoach", fields: [coachId], references: [id])
-  
-  studentId String
-  student   User   @relation("BlockedStudent", fields: [studentId], references: [id])
-  
+
+  blockerId String
+  blocker   User   @relation("Blocker", fields: [blockerId], references: [id])
+
+  blockedId String
+  blocked   User   @relation("Blocked", fields: [blockedId], references: [id])
+
   createdAt DateTime @default(now())
-  
-  @@unique([coachId, studentId])
-  @@index([coachId])
-  @@index([studentId])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }
 
 model TimeSlotTemplate {
@@ -594,28 +598,29 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
 }
 
-// Persistent 1:1 direct message thread between a student and a coach. Unlike the
-// lesson ChatMessage (tied to a booking, purged after 30 days), these are kept
-// indefinitely. Only a student may start a thread; the coach can only reply.
+// Persistent 1:1 direct message thread between any two users. Unlike the lesson
+// ChatMessage (tied to a booking, purged after 30 days), these are kept
+// indefinitely. Anyone can start a thread with anyone; participants are stored
+// canonically (participantAId < participantBId) so there is exactly one thread
+// per pair regardless of who initiated. Blocking lives in the Block model.
 model Conversation {
   id        String @id @default(cuid())
 
-  coachId   String
-  coach     User   @relation("ConvCoach", fields: [coachId], references: [id])
+  participantAId String
+  participantA   User   @relation("ConvA", fields: [participantAId], references: [id])
 
-  studentId String
-  student   User   @relation("ConvStudent", fields: [studentId], references: [id])
+  participantBId String
+  participantB   User   @relation("ConvB", fields: [participantBId], references: [id])
 
-  lastMessageAt      DateTime  @default(now()) // inbox ordering
-  blockedByStudentAt DateTime?                 // student muted this coach (coach-side block reuses the global Block model)
+  lastMessageAt  DateTime @default(now()) // inbox ordering
 
   messages  DirectMessage[]
 
   createdAt DateTime @default(now())
 
-  @@unique([coachId, studentId])
-  @@index([coachId])
-  @@index([studentId])
+  @@unique([participantAId, participantBId])
+  @@index([participantAId])
+  @@index([participantBId])
   @@index([lastMessageAt])
 }
 

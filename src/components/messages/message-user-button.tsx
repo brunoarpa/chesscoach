@@ -8,16 +8,16 @@ import { Button } from "@/components/ui/button";
 import { startConversation } from "@/lib/actions/messages";
 
 interface Props {
-  coachId: string;
+  userId: string;
 }
 
-export function MessageCoachButton({ coachId }: Props) {
+export function MessageUserButton({ userId }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
     setLoading(true);
-    const res = await startConversation(coachId);
+    const res = await startConversation(userId);
     if ("error" in res) {
       setLoading(false);
       toast.error(res.error);

@@ -91,9 +91,8 @@ export function MessagesView({
             }
           : {
               id: conversationId,
-              // A brand-new inbound thread means the sender is the other party.
+              // A brand-new inbound thread: the sender is the other party.
               otherParty: { id: message.senderId, username: senderName, image: null },
-              myRole: "coach",
               lastMessagePreview: message.content,
               lastMessageAt: message.createdAt,
               unreadCount: isOpen ? 0 : 1,

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { respondToLessonRequest, declineAcceptedLesson, submitReview, blockStudent } from "@/lib/actions/lessons";
+import { respondToLessonRequest, declineAcceptedLesson, submitReview, blockUser } from "@/lib/actions/lessons";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -307,7 +307,7 @@ function PendingRequestCard({ request }: { request: Request }) {
 
   async function handleBlock() {
     setBlockLoading(true);
-    const result = await blockStudent(request.studentId);
+    const result = await blockUser(request.studentId);
     setBlockLoading(false);
     if (typeof result === "object" && "error" in result) toast.error(result.error);
     else toast.success("Student blocked.");

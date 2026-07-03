@@ -8,12 +8,12 @@ import { createNotification } from "@/lib/notifications";
 import { getPusherServer } from "@/lib/pusher";
 import { userChannel, MESSAGE_NEW_EVENT, MESSAGE_READ_EVENT } from "@/lib/notification-channel";
 import { directMessageSchema } from "@/lib/validations";
-import { blockStudent, unblockStudent } from "@/lib/actions/lessons";
+import { blockUser, unblockUser } from "@/lib/actions/lessons";
 
-// A user counts as a coach (and so can receive messages) once they've set a
-// price - same test used across the profile/search surfaces.
-function isCoach(u: { coachChatPrice: number | null; coachCallPrice: number | null }) {
-  return !!(u.coachChatPrice || u.coachCallPrice);
+// Participants are stored canonically (A < B) so there is one thread per pair
+// regardless of who started it.
+function canonicalPair(a: string, b: string): [string, string] {
+  return a < b ? [a, b] : [b, a];
 }
 
 export interface MessageDTO {
@@ -33,8 +33,6 @@ export interface ConversationPartyDTO {
 export interface ConversationSummaryDTO {
   id: string;
   otherParty: ConversationPartyDTO;
-  /** The current user's role in this thread. */
-  myRole: "coach" | "student";
   lastMessagePreview: string | null;
   lastMessageAt: string;
   unreadCount: number;
@@ -43,61 +41,84 @@ export interface ConversationSummaryDTO {
 export interface ConversationDetailDTO {
   id: string;
   otherParty: ConversationPartyDTO;
-  myRole: "coach" | "student";
   messages: MessageDTO[];
-  /** Coach has blocked the student via the global Block model. */
-  coachBlockedStudent: boolean;
-  /** Student has muted the coach on this conversation. */
-  studentBlockedCoach: boolean;
+  /** The current user has blocked the other party. */
+  iBlockedThem: boolean;
+  /** The other party has blocked the current user. */
+  theyBlockedMe: boolean;
   /** Whether the current user may send in this thread right now. */
   canSend: boolean;
 }
 
+/** Fetch the two participant ids for a conversation, scoped to the caller. */
+async function loadParticipants(conversationId: string, me: string) {
+  const convo = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { id: true, participantAId: true, participantBId: true },
+  });
+  if (!convo) return null;
+  if (convo.participantAId !== me && convo.participantBId !== me) return null;
+  const otherId = convo.participantAId === me ? convo.participantBId : convo.participantAId;
+  return { convo, otherId };
+}
+
+/** Is there a block in either direction between two users? */
+async function blockBetween(a: string, b: string) {
+  const blocks = await prisma.block.findMany({
+    where: {
+      OR: [
+        { blockerId: a, blockedId: b },
+        { blockerId: b, blockedId: a },
+      ],
+    },
+    select: { blockerId: true },
+  });
+  return {
+    aBlockedB: blocks.some((x) => x.blockerId === a),
+    bBlockedA: blocks.some((x) => x.blockerId === b),
+    any: blocks.length > 0,
+  };
+}
+
 /**
- * Start (or fetch) the current user's conversation with a coach. Only a student
- * can create a thread; the coach may only ever reply inside an existing one.
+ * Start (or fetch) the current user's conversation with another user. Anyone can
+ * message anyone; there is exactly one thread per pair.
  */
 export async function startConversation(
-  coachId: string
+  targetId: string
 ): Promise<{ conversationId: string } | { error: string }> {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
   const me = session.user.id;
 
-  if (coachId === me) return { error: "You can't message yourself" };
+  if (targetId === me) return { error: "You can't message yourself" };
 
-  const coach = await prisma.user.findUnique({
-    where: { id: coachId },
-    select: { id: true, coachChatPrice: true, coachCallPrice: true },
-  });
-  if (!coach || !isCoach(coach)) return { error: "This user isn't a coach" };
-
-  const meUser = await prisma.user.findUnique({
-    where: { id: me },
-    select: { isSuspended: true },
-  });
+  const [target, meUser] = await Promise.all([
+    prisma.user.findUnique({ where: { id: targetId }, select: { id: true } }),
+    prisma.user.findUnique({ where: { id: me }, select: { isSuspended: true } }),
+  ]);
+  if (!target) return { error: "User not found" };
   if (meUser?.isSuspended) return { error: "Your account is suspended" };
 
-  // Coach may have blocked this student globally.
-  const blocked = await prisma.block.findUnique({
-    where: { coachId_studentId: { coachId, studentId: me } },
-  });
-  if (blocked) return { error: "This coach isn't accepting messages from you." };
+  const blocks = await blockBetween(me, targetId);
+  if (blocks.bBlockedA) return { error: "This user isn't accepting messages from you." };
+  if (blocks.aBlockedB) return { error: "You've blocked this user. Unblock them to message." };
 
+  const [pa, pb] = canonicalPair(me, targetId);
   const existing = await prisma.conversation.findUnique({
-    where: { coachId_studentId: { coachId, studentId: me } },
+    where: { participantAId_participantBId: { participantAId: pa, participantBId: pb } },
     select: { id: true },
   });
   if (existing) return { conversationId: existing.id };
 
-  // Only rate-limit the creation of *new* threads (spraying many coaches).
+  // Only rate-limit the creation of *new* threads (spraying many people).
   const rl = await rateLimit(`dm-new:${me}`, { maxAttempts: 10, windowMs: 60 * 60 * 1000 });
   if (!rl.success) {
     return { error: "You're starting conversations too quickly. Try again later." };
   }
 
   const convo = await prisma.conversation.create({
-    data: { coachId, studentId: me },
+    data: { participantAId: pa, participantBId: pb },
     select: { id: true },
   });
   return { conversationId: convo.id };
@@ -118,23 +139,9 @@ export async function sendMessage(
   }
   const clean = parsed.data.content;
 
-  const convo = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: {
-      id: true,
-      coachId: true,
-      studentId: true,
-      blockedByStudentAt: true,
-      _count: { select: { messages: true } },
-    },
-  });
-  if (!convo) return { error: "Conversation not found" };
-  if (convo.coachId !== me && convo.studentId !== me) {
-    return { error: "Not authorized" };
-  }
-
-  const iAmCoach = convo.coachId === me;
-  const recipientId = iAmCoach ? convo.studentId : convo.coachId;
+  const loaded = await loadParticipants(conversationId, me);
+  if (!loaded) return { error: "Conversation not found" };
+  const recipientId = loaded.otherId;
 
   const meUser = await prisma.user.findUnique({
     where: { id: me },
@@ -142,31 +149,22 @@ export async function sendMessage(
   });
   if (meUser?.isSuspended) return { error: "Your account is suspended" };
 
-  // A coach can only ever reply, never open the thread.
-  if (iAmCoach && convo._count.messages === 0) {
-    return { error: "Coaches can only reply once a student has messaged first." };
-  }
-
-  // Blocks: either side being blocked freezes the whole thread.
-  if (convo.blockedByStudentAt) {
-    return { error: "This conversation is blocked." };
-  }
-  const globalBlock = await prisma.block.findUnique({
-    where: { coachId_studentId: { coachId: convo.coachId, studentId: convo.studentId } },
-  });
-  if (globalBlock) return { error: "This conversation is blocked." };
+  // A block in either direction freezes the thread.
+  const blocks = await blockBetween(me, recipientId);
+  if (blocks.any) return { error: "This conversation is blocked." };
 
   const rl = await rateLimit(`dm-send:${me}`, { maxAttempts: 20, windowMs: 60 * 1000 });
   if (!rl.success) {
     return { error: "You're sending messages too quickly. Slow down a moment." };
   }
 
-  // Whether the recipient already had an unread message from us decides if this
-  // send should raise a fresh notification (dedupe bursts into one).
-  const priorUnread = await prisma.directMessage.count({
-    where: { conversationId, senderId: me, readAt: null },
-  });
-  const isFirstEver = convo._count.messages === 0;
+  // Dedupe notifications: only raise a fresh one if the recipient has no unread
+  // message from us yet. Email only on the very first message of the thread.
+  const [priorUnread, totalMessages] = await Promise.all([
+    prisma.directMessage.count({ where: { conversationId, senderId: me, readAt: null } }),
+    prisma.directMessage.count({ where: { conversationId } }),
+  ]);
+  const isFirstEver = totalMessages === 0;
 
   const message = await prisma.directMessage.create({
     data: { conversationId, senderId: me, content: clean },
@@ -199,7 +197,6 @@ export async function sendMessage(
     console.error("message pusher push failed", err);
   }
 
-  // Notify (bell + first-message email), deduped so a burst is one notification.
   if (priorUnread === 0) {
     await createNotification({
       userId: recipientId,
@@ -224,14 +221,14 @@ export async function getConversations(): Promise<ConversationSummaryDTO[]> {
   const me = session.user.id;
 
   const convos = await prisma.conversation.findMany({
-    where: { OR: [{ coachId: me }, { studentId: me }] },
+    where: { OR: [{ participantAId: me }, { participantBId: me }] },
     orderBy: { lastMessageAt: "desc" },
     select: {
       id: true,
-      coachId: true,
+      participantAId: true,
       lastMessageAt: true,
-      coach: { select: { id: true, username: true, image: true } },
-      student: { select: { id: true, username: true, image: true } },
+      participantA: { select: { id: true, username: true, image: true } },
+      participantB: { select: { id: true, username: true, image: true } },
       messages: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -243,17 +240,15 @@ export async function getConversations(): Promise<ConversationSummaryDTO[]> {
     },
   });
 
-  // Hide empty threads (created but never sent) except from the initiator, who
-  // needs to see the draft thread they just opened.
+  // Hide threads with no messages yet (created but never sent). The initiator
+  // still opens theirs via ?c= straight into the thread pane.
   return convos
-    .filter((c) => c.messages.length > 0 || c.coachId !== me)
+    .filter((c) => c.messages.length > 0)
     .map((c) => {
-      const iAmCoach = c.coachId === me;
-      const other = iAmCoach ? c.student : c.coach;
+      const other = c.participantAId === me ? c.participantB : c.participantA;
       return {
         id: c.id,
         otherParty: { id: other.id, username: other.username, image: other.image },
-        myRole: iAmCoach ? ("coach" as const) : ("student" as const),
         lastMessagePreview: c.messages[0]?.content ?? null,
         lastMessageAt: c.lastMessageAt.toISOString(),
         unreadCount: c._count.messages,
@@ -273,11 +268,10 @@ export async function getConversation(
     where: { id: conversationId },
     select: {
       id: true,
-      coachId: true,
-      studentId: true,
-      blockedByStudentAt: true,
-      coach: { select: { id: true, username: true, image: true } },
-      student: { select: { id: true, username: true, image: true } },
+      participantAId: true,
+      participantBId: true,
+      participantA: { select: { id: true, username: true, image: true } },
+      participantB: { select: { id: true, username: true, image: true } },
       messages: {
         orderBy: { createdAt: "asc" },
         select: { id: true, senderId: true, content: true, createdAt: true, readAt: true },
@@ -285,32 +279,20 @@ export async function getConversation(
     },
   });
   if (!convo) return null;
-  if (convo.coachId !== me && convo.studentId !== me) return null;
+  if (convo.participantAId !== me && convo.participantBId !== me) return null;
 
-  const iAmCoach = convo.coachId === me;
-  const other = iAmCoach ? convo.student : convo.coach;
+  const other = convo.participantAId === me ? convo.participantB : convo.participantA;
 
-  const globalBlock = await prisma.block.findUnique({
-    where: { coachId_studentId: { coachId: convo.coachId, studentId: convo.studentId } },
-  });
-  const meUser = await prisma.user.findUnique({
-    where: { id: me },
-    select: { isSuspended: true },
-  });
+  const [blocks, meUser] = await Promise.all([
+    blockBetween(me, other.id),
+    prisma.user.findUnique({ where: { id: me }, select: { isSuspended: true } }),
+  ]);
 
-  const coachBlockedStudent = !!globalBlock;
-  const studentBlockedCoach = !!convo.blockedByStudentAt;
-  const canSend =
-    !meUser?.isSuspended &&
-    !coachBlockedStudent &&
-    !studentBlockedCoach &&
-    // Coach can't send the opening message.
-    !(iAmCoach && convo.messages.length === 0);
+  const canSend = !meUser?.isSuspended && !blocks.any;
 
   return {
     id: convo.id,
     otherParty: { id: other.id, username: other.username, image: other.image },
-    myRole: iAmCoach ? "coach" : "student",
     messages: convo.messages.map((m) => ({
       id: m.id,
       senderId: m.senderId,
@@ -318,8 +300,8 @@ export async function getConversation(
       createdAt: m.createdAt.toISOString(),
       readAt: m.readAt ? m.readAt.toISOString() : null,
     })),
-    coachBlockedStudent,
-    studentBlockedCoach,
+    iBlockedThem: blocks.aBlockedB,
+    theyBlockedMe: blocks.bBlockedA,
     canSend,
   };
 }
@@ -332,12 +314,8 @@ export async function markConversationRead(
   if (!session?.user?.id) return { error: "Not authenticated" };
   const me = session.user.id;
 
-  const convo = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { id: true, coachId: true, studentId: true },
-  });
-  if (!convo) return { error: "Conversation not found" };
-  if (convo.coachId !== me && convo.studentId !== me) return { error: "Not authorized" };
+  const loaded = await loadParticipants(conversationId, me);
+  if (!loaded) return { error: "Not authorized" };
 
   const updated = await prisma.directMessage.updateMany({
     where: { conversationId, senderId: { not: me }, readAt: null },
@@ -345,11 +323,10 @@ export async function markConversationRead(
   });
 
   if (updated.count > 0) {
-    const senderId = convo.coachId === me ? convo.studentId : convo.coachId;
     try {
       const pusher = getPusherServer();
       if (pusher) {
-        await pusher.trigger(userChannel(senderId), MESSAGE_READ_EVENT, { conversationId });
+        await pusher.trigger(userChannel(loaded.otherId), MESSAGE_READ_EVENT, { conversationId });
       }
     } catch (err) {
       console.error("read-receipt pusher push failed", err);
@@ -358,7 +335,7 @@ export async function markConversationRead(
   return { success: true };
 }
 
-/** Block the other participant. Coach->student reuses the global block. */
+/** Block the other participant (unified: also stops bookings between them). */
 export async function blockConversationParty(
   conversationId: string
 ): Promise<{ success: true } | { error: string }> {
@@ -366,28 +343,15 @@ export async function blockConversationParty(
   if (!session?.user?.id) return { error: "Not authenticated" };
   const me = session.user.id;
 
-  const convo = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { id: true, coachId: true, studentId: true },
-  });
-  if (!convo) return { error: "Conversation not found" };
-  if (convo.coachId !== me && convo.studentId !== me) return { error: "Not authorized" };
+  const loaded = await loadParticipants(conversationId, me);
+  if (!loaded) return { error: "Not authorized" };
 
-  if (convo.coachId === me) {
-    // Unified block: also stops bookings + cancels pending requests.
-    const res = await blockStudent(convo.studentId);
-    if ("error" in res) return { error: res.error ?? "Failed to block user" };
-  } else {
-    await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { blockedByStudentAt: new Date() },
-    });
-  }
-  revalidatePath("/messages");
+  const res = await blockUser(loaded.otherId);
+  if ("error" in res) return { error: res.error ?? "Failed to block user" };
   return { success: true };
 }
 
-/** Unblock the other participant (mirror of blockConversationParty). */
+/** Unblock the other participant. */
 export async function unblockConversationParty(
   conversationId: string
 ): Promise<{ success: true } | { error: string }> {
@@ -395,22 +359,10 @@ export async function unblockConversationParty(
   if (!session?.user?.id) return { error: "Not authenticated" };
   const me = session.user.id;
 
-  const convo = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { id: true, coachId: true, studentId: true },
-  });
-  if (!convo) return { error: "Conversation not found" };
-  if (convo.coachId !== me && convo.studentId !== me) return { error: "Not authorized" };
+  const loaded = await loadParticipants(conversationId, me);
+  if (!loaded) return { error: "Not authorized" };
 
-  if (convo.coachId === me) {
-    await unblockStudent(convo.studentId);
-  } else {
-    await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { blockedByStudentAt: null },
-    });
-  }
-  revalidatePath("/messages");
+  await unblockUser(loaded.otherId);
   return { success: true };
 }
 
@@ -427,14 +379,8 @@ export async function reportConversation(
   if (trimmed.length < 3) return { error: "Please describe the problem." };
   if (trimmed.length > 1000) return { error: "Reason is too long." };
 
-  const convo = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { id: true, coachId: true, studentId: true },
-  });
-  if (!convo) return { error: "Conversation not found" };
-  if (convo.coachId !== me && convo.studentId !== me) return { error: "Not authorized" };
-
-  const reportedId = convo.coachId === me ? convo.studentId : convo.coachId;
+  const loaded = await loadParticipants(conversationId, me);
+  if (!loaded) return { error: "Not authorized" };
 
   // Light rate limit so the report action can't be spammed.
   const rl = await rateLimit(`dm-report:${me}`, { maxAttempts: 5, windowMs: 60 * 60 * 1000 });
@@ -442,7 +388,7 @@ export async function reportConversation(
 
   await prisma.abuseFlag.create({
     data: {
-      userId: reportedId,
+      userId: loaded.otherId,
       type: "MESSAGE_ABUSE",
       severity: "MEDIUM",
       relatedUserId: me,
@@ -462,7 +408,7 @@ export async function getUnreadMessageCount(): Promise<number> {
     where: {
       senderId: { not: me },
       readAt: null,
-      conversation: { OR: [{ coachId: me }, { studentId: me }] },
+      conversation: { OR: [{ participantAId: me }, { participantBId: me }] },
     },
   });
 }

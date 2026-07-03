@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -116,7 +117,12 @@ export default async function AdminPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-3xl font-bold mb-8 text-destructive">Admin Panel</h1>
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold text-destructive">Admin Panel</h1>
+        <Link href="/admin/messages" className="text-sm underline hover:text-foreground">
+          Direct messages
+        </Link>
+      </div>
 
       <Tabs defaultValue="flags">
         <TabsList className="mb-6">

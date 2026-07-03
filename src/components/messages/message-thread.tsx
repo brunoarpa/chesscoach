@@ -54,10 +54,8 @@ export function MessageThread({
   const [reporting, setReporting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const amIBlocking =
-    detail.myRole === "coach" ? detail.coachBlockedStudent : detail.studentBlockedCoach;
-  const blockedByOther =
-    detail.myRole === "coach" ? detail.studentBlockedCoach : detail.coachBlockedStudent;
+  const amIBlocking = detail.iBlockedThem;
+  const blockedByOther = detail.theyBlockedMe;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -212,8 +210,6 @@ export function MessageThread({
             </span>
           ) : blockedByOther ? (
             "You can no longer send messages in this conversation."
-          ) : detail.myRole === "coach" ? (
-            "Coaches can reply once a student has messaged first."
           ) : (
             "You can't send messages right now."
           )}
