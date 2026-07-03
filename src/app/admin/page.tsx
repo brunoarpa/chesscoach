@@ -9,6 +9,7 @@ import { AbuseFlagList } from "@/components/admin/abuse-flag-list";
 import { RecoveryRequestList } from "@/components/admin/recovery-request-list";
 import { LessonList } from "@/components/admin/lesson-list";
 import { ContactMessageList } from "@/components/admin/contact-message-list";
+import { LocalTime } from "@/components/local-time";
 
 export default async function AdminPage() {
   const session = await auth();
@@ -115,14 +116,21 @@ export default async function AdminPage() {
     }
   }
 
+  const conversations = await prisma.conversation.findMany({
+    orderBy: { lastMessageAt: "desc" },
+    take: 200,
+    select: {
+      id: true,
+      lastMessageAt: true,
+      participantA: { select: { username: true } },
+      participantB: { select: { username: true } },
+      _count: { select: { messages: true } },
+    },
+  });
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold text-destructive">Admin Panel</h1>
-        <Link href="/admin/messages" className="text-sm underline hover:text-foreground">
-          Direct messages
-        </Link>
-      </div>
+      <h1 className="text-3xl font-bold mb-8 text-destructive">Admin Panel</h1>
 
       <Tabs defaultValue="flags">
         <TabsList className="mb-6">
@@ -137,7 +145,8 @@ export default async function AdminPage() {
           </TabsTrigger>
           <TabsTrigger value="users">All Users ({allUsers.length})</TabsTrigger>
           <TabsTrigger value="lessons">Lessons ({lessons.length})</TabsTrigger>
-          <TabsTrigger value="messages">Messages ({contactMessages.length})</TabsTrigger>
+          <TabsTrigger value="dms">Direct Messages ({conversations.length})</TabsTrigger>
+          <TabsTrigger value="messages">Contact ({contactMessages.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flags">
@@ -161,6 +170,32 @@ export default async function AdminPage() {
 
         <TabsContent value="lessons">
           <LessonList lessons={JSON.parse(JSON.stringify(lessons))} />
+        </TabsContent>
+
+        <TabsContent value="dms">
+          <div className="border rounded-lg divide-y">
+            {conversations.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground text-center">
+                No conversations yet.
+              </p>
+            ) : (
+              conversations.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/admin/messages/${c.id}`}
+                  className="flex items-center justify-between gap-3 p-3 text-sm hover:bg-muted/60"
+                >
+                  <span className="font-medium">
+                    {c.participantA.username ?? "Unknown"} &harr;{" "}
+                    {c.participantB.username ?? "Unknown"}
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {c._count.messages} msg · <LocalTime iso={c.lastMessageAt.toISOString()} />
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="messages">
