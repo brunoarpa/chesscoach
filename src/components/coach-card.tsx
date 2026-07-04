@@ -92,10 +92,10 @@ export function CoachCard(props: Props) {
                 {props.avgRating != null ? `${props.avgRating.toFixed(1)} (${props.reviewCount})` : "No reviews"}
               </Stat>
               <Stat icon={<MessageSquare className="h-3.5 w-3.5" />} muted={props.coachChatPrice == null}>
-                {props.coachChatPrice != null ? `$${(props.coachChatPrice / 100).toFixed(2)}/30 min chat` : "No chat lessons"}
+                {props.coachChatPrice != null ? `$${(props.coachChatPrice / 100).toFixed(2)} / 30 min chat` : "No chat lessons"}
               </Stat>
               <Stat icon={<Phone className="h-3.5 w-3.5" />} muted={props.coachCallPrice == null}>
-                {props.coachCallPrice != null ? `$${(props.coachCallPrice / 100).toFixed(2)}/30 min call` : "No call lessons"}
+                {props.coachCallPrice != null ? `$${(props.coachCallPrice / 100).toFixed(2)} / 30 min call` : "No call lessons"}
               </Stat>
               <Stat icon={<BookOpen className="h-3.5 w-3.5" />}>
                 {props.lessonsGiven} {props.lessonsGiven === 1 ? "lesson" : "lessons"}

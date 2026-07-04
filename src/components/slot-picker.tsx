@@ -253,12 +253,12 @@ export function SlotPicker({
                 <SelectContent>
                   {coachChatPrice !== null && (
                     <SelectItem value="CHAT">
-                      Chat - ${(coachChatPrice / 100).toFixed(2)}/30 min
+                      Chat - ${(coachChatPrice / 100).toFixed(2)} / 30 min
                     </SelectItem>
                   )}
                   {canCall && (
                     <SelectItem value="CALL">
-                      Call - ${(coachCallPrice! / 100).toFixed(2)}/30 min
+                      Call - ${(coachCallPrice! / 100).toFixed(2)} / 30 min
                     </SelectItem>
                   )}
                 </SelectContent>
