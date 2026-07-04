@@ -1621,8 +1621,12 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
 
   return (
     <div ref={containerRef} className={`flex flex-col items-center gap-2 w-full ${multiPane ? "" : "max-w-[600px]"}`} tabIndex={-1}>
+      {/* Size the editor column to the same board width as the normal view so
+          applying a position doesn't pop the board to a new size. boardColRef
+          stays on the normal center column only, so the sizing effect keeps
+          boardPx frozen while editing (it early-returns on a null ref). */}
       {editMode && (
-        <div ref={boardColRef} className="flex flex-col items-center gap-2 w-full max-w-[600px] mx-auto">
+        <div className="flex flex-col items-center gap-2 mx-auto" style={{ width: boardPx || undefined, maxWidth: "100%" }}>
           {/* Editor board: free placement, no legality. Click a palette piece then
               squares to stamp it; drag pieces to move them, or off-board to remove. */}
           <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
