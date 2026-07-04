@@ -1643,7 +1643,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <div className="flex flex-col items-center gap-2 mx-auto" style={{ width: boardPx || undefined, maxWidth: "100%" }}>
           {/* Editor board: free placement, no legality. Click a palette piece then
               squares to stamp it; drag pieces to move them, or off-board to remove. */}
-          <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, height: boardPx || undefined }}>
+          <div className="relative aspect-square shrink-0" style={{ width: boardPx || undefined, maxWidth: "100%" }}>
             <Chessboard
               options={{
                 id: "position-editor",
