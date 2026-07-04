@@ -58,7 +58,21 @@ async function send(to: string, subject: string, html: string) {
     console.warn(html);
     return;
   }
-  await sgMail.send({ to, from: fromAddress(), subject, html });
+  await sgMail.send({
+    to,
+    from: fromAddress(),
+    subject,
+    html,
+    // Ship links untouched. SendGrid otherwise rewrites every href through a
+    // sendgrid.net tracking redirect, which makes our "verify email" / "reset
+    // password" token links look like phishing to strict providers (iCloud in
+    // particular silently drops them). No tracking = links point at our own
+    // domain = far better deliverability for transactional/auth mail.
+    trackingSettings: {
+      clickTracking: { enable: false, enableText: false },
+      openTracking: { enable: false },
+    },
+  });
 }
 
 export async function sendVerificationEmail(email: string, token: string) {
