@@ -11,18 +11,8 @@ import { LANGUAGES } from "@/lib/languages";
 import { updateProfile } from "@/lib/actions/auth";
 import { toast } from "sonner";
 
-const continents = [
-  { value: "AFRICA", label: "Africa" },
-  { value: "ASIA", label: "Asia" },
-  { value: "EUROPE", label: "Europe" },
-  { value: "NORTH_AMERICA", label: "North America" },
-  { value: "SOUTH_AMERICA", label: "South America" },
-  { value: "OCEANIA", label: "Oceania" },
-];
-
 interface Props {
   username: string;
-  continent: string | null;
   coachChatPrice?: number;
   coachCallPrice?: number;
   communicationPreference: string;
@@ -60,22 +50,6 @@ export function ProfileEditForm(props: Props) {
               3-20 characters. Letters, numbers, and underscores only.
             </p>
           </div>
-          <div className="space-y-2">
-            <Label>Continent</Label>
-            <Select name="continent" defaultValue={props.continent ?? undefined}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select continent" />
-              </SelectTrigger>
-              <SelectContent>
-                {continents.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="timezone">Timezone</Label>
             <Input
@@ -115,7 +89,7 @@ export function ProfileEditForm(props: Props) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="coachChatPrice">Chat lesson price per slot ($)</Label>
+              <Label htmlFor="coachChatPrice">Chat lesson price per slot (USD)</Label>
               <Input
                 id="coachChatPrice"
                 name="coachChatPrice"
@@ -127,7 +101,7 @@ export function ProfileEditForm(props: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="coachCallPrice">Call lesson price per slot ($)</Label>
+              <Label htmlFor="coachCallPrice">Call lesson price per slot (USD)</Label>
               <Input
                 id="coachCallPrice"
                 name="coachCallPrice"
@@ -140,7 +114,7 @@ export function ProfileEditForm(props: Props) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Each slot is 30 minutes. Leave empty if not coaching that type.
+            Each slot is 30 minutes. Leave empty if not coaching that type. All prices are in US dollars (USD).
           </p>
 
           <div className="space-y-2">

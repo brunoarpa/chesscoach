@@ -1,19 +1,10 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, DollarSign, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
+import { DollarSign, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
 import { FavouriteButton } from "@/components/favourite-button";
 import { BookingStatusBadge } from "@/components/booking-status-badge";
 import { getLanguageLabel } from "@/lib/languages";
-
-const continentLabels: Record<string, string> = {
-  AFRICA: "Africa",
-  ASIA: "Asia",
-  EUROPE: "Europe",
-  NORTH_AMERICA: "N. America",
-  SOUTH_AMERICA: "S. America",
-  OCEANIA: "Oceania",
-};
 
 import { getActivityDotColor } from "@/lib/utils";
 
@@ -33,7 +24,6 @@ interface Props {
   id: string;
   username: string;
   chessRating: number | null;
-  continent: string | null;
   coachChatPrice: number | null;
   coachCallPrice: number | null;
   communicationPreference: string;
@@ -83,9 +73,6 @@ export function CoachCard(props: Props) {
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               {props.chessRating && (
                 <span className="flex items-center gap-1">♝ {props.chessRating} rated</span>
-              )}
-              {props.continent && (
-                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {continentLabels[props.continent]}</span>
               )}
               {props.coachChatPrice !== null && (
                 <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> ${(props.coachChatPrice / 100).toFixed(2)}/slot (chat)</span>

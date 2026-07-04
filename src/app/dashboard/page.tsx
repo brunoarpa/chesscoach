@@ -204,11 +204,11 @@ export default async function DashboardPage({
         <div className="mb-6 p-4 rounded-lg border border-primary/40 bg-primary/5">
           <p className="font-medium">Your coach profile is set up - one last step!</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Students book specific time slots, so pick your weekly availability in the{" "}
+            Students book specific 30-minute time slots, so set your weekly availability in the{" "}
             <a href="#schedule" className="font-medium text-foreground underline underline-offset-2">
               Coaching schedule
             </a>{" "}
-            below to start receiving bookings.
+            below to start receiving bookings. It repeats every week, and you can change it or pause bookings anytime right here from your dashboard.
           </p>
         </div>
       )}

@@ -11,16 +11,6 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { LANGUAGES } from "@/lib/languages";
 import { LESSON_DURATION_MS } from "@/lib/utils";
 
-const continents = [
-  { value: "", label: "All" },
-  { value: "AFRICA", label: "Africa" },
-  { value: "ASIA", label: "Asia" },
-  { value: "EUROPE", label: "Europe" },
-  { value: "NORTH_AMERICA", label: "N. America" },
-  { value: "SOUTH_AMERICA", label: "S. America" },
-  { value: "OCEANIA", label: "Oceania" },
-];
-
 const ratingOptions = Array.from({ length: 30 }, (_, i) => (i + 1) * 100); // 100 to 3000
 
 const languageOptions = LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
@@ -78,7 +68,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
     Boolean(
       searchParams.get("availableFrom") ||
         searchParams.get("availableTo") ||
-        (searchParams.get("continent") && searchParams.get("continent") !== "all") ||
         (searchParams.get("communication") && searchParams.get("communication") !== "any") ||
         (searchParams.get("lastSeen") && searchParams.get("lastSeen") !== "any"),
     ),
@@ -129,7 +118,7 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label>Price per 30 min ($)</Label>
+        <Label>Price per 30 min (USD)</Label>
         <div className="flex gap-2">
           <Input
             name="minPrice"
@@ -224,22 +213,6 @@ export function SearchFilters({ params, isLoggedIn }: Props) {
               aria-label="Available until"
             />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Continent</Label>
-          <Select name="continent" defaultValue={searchParams.get("continent") ?? ""}>
-            <SelectTrigger>
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent>
-              {continents.map((c) => (
-                <SelectItem key={c.value || "all"} value={c.value || "all"}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="space-y-2">

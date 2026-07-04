@@ -13,7 +13,6 @@ async function main() {
       username: "admin",
       email: "admin@elochaser.com",
       role: "ADMIN",
-      continent: "NORTH_AMERICA",
     },
   });
 

@@ -11,7 +11,6 @@ export default async function ProfileEditPage() {
     where: { id: session.user.id },
     select: {
       username: true,
-      continent: true,
       coachChatPrice: true,
       coachCallPrice: true,
       communicationPreference: true,
@@ -28,7 +27,6 @@ export default async function ProfileEditPage() {
       <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
       <ProfileEditForm
         username={user.username ?? ""}
-        continent={user.continent}
         coachChatPrice={user.coachChatPrice ? user.coachChatPrice / 100 : undefined}
         coachCallPrice={user.coachCallPrice ? user.coachCallPrice / 100 : undefined}
         communicationPreference={user.communicationPreference}

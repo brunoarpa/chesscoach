@@ -156,7 +156,7 @@ export function WithdrawForm({
             {heldNote}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="withdraw-amount">Amount ($)</Label>
+                <Label htmlFor="withdraw-amount">Amount (USD)</Label>
                 <span className="text-xs text-muted-foreground">
                   Available: ${withdrawableDollars.toFixed(2)}
                 </span>

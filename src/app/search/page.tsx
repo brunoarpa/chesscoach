@@ -8,7 +8,6 @@ import { getEffectiveAvailability } from "@/lib/utils";
 
 interface SearchParams {
   q?: string;
-  continent?: string;
   minRating?: string;
   maxRating?: string;
   minPrice?: string;
@@ -54,10 +53,6 @@ export default async function SearchPage({
 
   if (params.q) {
     where.username = { contains: params.q, mode: "insensitive" };
-  }
-
-  if (params.continent && params.continent !== "all") {
-    where.continent = params.continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA";
   }
 
   if (params.minRating || params.maxRating) {
@@ -156,7 +151,6 @@ export default async function SearchPage({
       id: true,
       username: true,
       chessRating: true,
-      continent: true,
       coachChatPrice: true,
       coachCallPrice: true,
       communicationPreference: true,
@@ -217,7 +211,6 @@ export default async function SearchPage({
                     id={coach.id}
                     username={coach.username ?? "unknown"}
                     chessRating={coach.chessRating}
-                    continent={coach.continent}
                     coachChatPrice={coach.coachChatPrice}
                     coachCallPrice={coach.coachCallPrice}
                     communicationPreference={coach.communicationPreference}

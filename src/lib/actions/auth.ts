@@ -64,7 +64,6 @@ export async function updateProfile(formData: FormData) {
 
   const raw = {
     username: (formData.get("username") as string)?.trim() || undefined,
-    continent: (formData.get("continent") as string) || undefined,
     coachChatPrice: formData.get("coachChatPrice")
       ? Number(formData.get("coachChatPrice"))
       : undefined,
@@ -121,7 +120,6 @@ export async function updateProfile(formData: FormData) {
     where: { id: session.user.id },
     data: {
       username: newUsername,
-      continent: raw.continent as "AFRICA" | "ASIA" | "EUROPE" | "NORTH_AMERICA" | "SOUTH_AMERICA" | "OCEANIA" | undefined,
       coachChatPrice: chatPriceInCents,
       coachCallPrice: callPriceInCents,
       communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",

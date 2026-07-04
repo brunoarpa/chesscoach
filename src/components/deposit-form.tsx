@@ -66,7 +66,7 @@ export function DepositForm() {
       <CardContent>
         <div className="flex items-end gap-4">
           <div className="flex-1 space-y-2">
-            <Label>Amount ($)</Label>
+            <Label>Amount (USD)</Label>
             <Input
               type="number"
               step="0.01"

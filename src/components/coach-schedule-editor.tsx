@@ -205,6 +205,7 @@ export function CoachScheduleEditor({ initialTemplates, timezone, initialAvailab
           )}
         </div>
         <p className="text-sm text-muted-foreground">
+          This schedule repeats every week - update it here whenever you like, then Save.{" "}
           Tap a square to toggle a {LESSON_DURATION_MINUTES}-min slot, or drag across squares.{" "}
           {timezone ? (
             <>Times are in <span className="font-medium">{timezone}</span> (your profile timezone).</>

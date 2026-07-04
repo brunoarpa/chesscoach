@@ -16,15 +16,6 @@ import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-const continentLabels: Record<string, string> = {
-  AFRICA: "Africa",
-  ASIA: "Asia",
-  EUROPE: "Europe",
-  NORTH_AMERICA: "North America",
-  SOUTH_AMERICA: "South America",
-  OCEANIA: "Oceania",
-};
-
 import { getActivityDotColor, getActivityLabel, getEffectiveAvailability } from "@/lib/utils";
 
 function formatLastSeen(date: Date): string {
@@ -77,7 +68,6 @@ export default async function ProfilePage({
       id: true,
       username: true,
       bio: true,
-      continent: true,
       languages: true,
       coachChatPrice: true,
       coachCallPrice: true,
@@ -279,22 +269,16 @@ export default async function ProfilePage({
                       <strong>{user.chessRating}</strong>
                     </div>
                   )}
-                  {user.continent && (
-                    <div>
-                      <span className="text-muted-foreground">Continent:</span>{" "}
-                      <strong>{continentLabels[user.continent]}</strong>
-                    </div>
-                  )}
                   {user.coachChatPrice !== null && (
                     <div>
                       <span className="text-muted-foreground">Chat Price/slot:</span>{" "}
-                      <strong>${(user.coachChatPrice / 100).toFixed(2)}</strong>
+                      <strong>${(user.coachChatPrice / 100).toFixed(2)} USD</strong>
                     </div>
                   )}
                   {user.coachCallPrice !== null && (
                     <div>
                       <span className="text-muted-foreground">Call Price/slot:</span>{" "}
-                      <strong>${(user.coachCallPrice / 100).toFixed(2)}</strong>
+                      <strong>${(user.coachCallPrice / 100).toFixed(2)} USD</strong>
                     </div>
                   )}
                   <div>

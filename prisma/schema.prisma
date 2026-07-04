@@ -41,15 +41,6 @@ enum UserRole {
   ADMIN
 }
 
-enum Continent {
-  AFRICA
-  ASIA
-  EUROPE
-  NORTH_AMERICA
-  SOUTH_AMERICA
-  OCEANIA
-}
-
 enum LessonType {
   LESSON
 }
@@ -137,7 +128,6 @@ model User {
   verificationCode   String?  // auto-verification code for chess.com location
 
   // Profile info
-  continent             Continent?
   chessRating           Int?
   coachChatPrice        Int?      // cents per 30-min slot (chat)
   coachCallPrice        Int?      // cents per 30-min slot (call)
@@ -226,7 +216,6 @@ model User {
   @@index([lastActiveAt])
   @@index([activityStatus])
   @@index([verificationStatus])
-  @@index([continent])
   @@index([languages], type: Gin)
 }
 
