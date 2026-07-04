@@ -70,8 +70,6 @@ export async function updateProfile(formData: FormData) {
     coachCallPrice: formData.get("coachCallPrice")
       ? Number(formData.get("coachCallPrice"))
       : undefined,
-    communicationPreference:
-      (formData.get("communicationPreference") as string) || "CHAT_ONLY",
     bio: rawBio,
     timezone: rawTimezone,
     languages: filterValidLanguages(
@@ -122,7 +120,9 @@ export async function updateProfile(formData: FormData) {
       username: newUsername,
       coachChatPrice: chatPriceInCents,
       coachCallPrice: callPriceInCents,
-      communicationPreference: raw.communicationPreference as "CHAT_ONLY" | "CHAT_AND_CALL",
+      // Offering calls is derived from having a call price - one source of truth,
+      // so a coach can't set a call price yet accidentally block call bookings.
+      communicationPreference: callPriceInCents ? "CHAT_AND_CALL" : "CHAT_ONLY",
       bio: raw.bio || null,
       timezone: raw.timezone || null,
       languages: raw.languages,

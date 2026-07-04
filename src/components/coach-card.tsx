@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
+import { MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
+import type { ReactNode } from "react";
 import { FavouriteButton } from "@/components/favourite-button";
 import { BookingStatusBadge } from "@/components/booking-status-badge";
 import { getLanguageLabel } from "@/lib/languages";
@@ -18,6 +19,17 @@ function formatRelativeTime(date: Date): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return date.toLocaleDateString();
+}
+
+// One stat row: an icon in a fixed-width slot so labels align in a column, plus
+// a value that dims when it's a placeholder ("Unrated", "No call lessons", ...).
+function Stat({ icon, children, muted = false }: { icon: ReactNode; children: ReactNode; muted?: boolean }) {
+  return (
+    <span className={`flex items-center gap-1.5 ${muted ? "text-muted-foreground/70" : ""}`}>
+      <span className="flex w-4 shrink-0 items-center justify-center">{icon}</span>
+      {children}
+    </span>
+  );
 }
 
 interface Props {
@@ -54,7 +66,7 @@ export function CoachCard(props: Props) {
         <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold">{props.username}</h3>
+              <h3 className="text-lg font-semibold">{props.username}</h3>
             </div>
 
             <p className="text-sm text-muted-foreground mb-3">
@@ -64,58 +76,56 @@ export function CoachCard(props: Props) {
               </span>
             </p>
 
-            {props.bio && (
-              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-                {props.bio}
-              </p>
-            )}
+            {/* Fixed two-line height so cards with and without a bio line up. */}
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-2 min-h-[2.5rem]">
+              {props.bio || "No bio yet."}
+            </p>
 
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              {props.chessRating && (
-                <span className="flex items-center gap-1">♝ {props.chessRating} rated</span>
-              )}
-              {props.coachChatPrice !== null && (
-                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> ${(props.coachChatPrice / 100).toFixed(2)}/slot (chat)</span>
-              )}
-              {props.coachCallPrice !== null && (
-                <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> ${(props.coachCallPrice / 100).toFixed(2)}/slot (call)</span>
-              )}
-              <span className="flex items-center gap-1">
-                {props.communicationPreference === "CHAT_AND_CALL" ? (
-                  <><MessageSquare className="h-3 w-3" /><Phone className="h-3 w-3" /></>
-                ) : (
-                  <MessageSquare className="h-3 w-3" />
-                )}{" "}
-                {props.communicationPreference === "CHAT_AND_CALL" ? "Chat or Call" : "Chat"}
-              </span>
-              <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {props.lessonsGiven} lessons</span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
+            {/* Every row is always rendered (with a placeholder when a value is
+                missing) so details stay in the same spot on every card and nothing
+                shifts when a coach is unrated or offers only one lesson type. */}
+            <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-sm">
+              <Stat icon={<span>♝</span>} muted={props.chessRating == null}>
+                {props.chessRating != null ? `${props.chessRating} rated` : "Unrated"}
+              </Stat>
+              <Stat icon={<span className="text-amber-500">★</span>} muted={props.avgRating == null}>
+                {props.avgRating != null ? `${props.avgRating.toFixed(1)} (${props.reviewCount})` : "No reviews"}
+              </Stat>
+              <Stat icon={<MessageSquare className="h-3.5 w-3.5" />} muted={props.coachChatPrice == null}>
+                {props.coachChatPrice != null ? `$${(props.coachChatPrice / 100).toFixed(2)}/slot chat` : "No chat lessons"}
+              </Stat>
+              <Stat icon={<Phone className="h-3.5 w-3.5" />} muted={props.coachCallPrice == null}>
+                {props.coachCallPrice != null ? `$${(props.coachCallPrice / 100).toFixed(2)}/slot call` : "No call lessons"}
+              </Stat>
+              <Stat icon={<BookOpen className="h-3.5 w-3.5" />}>
+                {props.lessonsGiven} {props.lessonsGiven === 1 ? "lesson" : "lessons"}
+              </Stat>
+              <Stat icon={<Clock className="h-3.5 w-3.5" />}>
                 <span className={`w-2 h-2 rounded-full ${getActivityDotColor(props.lastActiveAt)}`} />
                 {formatRelativeTime(props.lastActiveAt)}
-              </span>
+              </Stat>
             </div>
 
-            {props.languages.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {props.languages.slice(0, 4).map((code) => (
-                  <Badge key={code} variant="secondary" className="text-xs font-normal">
-                    {getLanguageLabel(code)}
-                  </Badge>
-                ))}
-                {props.languages.length > 4 && (
-                  <Badge variant="secondary" className="text-xs font-normal">
-                    +{props.languages.length - 4}
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            {props.avgRating !== null && (
-              <div className="mt-2 text-xs">
-                {props.avgRating.toFixed(1)} ★ ({props.reviewCount} reviews)
-              </div>
-            )}
+            {/* Fixed min-height so the languages strip reserves its space even when
+                a coach hasn't listed any languages. */}
+            <div className="mt-3 flex flex-wrap gap-1 min-h-[1.5rem]">
+              {props.languages.length > 0 ? (
+                <>
+                  {props.languages.slice(0, 4).map((code) => (
+                    <Badge key={code} variant="secondary" className="text-xs font-normal">
+                      {getLanguageLabel(code)}
+                    </Badge>
+                  ))}
+                  {props.languages.length > 4 && (
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      +{props.languages.length - 4}
+                    </Badge>
+                  )}
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground">No languages listed</span>
+              )}
+            </div>
           </CardContent>
         </Card>
       </Link>
