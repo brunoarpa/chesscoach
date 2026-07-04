@@ -808,10 +808,13 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     // where the outer spans all three columns. Height is the visible scroll
     // column (single column) or the viewport below the board (multi-pane, where
     // the column is content-sized so measuring it would feed back).
-    const widthEl = multiPane ? boardColRef.current : containerRef.current;
-    if (!widthEl) return;
     const scrollCol = containerRef.current?.parentElement ?? null;
+    // Resolve the measured column inside update() so deferred/observer calls
+    // always read the element that's currently mounted (it swaps when the
+    // position editor opens and closes).
     const update = () => {
+      const widthEl = multiPane ? boardColRef.current : containerRef.current;
+      if (!widthEl) return;
       // Only the vertical bar (beside the board) eats into width; the horizontal
       // phone bar sits above the board, so it needs no width reserve.
       const evalReserve = showEval && engineEnabled && !horizontalBar ? EVAL_BAR_RESERVE : 0;
@@ -822,11 +825,22 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       setBoardPx(Math.max(MIN_BOARD, Math.min(Math.floor(Math.min(w, h)), 760)));
     };
     update();
+    // Re-measure once layout has settled. Closing the position editor swaps a
+    // large chunk of DOM (the centered editor becomes the full multi-pane grid),
+    // and the synchronous update() above can read an intermediate layout where
+    // the board column is briefly full-width, sizing the board too large so it
+    // overflows its column. The ResizeObserver doesn't reliably fire for that, so
+    // force a re-measure on the next couple of frames.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(update); });
+    const widthEl = multiPane ? boardColRef.current : containerRef.current;
     const ro = new ResizeObserver(update);
-    ro.observe(widthEl);
+    if (widthEl) ro.observe(widthEl);
     if (!multiPane && scrollCol) ro.observe(scrollCol);
     window.addEventListener("resize", update);
     return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
