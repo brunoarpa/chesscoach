@@ -271,13 +271,13 @@ export default async function ProfilePage({
                   )}
                   {user.coachChatPrice !== null && (
                     <div>
-                      <span className="text-muted-foreground">Chat Price/slot:</span>{" "}
+                      <span className="text-muted-foreground">Chat price / 30 min:</span>{" "}
                       <strong>${(user.coachChatPrice / 100).toFixed(2)} USD</strong>
                     </div>
                   )}
                   {user.coachCallPrice !== null && (
                     <div>
-                      <span className="text-muted-foreground">Call Price/slot:</span>{" "}
+                      <span className="text-muted-foreground">Call price / 30 min:</span>{" "}
                       <strong>${(user.coachCallPrice / 100).toFixed(2)} USD</strong>
                     </div>
                   )}

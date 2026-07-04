@@ -113,8 +113,8 @@ export function ProfileEditForm(props: Props) {
             <div>
               <Label>Lessons you offer</Label>
               <p className="text-xs text-muted-foreground">
-                Turn on each lesson type you teach and set its price. Each slot is 30
-                minutes, priced in US dollars (USD).
+                Turn on each lesson type you teach and set its price per 30-minute
+                lesson, in US dollars (USD).
               </p>
             </div>
 
@@ -132,7 +132,7 @@ export function ProfileEditForm(props: Props) {
               </div>
               {offersChat && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="coachChatPrice" className="text-xs">Price per slot (USD)</Label>
+                  <Label htmlFor="coachChatPrice" className="text-xs">Price per 30 min (USD)</Label>
                   <Input
                     id="coachChatPrice"
                     name="coachChatPrice"
@@ -161,7 +161,7 @@ export function ProfileEditForm(props: Props) {
               </div>
               {offersCall && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="coachCallPrice" className="text-xs">Price per slot (USD)</Label>
+                  <Label htmlFor="coachCallPrice" className="text-xs">Price per 30 min (USD)</Label>
                   <Input
                     id="coachCallPrice"
                     name="coachCallPrice"
