@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/rate-limit";
-import { createNotification } from "@/lib/notifications";
+import { sendNotificationEmail, emailText } from "@/lib/email";
 import { getPusherServer } from "@/lib/pusher";
 import { userChannel, MESSAGE_NEW_EVENT, MESSAGE_READ_EVENT } from "@/lib/notification-channel";
 import { directMessageSchema } from "@/lib/validations";
@@ -158,12 +158,10 @@ export async function sendMessage(
     return { error: "You're sending messages too quickly. Slow down a moment." };
   }
 
-  // Dedupe notifications: only raise a fresh one if the recipient has no unread
-  // message from us yet. Email only on the very first message of the thread.
-  const [priorUnread, totalMessages] = await Promise.all([
-    prisma.directMessage.count({ where: { conversationId, senderId: me, readAt: null } }),
-    prisma.directMessage.count({ where: { conversationId } }),
-  ]);
+  // Email only on the very first message of the thread. New DMs surface in-app
+  // through the dedicated Messages badge (account menu), not the notification
+  // bell, so we don't double-notify for the same event.
+  const totalMessages = await prisma.directMessage.count({ where: { conversationId } });
   const isFirstEver = totalMessages === 0;
 
   const message = await prisma.directMessage.create({
@@ -197,17 +195,27 @@ export async function sendMessage(
     console.error("message pusher push failed", err);
   }
 
-  if (priorUnread === 0) {
-    await createNotification({
-      userId: recipientId,
-      type: "NEW_MESSAGE",
-      title: `New message from ${meUser?.username ?? "a user"}`,
-      body: clean.length > 120 ? `${clean.slice(0, 117)}...` : clean,
-      link: `/messages?c=${conversationId}`,
-      email: isFirstEver
-        ? { subject: `New message from ${meUser?.username ?? "a user"}`, cta: "Open messages" }
-        : false,
-    });
+  if (isFirstEver) {
+    try {
+      const recipient = await prisma.user.findUnique({
+        where: { id: recipientId },
+        select: { email: true },
+      });
+      if (recipient?.email) {
+        const senderName = meUser?.username ?? "a user";
+        const preview = clean.length > 120 ? `${clean.slice(0, 117)}...` : clean;
+        await sendNotificationEmail({
+          to: recipient.email,
+          subject: `New message from ${senderName}`,
+          heading: `New message from ${senderName}`,
+          bodyHtml: `<p>${emailText(preview)}</p>`,
+          link: `/messages?c=${conversationId}`,
+          cta: "Open messages",
+        });
+      }
+    } catch (err) {
+      console.error("message email failed", err);
+    }
   }
 
   revalidatePath("/messages");
@@ -396,6 +404,46 @@ export async function reportConversation(
     },
   });
   return { success: true };
+}
+
+export interface UserSearchResultDTO {
+  id: string;
+  username: string | null;
+  image: string | null;
+}
+
+/**
+ * Search users by username so you can start a new conversation with someone
+ * even without a prior thread or a shared lesson. Excludes yourself and anyone
+ * blocked in either direction, so every result is actually messageable.
+ */
+export async function searchUsersToMessage(query: string): Promise<UserSearchResultDTO[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+  const me = session.user.id;
+
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  const blocks = await prisma.block.findMany({
+    where: { OR: [{ blockerId: me }, { blockedId: me }] },
+    select: { blockerId: true, blockedId: true },
+  });
+  const excludeIds = new Set<string>([me]);
+  for (const b of blocks) {
+    excludeIds.add(b.blockerId === me ? b.blockedId : b.blockerId);
+  }
+
+  return prisma.user.findMany({
+    where: {
+      username: { contains: q, mode: "insensitive" },
+      id: { notIn: [...excludeIds] },
+      isSuspended: false,
+    },
+    select: { id: true, username: true, image: true },
+    orderBy: { username: "asc" },
+    take: 8,
+  });
 }
 
 /** Total unread direct messages for the current user (navbar badge). */

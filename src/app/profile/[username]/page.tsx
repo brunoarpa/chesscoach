@@ -14,6 +14,7 @@ import { FavouriteButton } from "@/components/favourite-button";
 import { MessageUserButton } from "@/components/messages/message-user-button";
 import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { getActivityDotColor, getActivityLabel, getEffectiveAvailability } from "@/lib/utils";
@@ -401,17 +402,40 @@ export default async function ProfilePage({
             isCoachProfile &&
             effectiveAvailability === "AVAILABLE" &&
             !isBlocked && (
-              <SlotPicker
-                coachId={user.id}
-                coachChatPrice={user.coachChatPrice}
-                coachCallPrice={user.coachCallPrice}
-                coachCommunicationPreference={user.communicationPreference}
-                availableBalance={studentAvailableBalance ?? 0}
-                freeTrialsRemaining={freeTrialsRemaining}
-                slots={availableSlots}
-                hasCompletedTrial={hasCompletedTrial}
-                coachAcceptingFreeTrials={user.acceptingFreeTrials}
-              />
+              <>
+                <SlotPicker
+                  coachId={user.id}
+                  coachChatPrice={user.coachChatPrice}
+                  coachCallPrice={user.coachCallPrice}
+                  coachCommunicationPreference={user.communicationPreference}
+                  availableBalance={studentAvailableBalance ?? 0}
+                  freeTrialsRemaining={freeTrialsRemaining}
+                  slots={availableSlots}
+                  hasCompletedTrial={hasCompletedTrial}
+                  coachAcceptingFreeTrials={user.acceptingFreeTrials}
+                />
+                <Card>
+                  <CardContent className="py-4">
+                    <div className="flex items-start gap-2.5">
+                      <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                      <div className="flex-1 space-y-2.5">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            Not sure {user.username} is the right fit?
+                          </span>{" "}
+                          Message them first to talk through your goals, level, and
+                          schedule before you book.
+                        </p>
+                        <MessageUserButton
+                          userId={user.id}
+                          label={`Message ${user.username}`}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
           {!isOwnProfile && isBlocked && session?.user && (
             <Card>

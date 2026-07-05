@@ -12,12 +12,15 @@ import {
   blockConversationParty,
   unblockConversationParty,
   reportConversation,
+  startConversation,
   type ConversationSummaryDTO,
   type ConversationDetailDTO,
   type MessageDTO,
+  type UserSearchResultDTO,
 } from "@/lib/actions/messages";
 import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
+import { NewMessageSearch } from "./new-message-search";
 
 interface Props {
   userId: string;
@@ -67,6 +70,30 @@ export function MessagesView({
     setSelectedId(null);
     setDetail(null);
     window.history.replaceState(null, "", "/messages");
+  }
+
+  // Start (or reopen) a thread with someone found via name search.
+  async function handleStartWith(user: UserSearchResultDTO) {
+    const res = await startConversation(user.id);
+    if ("error" in res) {
+      toast.error(res.error);
+      return;
+    }
+    const convoId = res.conversationId;
+    setConversations((prev) => {
+      if (prev.some((c) => c.id === convoId)) return prev;
+      // Optimistic empty summary so the new thread shows in the list right away;
+      // it persists on the server once the first message is sent.
+      const summary: ConversationSummaryDTO = {
+        id: convoId,
+        otherParty: { id: user.id, username: user.username, image: user.image },
+        lastMessagePreview: null,
+        lastMessageAt: new Date().toISOString(),
+        unreadCount: 0,
+      };
+      return [summary, ...prev];
+    });
+    select(convoId);
   }
 
   // Real-time: new messages + read receipts on the personal channel.
@@ -213,8 +240,9 @@ export function MessagesView({
           selectedId ? "hidden md:flex" : "flex"
         }`}
       >
-        <div className="border-b px-4 py-3">
+        <div className="space-y-2.5 border-b px-4 py-3">
           <h1 className="text-sm font-semibold">Messages</h1>
+          <NewMessageSearch onPick={handleStartWith} />
         </div>
         <ConversationList
           conversations={conversations}

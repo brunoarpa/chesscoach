@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -45,24 +46,42 @@ export default async function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 max-w-4xl w-full">
-        <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Free game review</h3>
+        <Link
+          href="/review"
+          className="group space-y-2 p-6 rounded-lg border transition-colors hover:border-foreground/30 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h3 className="font-semibold text-lg flex items-center justify-between gap-2">
+            Free game review
+            <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </h3>
           <p className="text-base text-muted-foreground">
             Spot every blunder in seconds, no sign-up needed.
           </p>
-        </div>
-        <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Free trial lessons</h3>
+        </Link>
+        <Link
+          href="/search"
+          className="group space-y-2 p-6 rounded-lg border transition-colors hover:border-foreground/30 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h3 className="font-semibold text-lg flex items-center justify-between gap-2">
+            Free trial lessons
+            <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </h3>
           <p className="text-base text-muted-foreground">
             Try any coach at no cost before you pay.
           </p>
-        </div>
-        <div className="space-y-2 p-6 rounded-lg border">
-          <h3 className="font-semibold text-lg">Affordable coaches</h3>
+        </Link>
+        <Link
+          href="/search"
+          className="group space-y-2 p-6 rounded-lg border transition-colors hover:border-foreground/30 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <h3 className="font-semibold text-lg flex items-center justify-between gap-2">
+            Affordable coaches
+            <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </h3>
           <p className="text-base text-muted-foreground">
             One wallet, every coach. No checkout each time.
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   );
