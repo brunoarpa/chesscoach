@@ -49,7 +49,9 @@ export default async function Home() {
     prisma.user.aggregate({ where: COACH_WHERE, _sum: { lessonsGiven: true } }),
     prisma.user.findMany({
       where: COACH_WHERE,
-      orderBy: { coachElo: "desc" },
+      // Order by the rating visitors actually see, so the strip reads as our
+      // strongest coaches rather than a random-looking set. Unrated coaches last.
+      orderBy: { chessRating: { sort: "desc", nulls: "last" } },
       take: 4,
       select: {
         id: true,
