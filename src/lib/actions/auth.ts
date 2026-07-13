@@ -304,7 +304,7 @@ export async function verifyChessComLocation() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { chessComUsername: true, verificationCode: true, verificationStatus: true, image: true },
+    select: { chessComUsername: true, verificationCode: true, verificationStatus: true, customAvatar: true },
   });
 
   if (!user) return { error: "User not found" };
@@ -325,12 +325,12 @@ export async function verifyChessComLocation() {
 
   // Verification passed - fetch rating, profile, and their chess.com avatar.
   // A coach's chess.com identity is their public face here, so prefer that
-  // picture over whatever OAuth set; fall back to the existing image only when
-  // they never set a chess.com avatar.
+  // picture over whatever OAuth set - unless they uploaded their own photo
+  // (customAvatar), which always wins.
   const [rating, profile, avatar] = await Promise.all([
     fetchChessComRating(user.chessComUsername),
     fetchChessComProfile(user.chessComUsername),
-    fetchChessComAvatar(user.chessComUsername),
+    user.customAvatar ? Promise.resolve(null) : fetchChessComAvatar(user.chessComUsername),
   ]);
 
   await prisma.user.update({
@@ -340,7 +340,7 @@ export async function verifyChessComLocation() {
       chessRating: rating,
       chessComAccountAge: profile?.joined ?? null,
       verificationCode: null,
-      ...(avatar ? { image: avatar } : {}),
+      ...(!user.customAvatar && avatar ? { image: avatar } : {}),
     },
   });
 

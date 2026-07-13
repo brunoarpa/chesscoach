@@ -120,6 +120,9 @@ model User {
   passwordHash  String?
   emailVerified DateTime?
   image         String?
+  // True once the user uploads their own photo: locks `image` so the chess.com
+  // avatar sync can never overwrite a picture they chose themselves.
+  customAvatar  Boolean  @default(false)
   role          UserRole @default(USER)
 
   // Chess.com verification

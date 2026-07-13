@@ -172,7 +172,7 @@ export async function refreshAllChessComRatings() {
       verificationStatus: "VERIFIED",
       chessComUsername: { not: null },
     },
-    select: { id: true, chessComUsername: true, image: true },
+    select: { id: true, chessComUsername: true, customAvatar: true },
   });
 
   // Each user means two external chess.com calls (each capped at 3s). A flat
@@ -185,19 +185,20 @@ export async function refreshAllChessComRatings() {
     await Promise.all(
       chunk.map(async (user) => {
         if (!user.chessComUsername) return;
-        // Only spend an avatar call on users who don't already have a picture, so
-        // we never overwrite an OAuth/manual image and keep the fan-out cheap.
+        // Re-sync the chess.com avatar every run so a coach changing their photo
+        // on chess.com is reflected here, unless they uploaded their own picture
+        // (customAvatar), which must never be overwritten.
         const [rating, currentUsername, avatar] = await Promise.all([
           fetchChessComRating(user.chessComUsername),
           fetchChessComCurrentUsername(user.chessComUsername),
-          user.image ? Promise.resolve(null) : fetchChessComAvatar(user.chessComUsername),
+          user.customAvatar ? Promise.resolve(null) : fetchChessComAvatar(user.chessComUsername),
         ]);
         const updateData: Record<string, unknown> = {};
         if (rating !== null) updateData.chessRating = rating;
         if (currentUsername && currentUsername !== user.chessComUsername) {
           updateData.chessComUsername = currentUsername;
         }
-        if (!user.image && avatar) updateData.image = avatar;
+        if (!user.customAvatar && avatar) updateData.image = avatar;
         if (Object.keys(updateData).length > 0) {
           await prisma.user.update({
             where: { id: user.id },

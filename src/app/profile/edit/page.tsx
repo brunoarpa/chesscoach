@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ProfileEditForm } from "@/components/profile-edit-form";
-import { UserAvatar } from "@/components/user-avatar";
+import { AvatarUpload } from "@/components/avatar-upload";
 
 export default async function ProfileEditPage() {
   const session = await auth();
@@ -13,6 +13,7 @@ export default async function ProfileEditPage() {
     select: {
       username: true,
       image: true,
+      customAvatar: true,
       coachChatPrice: true,
       coachCallPrice: true,
       bio: true,
@@ -28,17 +29,13 @@ export default async function ProfileEditPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
 
-      <div className="flex items-center gap-4 mb-8 rounded-lg border p-4">
-        <UserAvatar username={user.username} image={user.image} size="xl" />
-        <div className="text-sm text-muted-foreground">
-          {user.image ? (
-            <p>This is your profile photo.</p>
-          ) : user.chessComUsername ? (
-            <p>Your photo syncs from your chess.com avatar once you verify.</p>
-          ) : (
-            <p>Verify your chess.com account to pull in your avatar automatically.</p>
-          )}
-        </div>
+      <div className="mb-8">
+        <AvatarUpload
+          username={user.username}
+          image={user.image}
+          customAvatar={user.customAvatar}
+          hasChessComUsername={!!user.chessComUsername}
+        />
       </div>
 
       <ProfileEditForm
