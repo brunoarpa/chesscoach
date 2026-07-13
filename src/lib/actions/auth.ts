@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation } from "@/lib/chess-com";
+import { chessComUsernameExists, fetchChessComProfile, fetchChessComRating, fetchChessComLocation, fetchChessComAvatar } from "@/lib/chess-com";
 import { filterValidLanguages } from "@/lib/languages";
 import { generateUpcomingSlots } from "@/lib/actions/timeslots";
 import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
@@ -304,7 +304,7 @@ export async function verifyChessComLocation() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { chessComUsername: true, verificationCode: true, verificationStatus: true },
+    select: { chessComUsername: true, verificationCode: true, verificationStatus: true, image: true },
   });
 
   if (!user) return { error: "User not found" };
@@ -323,10 +323,12 @@ export async function verifyChessComLocation() {
     return { error: `Verification code not found in your chess.com location. Make sure your Location field contains: ${user.verificationCode}` };
   }
 
-  // Verification passed - fetch rating and profile
-  const [rating, profile] = await Promise.all([
+  // Verification passed - fetch rating, profile, and (if they have no picture
+  // yet) their chess.com avatar so their coach card shows a real face.
+  const [rating, profile, avatar] = await Promise.all([
     fetchChessComRating(user.chessComUsername),
     fetchChessComProfile(user.chessComUsername),
+    user.image ? Promise.resolve(null) : fetchChessComAvatar(user.chessComUsername),
   ]);
 
   await prisma.user.update({
@@ -336,6 +338,7 @@ export async function verifyChessComLocation() {
       chessRating: rating,
       chessComAccountAge: profile?.joined ?? null,
       verificationCode: null,
+      ...(!user.image && avatar ? { image: avatar } : {}),
     },
   });
 

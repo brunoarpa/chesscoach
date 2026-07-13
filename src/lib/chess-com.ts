@@ -13,6 +13,7 @@ interface ChessComStats {
 interface ChessComProfile {
   joined: number; // Unix timestamp
   username: string; // current username (may differ from stored if renamed)
+  avatar?: string; // profile picture URL, absent if the user never set one
 }
 
 // chess.com is an external dependency rendered inline during SSR (e.g. the
@@ -120,6 +121,26 @@ export async function fetchChessComLocation(
 }
 
 /**
+ * Fetch a player's chess.com avatar URL, or null if they never set one.
+ * Used to give verified coaches a real face on their card/profile.
+ */
+export async function fetchChessComAvatar(
+  chessComUsername: string
+): Promise<string | null> {
+  try {
+    const res = await chessComFetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(chessComUsername.toLowerCase())}`
+    );
+    if (!res.ok) return null;
+
+    const profile: ChessComProfile = await res.json();
+    return profile.avatar ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch a player's current chess.com username (handles renames).
  */
 export async function fetchChessComCurrentUsername(
@@ -151,7 +172,7 @@ export async function refreshAllChessComRatings() {
       verificationStatus: "VERIFIED",
       chessComUsername: { not: null },
     },
-    select: { id: true, chessComUsername: true },
+    select: { id: true, chessComUsername: true, image: true },
   });
 
   // Each user means two external chess.com calls (each capped at 3s). A flat
@@ -164,15 +185,19 @@ export async function refreshAllChessComRatings() {
     await Promise.all(
       chunk.map(async (user) => {
         if (!user.chessComUsername) return;
-        const [rating, currentUsername] = await Promise.all([
+        // Only spend an avatar call on users who don't already have a picture, so
+        // we never overwrite an OAuth/manual image and keep the fan-out cheap.
+        const [rating, currentUsername, avatar] = await Promise.all([
           fetchChessComRating(user.chessComUsername),
           fetchChessComCurrentUsername(user.chessComUsername),
+          user.image ? Promise.resolve(null) : fetchChessComAvatar(user.chessComUsername),
         ]);
         const updateData: Record<string, unknown> = {};
         if (rating !== null) updateData.chessRating = rating;
         if (currentUsername && currentUsername !== user.chessComUsername) {
           updateData.chessComUsername = currentUsername;
         }
+        if (!user.image && avatar) updateData.image = avatar;
         if (Object.keys(updateData).length > 0) {
           await prisma.user.update({
             where: { id: user.id },

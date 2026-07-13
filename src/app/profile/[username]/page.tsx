@@ -12,6 +12,7 @@ import { getAvailableSlots } from "@/lib/actions/timeslots";
 import { carriedOutTrialWhere } from "@/lib/lesson-ledger";
 import { FavouriteButton } from "@/components/favourite-button";
 import { MessageUserButton } from "@/components/messages/message-user-button";
+import { UserAvatar } from "@/components/user-avatar";
 import { getLanguageLabel } from "@/lib/languages";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
@@ -68,6 +69,7 @@ export default async function ProfilePage({
     select: {
       id: true,
       username: true,
+      image: true,
       bio: true,
       languages: true,
       coachChatPrice: true,
@@ -211,23 +213,26 @@ export default async function ProfilePage({
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{user.username}</h1>
-            <div
-              className={`w-3 h-3 rounded-full ${getActivityDotColor(user.lastActiveAt)}`}
-              title={getActivityLabel(user.lastActiveAt)}
-            />
-            {user.verificationStatus === "VERIFIED" && (
-              <Badge variant="default" title="chess.com account verified">✓ chess.com</Badge>
-            )}
-            {user.verificationStatus === "PENDING" && (
-              <Badge variant="secondary">Pending Verification</Badge>
-            )}
+        <div className="flex items-start gap-4">
+          <UserAvatar username={user.username} image={user.image} size="xl" />
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-3xl font-bold">{user.username}</h1>
+              <div
+                className={`w-3 h-3 rounded-full ${getActivityDotColor(user.lastActiveAt)}`}
+                title={getActivityLabel(user.lastActiveAt)}
+              />
+              {user.verificationStatus === "VERIFIED" && (
+                <Badge variant="default" title="chess.com account verified">✓ chess.com</Badge>
+              )}
+              {user.verificationStatus === "PENDING" && (
+                <Badge variant="secondary">Pending Verification</Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {getActivityLabel(user.lastActiveAt)}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            {getActivityLabel(user.lastActiveAt)}
-          </p>
         </div>
 
         {isOwnProfile && (

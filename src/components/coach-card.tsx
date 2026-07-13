@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { MessageSquare, Phone, BookOpen, Clock } from "lucide-react";
 import type { ReactNode } from "react";
 import { FavouriteButton } from "@/components/favourite-button";
 import { BookingStatusBadge } from "@/components/booking-status-badge";
+import { MessageUserButton } from "@/components/messages/message-user-button";
+import { UserAvatar } from "@/components/user-avatar";
 import { getLanguageLabel } from "@/lib/languages";
 
 import { getActivityDotColor } from "@/lib/utils";
@@ -35,6 +38,7 @@ function Stat({ icon, children, muted = false }: { icon: ReactNode; children: Re
 interface Props {
   id: string;
   username: string;
+  image?: string | null;
   chessRating: number | null;
   coachChatPrice: number | null;
   coachCallPrice: number | null;
@@ -52,9 +56,11 @@ interface Props {
   languages: string[];
   isFavourited?: boolean;
   showFavourite?: boolean;
+  isLoggedIn?: boolean;
 }
 
 export function CoachCard(props: Props) {
+  const profileHref = `/profile/${props.username}`;
   return (
     <div className="relative h-full">
       {props.showFavourite && (
@@ -62,35 +68,41 @@ export function CoachCard(props: Props) {
           <FavouriteButton coachId={props.id} initialFavourited={props.isFavourited ?? false} />
         </div>
       )}
-      <Link href={`/profile/${props.username}`} className="block h-full">
-        <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold">{props.username}</h3>
+      <Card className="h-full flex flex-col hover:shadow-md transition-shadow">
+        <CardContent className="pt-4 flex flex-1 flex-col">
+          {/* Header + details link to the profile. Buttons live outside the link
+              below so they stay independently clickable. */}
+          <Link href={profileHref} className="block group">
+            <div className="flex items-start gap-3 pr-8">
+              <UserAvatar username={props.username} image={props.image} size="xl" />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg font-semibold truncate group-hover:underline">
+                  {props.username}
+                </h3>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                  ♝ Chess Coach
+                  <BookingStatusBadge bookable={props.bookable} hasOpenSlots={props.hasOpenSlots} acceptingFreeTrials={props.acceptingFreeTrials} />
+                </p>
+                <p className="text-sm mt-0.5 flex items-center gap-3">
+                  <span className={props.chessRating == null ? "text-muted-foreground/70" : "font-medium"}>
+                    ♝ {props.chessRating != null ? `${props.chessRating}` : "Unrated"}
+                  </span>
+                  <span className={props.avgRating == null ? "text-muted-foreground/70" : ""}>
+                    <span className="text-amber-500">★</span>{" "}
+                    {props.avgRating != null ? `${props.avgRating.toFixed(1)} (${props.reviewCount})` : "No reviews"}
+                  </span>
+                </p>
+              </div>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-3">
-              <span className="flex items-center gap-1.5">
-                ♝ Chess Coach
-                <BookingStatusBadge bookable={props.bookable} hasOpenSlots={props.hasOpenSlots} acceptingFreeTrials={props.acceptingFreeTrials} />
-              </span>
-            </p>
-
             {/* Fixed two-line height so cards with and without a bio line up. */}
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-2 min-h-[2.5rem]">
+            <p className="text-sm text-muted-foreground mt-3 line-clamp-2 min-h-[2.5rem]">
               {props.bio || "No bio yet."}
             </p>
 
             {/* Every row is always rendered (with a placeholder when a value is
-                missing) so details stay in the same spot on every card and nothing
-                shifts when a coach is unrated or offers only one lesson type. */}
-            <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-sm">
-              <Stat icon={<span>♝</span>} muted={props.chessRating == null}>
-                {props.chessRating != null ? `${props.chessRating} rated` : "Unrated"}
-              </Stat>
-              <Stat icon={<span className="text-amber-500">★</span>} muted={props.avgRating == null}>
-                {props.avgRating != null ? `${props.avgRating.toFixed(1)} (${props.reviewCount})` : "No reviews"}
-              </Stat>
+                missing) so details stay in the same spot on every card. */}
+            <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-sm mt-1">
               <Stat icon={<MessageSquare className="h-3.5 w-3.5" />} muted={props.coachChatPrice == null}>
                 {props.coachChatPrice != null ? `$${(props.coachChatPrice / 100).toFixed(2)} / 30 min chat` : "No chat lessons"}
               </Stat>
@@ -126,9 +138,27 @@ export function CoachCard(props: Props) {
                 <span className="text-xs text-muted-foreground">No languages listed</span>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </Link>
+          </Link>
+
+          {/* Actions: primary nudges toward the profile (where booking lives),
+              secondary opens a low-commitment message. */}
+          <div className="mt-4 flex gap-2">
+            <Link href={profileHref} className="flex-1">
+              <Button className="w-full">{props.bookable ? "Book a lesson" : "View profile"}</Button>
+            </Link>
+            {props.isLoggedIn ? (
+              <MessageUserButton userId={props.id} label="Message" />
+            ) : (
+              <Link href={`/login?callbackUrl=${encodeURIComponent(profileHref)}`}>
+                <Button variant="outline" className="gap-1.5">
+                  <MessageSquare className="h-4 w-4" />
+                  Message
+                </Button>
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
