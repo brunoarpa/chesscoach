@@ -144,7 +144,9 @@ export function CoachCard(props: Props) {
               secondary opens a low-commitment message. */}
           <div className="mt-4 flex gap-2">
             <Link href={profileHref} className="flex-1">
-              <Button className="w-full">{props.bookable ? "Book a lesson" : "View profile"}</Button>
+              <Button className="w-full">
+                {props.bookable && props.hasOpenSlots ? "Book a lesson" : "View profile"}
+              </Button>
             </Link>
             {props.isLoggedIn ? (
               <MessageUserButton userId={props.id} label="Message" />

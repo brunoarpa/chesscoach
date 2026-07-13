@@ -323,12 +323,14 @@ export async function verifyChessComLocation() {
     return { error: `Verification code not found in your chess.com location. Make sure your Location field contains: ${user.verificationCode}` };
   }
 
-  // Verification passed - fetch rating, profile, and (if they have no picture
-  // yet) their chess.com avatar so their coach card shows a real face.
+  // Verification passed - fetch rating, profile, and their chess.com avatar.
+  // A coach's chess.com identity is their public face here, so prefer that
+  // picture over whatever OAuth set; fall back to the existing image only when
+  // they never set a chess.com avatar.
   const [rating, profile, avatar] = await Promise.all([
     fetchChessComRating(user.chessComUsername),
     fetchChessComProfile(user.chessComUsername),
-    user.image ? Promise.resolve(null) : fetchChessComAvatar(user.chessComUsername),
+    fetchChessComAvatar(user.chessComUsername),
   ]);
 
   await prisma.user.update({
@@ -338,7 +340,7 @@ export async function verifyChessComLocation() {
       chessRating: rating,
       chessComAccountAge: profile?.joined ?? null,
       verificationCode: null,
-      ...(!user.image && avatar ? { image: avatar } : {}),
+      ...(avatar ? { image: avatar } : {}),
     },
   });
 

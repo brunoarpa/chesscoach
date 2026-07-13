@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowRight, MessagesSquare, MonitorPlay, CalendarCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
@@ -11,6 +12,12 @@ import { prisma } from "@/lib/prisma";
 const COACH_WHERE: Prisma.UserWhereInput = {
   isSuspended: false,
   OR: [{ coachChatPrice: { not: null } }, { coachCallPrice: { not: null } }],
+};
+
+export const metadata: Metadata = {
+  title: "Learn faster with your best chess coach | EloChaser",
+  description:
+    "One-on-one chess lessons on a live, synced board. Find a coach in your rating range and budget, message them free, and get your first lessons free.",
 };
 
 function startingPrice(chat: number | null, call: number | null): number | null {
@@ -83,7 +90,7 @@ export default async function Home() {
         <p className="text-xl sm:text-2xl font-medium text-muted-foreground text-balance">
           {hasTrials
             ? `One-on-one lessons on a live board. Your first ${trialsRemaining} free.`
-            : "One-on-one lessons with vetted coaches, on a live synced board."}
+            : "One-on-one lessons with real chess coaches, on a live synced board."}
         </p>
         <div className="pt-1">
           <Link href="/search">
