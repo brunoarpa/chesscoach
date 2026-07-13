@@ -20,6 +20,7 @@ export default async function ProfileEditPage() {
       timezone: true,
       languages: true,
       chessComUsername: true,
+      verificationStatus: true,
     },
   });
 
@@ -35,6 +36,7 @@ export default async function ProfileEditPage() {
           image={user.image}
           customAvatar={user.customAvatar}
           hasChessComUsername={!!user.chessComUsername}
+          chessComVerified={user.verificationStatus === "VERIFIED"}
         />
       </div>
 

@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
-import { uploadAvatar, removeAvatar } from "@/lib/actions/avatar";
+import { uploadAvatar, removeAvatar, syncChessComAvatar } from "@/lib/actions/avatar";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -15,9 +15,11 @@ interface Props {
   customAvatar: boolean;
   // What the photo falls back to when no custom upload exists, for the helper text.
   hasChessComUsername: boolean;
+  // Verified coaches can pull their chess.com avatar on demand.
+  chessComVerified: boolean;
 }
 
-export function AvatarUpload({ username, image, customAvatar, hasChessComUsername }: Props) {
+export function AvatarUpload({ username, image, customAvatar, hasChessComUsername, chessComVerified }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(image);
   const [isCustom, setIsCustom] = useState(customAvatar);
@@ -66,6 +68,19 @@ export function AvatarUpload({ username, image, customAvatar, hasChessComUsernam
     });
   }
 
+  function onSyncChessCom() {
+    startTransition(async () => {
+      const res = await syncChessComAvatar();
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
+      }
+      setPreview(res.url);
+      setIsCustom(false);
+      toast.success("Synced from chess.com.");
+    });
+  }
+
   const helper = isCustom
     ? "Your uploaded photo. It won't be overwritten."
     : hasChessComUsername
@@ -86,6 +101,11 @@ export function AvatarUpload({ username, image, customAvatar, hasChessComUsernam
           >
             {pending ? "Uploading…" : isCustom ? "Change photo" : "Upload photo"}
           </Button>
+          {chessComVerified && (
+            <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onSyncChessCom}>
+              Use chess.com photo
+            </Button>
+          )}
           {isCustom && (
             <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
               Remove

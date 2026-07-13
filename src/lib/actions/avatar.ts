@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/rate-limit";
+import { fetchChessComAvatar } from "@/lib/chess-com";
 
 const MAX_BYTES = 4 * 1024 * 1024; // 4MB - keeps us under the serverless body limit
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -67,6 +68,45 @@ export async function uploadAvatar(formData: FormData): Promise<Result> {
   if (session.user.username) revalidatePath(`/profile/${session.user.username}`);
   revalidatePath("/search");
   return { success: true, url };
+}
+
+/**
+ * Pull the current chess.com avatar on demand (verified coaches only). Lets a
+ * user refresh their photo immediately instead of waiting for the daily cron.
+ * Clears customAvatar since the picture is now chess.com-sourced again.
+ */
+export async function syncChessComAvatar(): Promise<Result> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "You must be signed in." };
+
+  const { success: rlSuccess } = await rateLimit(`sync-avatar:${session.user.id}`, {
+    maxAttempts: 20,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rlSuccess) return { error: "Too many attempts. Try again in an hour." };
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { chessComUsername: true, verificationStatus: true },
+  });
+  if (!user?.chessComUsername || user.verificationStatus !== "VERIFIED") {
+    return { error: "Verify your chess.com account first." };
+  }
+
+  const avatar = await fetchChessComAvatar(user.chessComUsername);
+  if (!avatar) {
+    return { error: "No avatar found on your chess.com account. Set one there first." };
+  }
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { image: avatar, customAvatar: false },
+  });
+
+  revalidatePath("/profile/edit");
+  if (session.user.username) revalidatePath(`/profile/${session.user.username}`);
+  revalidatePath("/search");
+  return { success: true, url: avatar };
 }
 
 /**

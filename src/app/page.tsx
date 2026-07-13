@@ -6,6 +6,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEffectiveAvailability } from "@/lib/utils";
 
 // A coach is anyone with a lesson price set. Reused for every landing query so
 // the counts, ELO range, and sample strip all describe the same population.
@@ -49,10 +50,11 @@ export default async function Home() {
     prisma.user.aggregate({ where: COACH_WHERE, _sum: { lessonsGiven: true } }),
     prisma.user.findMany({
       where: COACH_WHERE,
-      // Order by the rating visitors actually see, so the strip reads as our
-      // strongest coaches rather than a random-looking set. Unrated coaches last.
-      orderBy: { chessRating: { sort: "desc", nulls: "last" } },
-      take: 4,
+      // Same order as the search page: top by coaching rating (coachElo). We
+      // pull a few extra so we can float bookable coaches first, then take 4,
+      // mirroring exactly what shows at the top of "Find a Coach".
+      orderBy: { coachElo: "desc" },
+      take: 12,
       select: {
         id: true,
         username: true,
@@ -60,9 +62,20 @@ export default async function Home() {
         chessRating: true,
         coachChatPrice: true,
         coachCallPrice: true,
+        coachAvailability: true,
       },
     }),
   ]);
+
+  // Bookable coaches first (stable), matching the search page's sort, then the
+  // top 4 of that. These are the most attractive coaches to a new visitor.
+  const topCoaches = [...sampleCoaches]
+    .sort(
+      (a, b) =>
+        Number(getEffectiveAvailability(b.coachAvailability, b.coachChatPrice, b.coachCallPrice) === "AVAILABLE") -
+        Number(getEffectiveAvailability(a.coachAvailability, a.coachChatPrice, a.coachCallPrice) === "AVAILABLE"),
+    )
+    .slice(0, 4);
 
   const minElo = eloAgg._min.chessRating;
   const maxElo = eloAgg._max.chessRating;
@@ -115,7 +128,7 @@ export default async function Home() {
       </section>
 
       {/* Live coach strip - real faces prove there's supply behind the promise. */}
-      {sampleCoaches.length > 0 && (
+      {topCoaches.length > 0 && (
         <section className="mt-16 max-w-4xl w-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Meet a few of the coaches</h2>
@@ -124,7 +137,7 @@ export default async function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {sampleCoaches.map((coach) => {
+            {topCoaches.map((coach) => {
               const price = startingPrice(coach.coachChatPrice, coach.coachCallPrice);
               return (
                 <Link
