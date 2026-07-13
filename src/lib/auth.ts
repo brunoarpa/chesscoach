@@ -192,10 +192,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             username: true,
             role: true,
             verificationStatus: true,
+            image: true,
           },
         });
         if (dbUser) {
           session.user.id = dbUser.id;
+          // Pull the live image so the navbar avatar always matches the profile
+          // photo (upload / chess.com sync updates it here on the next request).
+          session.user.image = dbUser.image;
           (session.user as unknown as Record<string, unknown>).username = dbUser.username;
           (session.user as unknown as Record<string, unknown>).role = dbUser.role;
           (session.user as unknown as Record<string, unknown>).verificationStatus = dbUser.verificationStatus;

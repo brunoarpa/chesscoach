@@ -4,7 +4,6 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
-import { LessonFlowGuide } from "@/components/dashboard/lesson-flow-guide";
 import { SiteFooter } from "@/components/site-footer";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -43,7 +42,6 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-1">{children}</main>
           <SiteFooter />
-          <LessonFlowGuide />
           <Toaster />
         </ThemeProvider>
       </body>
