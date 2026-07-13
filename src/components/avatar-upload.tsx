@@ -13,13 +13,11 @@ interface Props {
   username: string | null;
   image: string | null;
   customAvatar: boolean;
-  // What the photo falls back to when no custom upload exists, for the helper text.
-  hasChessComUsername: boolean;
   // Verified coaches can pull their chess.com avatar on demand.
   chessComVerified: boolean;
 }
 
-export function AvatarUpload({ username, image, customAvatar, hasChessComUsername, chessComVerified }: Props) {
+export function AvatarUpload({ username, image, customAvatar, chessComVerified }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(image);
   const [isCustom, setIsCustom] = useState(customAvatar);
@@ -81,12 +79,6 @@ export function AvatarUpload({ username, image, customAvatar, hasChessComUsernam
     });
   }
 
-  const helper = isCustom
-    ? "Your uploaded photo. It won't be overwritten."
-    : hasChessComUsername
-      ? "Currently synced from your chess.com avatar. Upload one to override it."
-      : "Upload a photo, or verify chess.com to pull in your avatar automatically.";
-
   return (
     <div className="flex items-center gap-4 rounded-lg border p-4">
       <UserAvatar username={username} image={preview} size="xl" />
@@ -112,7 +104,6 @@ export function AvatarUpload({ username, image, customAvatar, hasChessComUsernam
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{helper}</p>
       </div>
       <input
         ref={inputRef}

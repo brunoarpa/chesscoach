@@ -31,21 +31,23 @@ export async function uploadAvatar(formData: FormData): Promise<Result> {
   if (!ALLOWED_TYPES.has(file.type)) return { error: "Use a JPG, PNG, WebP, or GIF image." };
   if (file.size > MAX_BYTES) return { error: "Image must be under 4MB." };
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return { error: "Photo uploads are not configured yet. Please try again later." };
-  }
-
   const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
 
   let url: string;
   try {
+    // The token is auto-read from BLOB_READ_WRITE_TOKEN when a Blob store is
+    // linked to the project on Vercel.
     const blob = await put(`avatars/${session.user.id}.${ext}`, file, {
       access: "public",
       addRandomSuffix: true,
       contentType: file.type,
     });
     url = blob.url;
-  } catch {
+  } catch (e) {
+    console.error("avatar upload failed", e);
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return { error: "Photo uploads aren't enabled yet (Blob store not linked). Redeploy after connecting it." };
+    }
     return { error: "Upload failed. Please try again." };
   }
 
