@@ -28,6 +28,17 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  images: {
+    // Avatars come from three sources: profile-photo uploads (Vercel Blob),
+    // Google sign-in pictures, and synced chess.com avatars. Allowlisting them
+    // lets next/image resize + serve WebP/AVIF instead of shipping the raw
+    // multi-hundred-KB uploads into a tiny circle.
+    remotePatterns: [
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      { protocol: "https", hostname: "images.chesscomfiles.com" },
+    ],
+  },
   async headers() {
     return [
       {

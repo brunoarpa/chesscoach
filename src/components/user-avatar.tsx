@@ -1,5 +1,29 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Image from "next/image";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+
+// Rendered pixel size per avatar size. We fetch at 2x for retina sharpness;
+// next/image resizes the source down to this instead of shipping the full
+// upload. Keep in sync with the size-* classes in components/ui/avatar.tsx.
+const SIZE_PX = { sm: 24, default: 32, lg: 40, xl: 56 } as const;
+
+// Hosts configured in next.config images.remotePatterns. Only these can go
+// through next/image; anything else falls back to a plain <img> so an
+// unexpected image host can never throw and break the page render.
+const OPTIMIZED_HOSTS = [
+  "public.blob.vercel-storage.com",
+  "lh3.googleusercontent.com",
+  "images.chesscomfiles.com",
+];
+
+function canOptimize(src: string): boolean {
+  try {
+    const host = new URL(src).hostname;
+    return OPTIMIZED_HOSTS.some((d) => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
 
 // Deterministic fallback tints so a coach without a photo still gets a stable,
 // recognisable colour instead of a sea of identical grey circles.
@@ -40,12 +64,31 @@ interface Props {
  * have one, otherwise a deterministically-coloured initials tile.
  */
 export function UserAvatar({ username, image, size = "default", className }: Props) {
+  const px = SIZE_PX[size];
   return (
     <Avatar size={size} className={className}>
-      {image && <AvatarImage src={image} alt={username ?? ""} />}
+      {/* Initials tile sits underneath: it shows while the photo loads and if
+          the photo ever fails, so the avatar is never blank. */}
       <AvatarFallback className={cn(tintFor(username ?? "?"))}>
         {initials(username)}
       </AvatarFallback>
+      {image &&
+        (canOptimize(image) ? (
+          <Image
+            src={image}
+            alt={username ?? ""}
+            width={px * 2}
+            height={px * 2}
+            className="absolute inset-0 z-10 size-full rounded-full object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt={username ?? ""}
+            className="absolute inset-0 z-10 size-full rounded-full object-cover"
+          />
+        ))}
     </Avatar>
   );
 }
