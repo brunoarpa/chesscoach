@@ -31,7 +31,9 @@ export async function generateMetadata({
   });
 
   return {
-    title: category.title,
+    // Absolute: the title already ends with "| EloChaser", so opt out of the
+    // layout's "%s | EloChaser" template to avoid doubling the brand.
+    title: { absolute: category.title },
     description: category.description,
     alternates: { canonical: `/coaches/${category.slug}` },
     openGraph: {
