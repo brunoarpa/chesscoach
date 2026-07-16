@@ -23,8 +23,17 @@ interface FrontMatter {
   title?: string;
   slug?: string;
   description?: string;
-  date?: string;
+  // gray-matter/YAML parses an unquoted `2026-07-16` into a Date, not a string.
+  date?: string | Date;
   keywords?: string[];
+}
+
+// Normalise a frontmatter date to an ISO date string (YYYY-MM-DD) so the
+// <time> attribute and JSON-LD datePublished are machine-readable.
+function normalizeDate(value: string | Date | undefined): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString().slice(0, 10);
 }
 
 async function readPostFiles(): Promise<string[]> {
@@ -42,7 +51,7 @@ function toMeta(fileName: string, data: FrontMatter): PostMeta {
     slug: data.slug || fileName.replace(/\.md$/, ""),
     title: data.title || fileName.replace(/\.md$/, ""),
     description: data.description || "",
-    date: data.date ? String(data.date) : "",
+    date: normalizeDate(data.date),
     keywords: data.keywords ?? [],
   };
 }

@@ -42,6 +42,14 @@ export default async function BlogPostPage({
   const post = await getPostBySlug(slug);
   if (!post) notFound();
 
+  const formattedDate = post.date
+    ? new Date(post.date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+
   return (
     <div className="container mx-auto px-4 py-12 max-w-3xl">
       <JsonLd
@@ -56,6 +64,21 @@ export default async function BlogPostPage({
           publisher: { "@type": "Organization", name: "EloChaser" },
         }}
       />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Blog", item: `${SITE_URL}/blog` },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: post.title,
+              item: `${SITE_URL}/blog/${post.slug}`,
+            },
+          ],
+        }}
+      />
       <Link
         href="/blog"
         className="text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -63,6 +86,14 @@ export default async function BlogPostPage({
         ← All posts
       </Link>
       <h1 className="mt-4 text-4xl font-bold tracking-tight">{post.title}</h1>
+      {formattedDate && (
+        <time
+          dateTime={post.date}
+          className="mt-3 block text-sm text-muted-foreground"
+        >
+          {formattedDate}
+        </time>
+      )}
       <div
         className="blog-content mt-8"
         dangerouslySetInnerHTML={{ __html: post.html }}

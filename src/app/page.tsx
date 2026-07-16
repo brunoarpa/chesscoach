@@ -27,6 +27,31 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
+// Shared by the visible FAQ section and its FAQPage structured data, so the
+// two can never drift apart (Google requires the markup to match the page).
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: "How much does an online chess coach cost?",
+    a: "On EloChaser, coaches set their own prices, and lessons typically start from around $15 per 30-minute slot. You can filter coaches by budget, and there is no subscription: you pay per slot.",
+  },
+  {
+    q: "Are the first chess lessons really free?",
+    a: "Yes. New students get their first lessons free so you can try a coach before paying anything. You can also message any coach for free before booking.",
+  },
+  {
+    q: "How do online chess lessons work?",
+    a: "Lessons happen on a live, shared chess board that you and your coach both control while you talk. A typical session reviews one of your recent games, teaches the theme you most need, and sends you off with something to practice.",
+  },
+  {
+    q: "What rating should my chess coach be?",
+    a: "A coach rated comfortably above you is enough, you do not need a grandmaster. For most players under 1500, a coach rated 1800 to 2000 is ideal, and often more affordable.",
+  },
+  {
+    q: "Do I need a chess coach, or is an app enough?",
+    a: "If you are a total beginner, an app is fine to start. Once you plateau and cannot see why you keep losing, a coach is the fastest way forward because they spot the blind spots an app cannot.",
+  },
+];
+
 function startingPrice(chat: number | null, call: number | null): number | null {
   const prices = [chat, call].filter((p): p is number => p != null);
   return prices.length ? Math.min(...prices) : null;
@@ -225,6 +250,36 @@ export default async function Home() {
               Fix real mistakes together on a shared, synced board.
             </p>
           </div>
+        </div>
+      </section>
+
+      <section className="mt-20 max-w-3xl w-full">
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: FAQS.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          }}
+        />
+        <h2 className="text-xl font-semibold text-center mb-8">
+          Frequently asked questions
+        </h2>
+        <div className="divide-y">
+          {FAQS.map((f) => (
+            <details key={f.q} className="group py-4">
+              <summary className="cursor-pointer font-medium list-none flex justify-between items-center gap-4">
+                {f.q}
+                <span className="text-muted-foreground transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <p className="mt-3 text-muted-foreground">{f.a}</p>
+            </details>
+          ))}
         </div>
       </section>
     </div>
