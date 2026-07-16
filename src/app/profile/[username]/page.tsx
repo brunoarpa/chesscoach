@@ -97,18 +97,17 @@ export async function generateMetadata({
   }
 
   const rating = user.chessRating ?? user.coachElo;
-  const price = startingPrice(user.coachChatPrice, user.coachCallPrice);
+  const priceCents = startingPrice(user.coachChatPrice, user.coachCallPrice);
+  const price = priceCents != null ? (priceCents / 100).toFixed(2) : null;
   const title = `${user.username} - Online Chess Coach`;
+  // Keyword-rich, consistent template (kept ~150 chars for the SERP snippet)
+  // rather than the coach's free-form bio, so every profile reads as a coaching
+  // landing page with rating and price. The bio still shows on the page itself.
   const description =
-    user.bio?.trim() ||
-    [
-      `Book one-on-one online chess lessons with ${user.username} on EloChaser.`,
-      rating ? `Rated ${rating}.` : null,
-      price != null ? `Lessons from $${price}.` : null,
-      "Message free before you book.",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    `Book online chess lessons with ${user.username}, ` +
+    `${rating ? `a ${rating}-rated ` : ""}chess coach on EloChaser. ` +
+    `Live 1-on-1 board${price ? `, from $${price}/30 min` : ""}. ` +
+    `Message free, first lessons free.`;
 
   return {
     title,
@@ -305,7 +304,8 @@ export default async function ProfilePage({
                   makesOffer: {
                     "@type": "Offer",
                     priceCurrency: "USD",
-                    price: coachStartingPrice,
+                    // Prices are stored in cents; schema.org wants a dollar amount.
+                    price: (coachStartingPrice / 100).toFixed(2),
                     itemOffered: {
                       "@type": "Service",
                       name: "Online chess coaching lesson",

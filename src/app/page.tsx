@@ -288,6 +288,80 @@ export default async function Home() {
           ))}
         </div>
       </section>
+
+      <section className="mt-20 max-w-3xl w-full space-y-8 text-muted-foreground leading-relaxed">
+        <div className="space-y-3">
+          <h2 className="text-2xl font-semibold text-foreground">
+            Online chess coaching, made simple
+          </h2>
+          <p>
+            EloChaser is an online chess coaching marketplace that connects you
+            with a personal chess coach for live, one-on-one lessons. Every
+            lesson happens on a shared, synced board that you and your coach
+            control together, so you learn by fixing your own games in real
+            time instead of watching generic videos. You can find an online
+            chess coach in your exact rating range, message any coach for free
+            before you book, and get your first lessons free.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-foreground">
+            Why one-on-one coaching beats studying alone
+          </h3>
+          <p>
+            Apps and puzzle trainers are great for volume, but they cannot see
+            why you keep making the same mistakes. A coach watches how you
+            think, spots the blind spot behind your losses, and tells you the
+            one thing to work on next. That is why players who plateau on their
+            own often break through quickly once they start working with an
+            online chess coach. Read more in{" "}
+            <Link href="/blog/chess-coach-vs-chess-app" className="text-primary underline underline-offset-2">
+              chess coach vs chess app
+            </Link>
+            .
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-foreground">
+            A chess coach for every level and budget
+          </h3>
+          <p>
+            Whether you are a complete beginner learning your first openings or
+            an intermediate player pushing toward 2000, there is a coach for
+            you. Prices start from just a few dollars per 30-minute slot and
+            scale with a coach&apos;s rating, so you can find affordable chess
+            coaching for beginners or book a stronger coach for serious
+            tournament preparation. You pay per slot, with no subscription.{" "}
+            <Link href="/search" className="text-primary underline underline-offset-2">
+              Browse chess coaches by rating and price
+            </Link>
+            .
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-foreground">
+            Learn chess the way that actually sticks
+          </h3>
+          <p>
+            The fastest way to improve is to review your real games with someone
+            who can explain what went wrong. On EloChaser your coach reviews
+            your games, teaches the theme you most need, and sends you off with
+            a clear plan, all on a live board. Not sure where to start? Our blog
+            covers{" "}
+            <Link href="/blog/how-to-improve-your-chess-rating" className="text-primary underline underline-offset-2">
+              how to improve your chess rating
+            </Link>{" "}
+            and{" "}
+            <Link href="/blog/how-online-chess-coaching-works" className="text-primary underline underline-offset-2">
+              what to expect from online chess coaching
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
     </div>
   );
 }
