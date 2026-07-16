@@ -55,7 +55,9 @@ You do not need to spend a lot to improve. A few tips:
 3. **Message coaches before booking** to check the fit. A coach who explains
    things in a way that clicks for you is worth more than a cheaper one who does
    not.
-4. **Use free trials.** On [EloChaser](https://www.elochaser.com) you can
+4. **Use free trials.** On [EloChaser](https://www.elochaser.com), prices start
+   from just a few dollars per 30-minute slot (lower-rated coaches are the
+   cheapest), you can
    [browse coaches by price and rating](https://www.elochaser.com/search),
    message them free, and try your first lessons free, so you can find your
    coach without paying to find out if they are a fit.

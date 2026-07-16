@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 const FAQS: { q: string; a: string }[] = [
   {
     q: "How much does an online chess coach cost?",
-    a: "On EloChaser, coaches set their own prices, and lessons typically start from around $15 per 30-minute slot. You can filter coaches by budget, and there is no subscription: you pay per slot.",
+    a: "On EloChaser, coaches set their own prices and lessons start from as little as a few dollars per 30-minute slot. Prices generally scale with a coach's rating, so lower-rated coaches are the cheapest way to start. You filter by budget, and there is no subscription: you pay per slot.",
   },
   {
     q: "Are the first chess lessons really free?",
@@ -47,8 +47,8 @@ const FAQS: { q: string; a: string }[] = [
     a: "A coach rated comfortably above you is enough, you do not need a grandmaster. For most players under 1500, a coach rated 1800 to 2000 is ideal, and often more affordable.",
   },
   {
-    q: "Do I need a chess coach, or is an app enough?",
-    a: "If you are a total beginner, an app is fine to start. Once you plateau and cannot see why you keep losing, a coach is the fastest way forward because they spot the blind spots an app cannot.",
+    q: "Do I really need a chess coach to improve?",
+    a: "If you are an absolute beginner still learning the rules and basic tactics, playing lots of games and solving puzzles will improve you for a while. Once you plateau and cannot see why you keep losing, a coach is the fastest way forward because they spot the blind spots you cannot see on your own.",
   },
 ];
 
@@ -227,26 +227,32 @@ export default async function Home() {
 
       {/* How it works */}
       <section className="mt-20 max-w-4xl w-full">
-        <h2 className="text-xl font-semibold text-center mb-8">How it works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <MessagesSquare className="h-6 w-6 text-muted-foreground" />
-            <h3 className="font-semibold">1. Find and message</h3>
-            <p className="text-sm text-muted-foreground">
+        <h2 className="text-2xl font-semibold text-center mb-10">How it works</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="rounded-full bg-muted p-4">
+              <MessagesSquare className="h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-semibold">1. Find and message</h3>
+            <p className="text-muted-foreground">
               Filter by rating, price, and language. Message any coach free.
             </p>
           </div>
-          <div className="space-y-2">
-            <CalendarCheck className="h-6 w-6 text-muted-foreground" />
-            <h3 className="font-semibold">2. Book a slot</h3>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="rounded-full bg-muted p-4">
+              <CalendarCheck className="h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-semibold">2. Book a slot</h3>
+            <p className="text-muted-foreground">
               Pay per 30-minute slot, no subscription. First lessons free.
             </p>
           </div>
-          <div className="space-y-2">
-            <MonitorPlay className="h-6 w-6 text-muted-foreground" />
-            <h3 className="font-semibold">3. Learn on a live board</h3>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="rounded-full bg-muted p-4">
+              <MonitorPlay className="h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-semibold">3. Learn on a live board</h3>
+            <p className="text-muted-foreground">
               Fix real mistakes together on a shared, synced board.
             </p>
           </div>
