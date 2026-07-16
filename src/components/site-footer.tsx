@@ -18,6 +18,8 @@ export function SiteFooter() {
       <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 px-4">
         <span>&copy; {new Date().getFullYear()} EloChaser</span>
         <span className="hidden sm:inline">&middot;</span>
+        <Link href="/blog" className="hover:underline">Blog</Link>
+        <span className="hidden sm:inline">&middot;</span>
         <Link href="/terms" className="hover:underline">Terms of Service</Link>
         <span className="hidden sm:inline">&middot;</span>
         <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
