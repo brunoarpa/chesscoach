@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site";
 import { getAllPosts } from "@/lib/blog";
+import { COACH_CATEGORIES } from "@/lib/coach-categories";
 
 // Re-crawl-friendly: rebuild the sitemap at most once a day rather than
 // hitting the DB on every crawler request.
@@ -12,6 +13,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/`, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/search`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.7 },
+    ...COACH_CATEGORIES.map((c) => ({
+      url: `${SITE_URL}/coaches/${c.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
     { url: `${SITE_URL}/signup`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/login`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${SITE_URL}/contact`, changeFrequency: "yearly", priority: 0.3 },

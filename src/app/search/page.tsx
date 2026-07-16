@@ -8,8 +8,10 @@ export const metadata: Metadata = {
     "Browse online chess coaches on EloChaser. Filter by rating, price, language, and availability to find the right coach for you, then message them free.",
   alternates: { canonical: "/search" },
 };
+import Link from "next/link";
 import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
+import { COACH_CATEGORIES } from "@/lib/coach-categories";
 import { auth } from "@/lib/auth";
 import { filterValidLanguages } from "@/lib/languages";
 import { getEffectiveAvailability } from "@/lib/utils";
@@ -217,6 +219,17 @@ export default async function SearchPage({
             ? "No coaches match your filters yet."
             : `${coaches.length} coach${coaches.length === 1 ? "" : "es"} available`}
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {COACH_CATEGORIES.map((c) => (
+            <Link
+              key={c.slug}
+              href={`/coaches/${c.slug}`}
+              className="rounded-full border px-3 py-1 text-sm hover:bg-muted transition-colors"
+            >
+              {c.h1}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">

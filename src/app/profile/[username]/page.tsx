@@ -291,6 +291,23 @@ export default async function ProfilePage({
         <JsonLd
           data={{
             "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Find a coach", item: `${SITE_URL}/search` },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: user.username,
+                item: `${SITE_URL}/profile/${user.username}`,
+              },
+            ],
+          }}
+        />
+      )}
+      {isCoachProfile && !user.isSuspended && (
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
             "@type": "Person",
             "@id": `${SITE_URL}/profile/${user.username}#coach`,
             name: user.username,
