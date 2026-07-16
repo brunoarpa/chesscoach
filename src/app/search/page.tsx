@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
+
+export const metadata: Metadata = {
+  title: "Find an Online Chess Coach - Browse Coaches by Rating & Price",
+  description:
+    "Browse online chess coaches on EloChaser. Filter by rating, price, language, and availability to find the right coach for you, then message them free.",
+  alternates: { canonical: "/search" },
+};
 import { CoachCard } from "@/components/coach-card";
 import { SearchFilters } from "@/components/search-filters";
 import { auth } from "@/lib/auth";

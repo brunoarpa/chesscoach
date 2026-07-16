@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { SITE_URL } from "@/lib/site";
+import { JsonLd } from "@/components/json-ld";
 import { auth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +57,77 @@ function formatAccountAge(date: Date): string {
   if (months > 0) parts.push(`${months}mo`);
   if (days > 0 && years === 0) parts.push(`${days}d`);
   return parts.length > 0 ? parts.join(" ") : "< 1 day";
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: {
+      username: true,
+      bio: true,
+      image: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
+      coachElo: true,
+      chessRating: true,
+      isSuspended: true,
+    },
+  });
+
+  if (!user) {
+    return { title: "Profile not found" };
+  }
+
+  const isCoach = !!(user.coachChatPrice || user.coachCallPrice);
+  const canonical = `/profile/${user.username}`;
+
+  // Only public coach profiles belong in the index. Suspended accounts and
+  // plain student accounts are kept out.
+  if (!isCoach || user.isSuspended) {
+    return {
+      title: user.username ?? "Profile",
+      alternates: { canonical },
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const rating = user.chessRating ?? user.coachElo;
+  const price = startingPrice(user.coachChatPrice, user.coachCallPrice);
+  const title = `${user.username} - Online Chess Coach`;
+  const description =
+    user.bio?.trim() ||
+    [
+      `Book one-on-one online chess lessons with ${user.username} on EloChaser.`,
+      rating ? `Rated ${rating}.` : null,
+      price != null ? `Lessons from $${price}.` : null,
+      "Message free before you book.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "profile",
+      title: `${user.username} - Online Chess Coach | EloChaser`,
+      description,
+      url: `${SITE_URL}${canonical}`,
+      images: user.image ? [{ url: user.image }] : undefined,
+    },
+    robots: { index: true, follow: true },
+  };
+}
+
+function startingPrice(chat: number | null, call: number | null): number | null {
+  const prices = [chat, call].filter((p): p is number => p != null);
+  return prices.length ? Math.min(...prices) : null;
 }
 
 export default async function ProfilePage({
@@ -210,8 +284,49 @@ export default async function ProfilePage({
     }));
   }
 
+  const coachStartingPrice = startingPrice(user.coachChatPrice, user.coachCallPrice);
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {isCoachProfile && !user.isSuspended && (
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "@id": `${SITE_URL}/profile/${user.username}#coach`,
+            name: user.username,
+            url: `${SITE_URL}/profile/${user.username}`,
+            jobTitle: "Chess Coach",
+            ...(user.image ? { image: user.image } : {}),
+            ...(user.bio ? { description: user.bio } : {}),
+            knowsAbout: "Chess",
+            ...(coachStartingPrice != null
+              ? {
+                  makesOffer: {
+                    "@type": "Offer",
+                    priceCurrency: "USD",
+                    price: coachStartingPrice,
+                    itemOffered: {
+                      "@type": "Service",
+                      name: "Online chess coaching lesson",
+                    },
+                  },
+                }
+              : {}),
+            ...(avgCoachRating !== null && coachReviews.length > 0
+              ? {
+                  aggregateRating: {
+                    "@type": "AggregateRating",
+                    ratingValue: avgCoachRating.toFixed(1),
+                    reviewCount: coachReviews.length,
+                    bestRating: 5,
+                    worstRating: 1,
+                  },
+                }
+              : {}),
+          }}
+        />
+      )}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-4 mb-8">
         <div className="flex items-start gap-4">
           <UserAvatar username={user.username} image={user.image} size="xl" />

@@ -7,6 +7,8 @@ import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveAvailability } from "@/lib/utils";
+import { SITE_URL } from "@/lib/site";
+import { JsonLd } from "@/components/json-ld";
 
 // A coach is anyone with a lesson price set. Reused for every landing query so
 // the counts, ELO range, and sample strip all describe the same population.
@@ -16,9 +18,13 @@ const COACH_WHERE: Prisma.UserWhereInput = {
 };
 
 export const metadata: Metadata = {
-  title: "Learn faster with your best chess coach | EloChaser",
+  // Absolute: opt out of the "%s | EloChaser" template so the brand isn't doubled.
+  title: {
+    absolute: "Online Chess Coaching - Find Your Chess Coach | EloChaser",
+  },
   description:
-    "One-on-one chess lessons on a live, synced board. Find a coach in your rating range and budget, message them free, and get your first lessons free.",
+    "One-on-one chess lessons on a live, synced board. Find an online chess coach in your rating range and budget, message them free, and get your first lessons free.",
+  alternates: { canonical: "/" },
 };
 
 function startingPrice(chat: number | null, call: number | null): number | null {
@@ -97,6 +103,36 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col items-center px-4 pt-12 pb-20">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              "@id": `${SITE_URL}/#organization`,
+              name: "EloChaser",
+              url: SITE_URL,
+              description:
+                "Online marketplace connecting chess students with one-on-one chess coaches for live lessons.",
+            },
+            {
+              "@type": "WebSite",
+              "@id": `${SITE_URL}/#website`,
+              url: SITE_URL,
+              name: "EloChaser",
+              publisher: { "@id": `${SITE_URL}/#organization` },
+              potentialAction: {
+                "@type": "SearchAction",
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+                },
+                "query-input": "required name=search_term_string",
+              },
+            },
+          ],
+        }}
+      />
       {/* Hero */}
       <section className="text-center space-y-6 max-w-2xl">
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-balance">
