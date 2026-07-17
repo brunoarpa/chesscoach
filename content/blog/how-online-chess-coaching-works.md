@@ -1,5 +1,6 @@
 ---
 title: "Online Chess Coaching: How It Works and What to Expect"
+seoTitle: "Online Chess Coaching: How It Works"
 slug: how-online-chess-coaching-works
 description: "What actually happens in an online chess lesson, how to find the right coach, and how to get the most out of every session."
 keywords:
@@ -68,7 +69,7 @@ For most players past the total-beginner stage, yes. A coach compresses months
 of trial and error into a few focused sessions by telling you the *right* thing
 to work on next. If you are stuck at the same rating and cannot see why, that is
 the clearest sign coaching will help. We compare it directly with self-study in
-[Chess Coach vs Chess App](/blog/chess-coach-vs-chess-app).
+[Is a Chess Coach Worth It?](/blog/is-a-chess-coach-worth-it).
 
 Ready to try it? [Find an online chess coach on EloChaser](https://www.elochaser.com/search)
 and message a few before you book.

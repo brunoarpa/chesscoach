@@ -1,5 +1,6 @@
 ---
 title: "5 Chess Endgames Every Beginner Should Know"
+seoTitle: "Chess Endgames for Beginners: The 5 to Know"
 slug: chess-endgames-for-beginners
 description: "The handful of essential chess endgames that win games you're currently drawing or losing, explained simply for beginners."
 keywords:

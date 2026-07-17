@@ -39,6 +39,17 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.chesscomfiles.com" },
     ],
   },
+  async redirects() {
+    return [
+      // Renamed to target the phrase people actually search. Keep the old URL
+      // alive so any existing link or indexed result lands on the post.
+      {
+        source: "/blog/chess-coach-vs-chess-app",
+        destination: "/blog/is-a-chess-coach-worth-it",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

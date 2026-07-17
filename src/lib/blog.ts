@@ -10,6 +10,9 @@ const BLOG_DIR = join(process.cwd(), "content", "blog");
 export interface PostMeta {
   slug: string;
   title: string;
+  // Search-result title: keyword-led and short enough to survive Google's ~60
+  // char cut once "| EloChaser" is appended. Falls back to title.
+  seoTitle: string;
   description: string;
   date: string;
   keywords: string[];
@@ -21,6 +24,7 @@ export interface Post extends PostMeta {
 
 interface FrontMatter {
   title?: string;
+  seoTitle?: string;
   slug?: string;
   description?: string;
   // gray-matter/YAML parses an unquoted `2026-07-16` into a Date, not a string.
@@ -47,9 +51,11 @@ async function readPostFiles(): Promise<string[]> {
 }
 
 function toMeta(fileName: string, data: FrontMatter): PostMeta {
+  const title = data.title || fileName.replace(/\.md$/, "");
   return {
     slug: data.slug || fileName.replace(/\.md$/, ""),
-    title: data.title || fileName.replace(/\.md$/, ""),
+    title,
+    seoTitle: data.seoTitle || title,
     description: data.description || "",
     date: normalizeDate(data.date),
     keywords: data.keywords ?? [],

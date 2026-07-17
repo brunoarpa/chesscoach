@@ -316,8 +316,8 @@ export default async function Home() {
             one thing to work on next. That is why players who plateau on their
             own often break through quickly once they start working with an
             online chess coach. Read more in{" "}
-            <Link href="/blog/chess-coach-vs-chess-app" className="text-primary underline underline-offset-2">
-              chess coach vs chess app
+            <Link href="/blog/is-a-chess-coach-worth-it" className="text-primary underline underline-offset-2">
+              is a chess coach worth it
             </Link>
             .
           </p>

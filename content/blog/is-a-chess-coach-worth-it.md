@@ -1,16 +1,17 @@
 ---
-title: "Chess Coach vs Chess App: Which One Actually Makes You Better?"
-slug: chess-coach-vs-chess-app
+title: "Is a Chess Coach Worth It? Coach vs Chess App"
+seoTitle: "Is a Chess Coach Worth It?"
+slug: is-a-chess-coach-worth-it
 description: "Chess apps are great for volume, but they can't see your blind spots. Here's when a personal chess coach is worth it, and when an app is enough."
 keywords:
-  - chess coach vs app
+  - is a chess coach worth it
   - do i need a chess coach
+  - chess coach vs app
   - online chess coach
-  - best way to improve at chess
 date: 2026-07-16
 ---
 
-# Chess Coach vs Chess App: Which One Actually Makes You Better?
+# Is a Chess Coach Worth It? Coach vs Chess App
 
 If you want to get better at chess in 2026, you have two obvious paths: drill on
 an app, or work with a coach. Both work, but they solve different problems, and

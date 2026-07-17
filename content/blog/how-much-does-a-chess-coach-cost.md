@@ -1,5 +1,6 @@
 ---
 title: "How Much Does a Chess Coach Cost? (2026 Price Guide)"
+seoTitle: "How Much Does a Chess Coach Cost? (2026)"
 slug: how-much-does-a-chess-coach-cost
 description: "What online chess coaching actually costs in 2026, what changes the price, and how to get good coaching on a small budget."
 keywords:
@@ -67,7 +68,7 @@ You do not need to spend a lot to improve. A few tips:
 If you are a total beginner still learning tactics, an app is fine for now, and
 free. Once you plateau, a coach becomes the fastest way forward because they fix
 the specific blind spot you cannot see yourself. We break that down in
-[Chess Coach vs Chess App](/blog/chess-coach-vs-chess-app).
+[Is a Chess Coach Worth It?](/blog/is-a-chess-coach-worth-it).
 
 For most improving players, a handful of well-chosen sessions costs less than a
 month of streaming subscriptions and moves your rating more than months of solo

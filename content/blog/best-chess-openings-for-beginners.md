@@ -1,5 +1,6 @@
 ---
 title: "Best Chess Openings for Beginners (That You'll Actually Remember)"
+seoTitle: "Best Chess Openings for Beginners (2026 Guide)"
 slug: best-chess-openings-for-beginners
 description: "Simple, solid chess openings for beginners as White and Black, with the ideas behind them so you understand the moves instead of just memorizing them."
 keywords:

@@ -1,5 +1,6 @@
 ---
 title: "How to Improve Your Chess Rating: A Practical Guide for Beginners"
+seoTitle: "How to Improve Your Chess Rating"
 slug: how-to-improve-your-chess-rating
 description: "A step-by-step plan to raise your chess rating, from fixing blunders to studying endgames and knowing when a coach is worth it."
 keywords:
