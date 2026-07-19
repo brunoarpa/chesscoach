@@ -1,6 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, MessagesSquare, MonitorPlay, CalendarCheck } from "lucide-react";
+import {
+  ArrowRight,
+  MessagesSquare,
+  MonitorPlay,
+  CalendarCheck,
+  Puzzle,
+  ScanSearch,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import { Prisma } from "@/generated/prisma/client";
@@ -19,11 +26,14 @@ const COACH_WHERE: Prisma.UserWhereInput = {
 
 export const metadata: Metadata = {
   // Absolute: opt out of the "%s | EloChaser" template so the brand isn't doubled.
+  // Keeps "chess coach" in the title: it is still the commercial term the paid
+  // search campaign competes on, even though the page now leads with the free
+  // improvement tools rather than the booking flow.
   title: {
-    absolute: "Online Chess Coaching - Find Your Chess Coach | EloChaser",
+    absolute: "Improve at Chess: Free Game Review, Puzzles and Coaching | EloChaser",
   },
   description:
-    "One-on-one chess lessons on a live, synced board. Find an online chess coach in your rating range and budget, message them free, and get your first lessons free.",
+    "See every mistake in your games with a free engine review, drill tactics puzzles, then fix what keeps costing you with a one-on-one chess coach on a live board.",
   alternates: { canonical: "/" },
 };
 
@@ -138,7 +148,7 @@ export default async function Home() {
               name: "EloChaser",
               url: SITE_URL,
               description:
-                "Online marketplace connecting chess students with one-on-one chess coaches for live lessons.",
+                "Chess improvement site offering free game analysis and tactics puzzles, plus a marketplace connecting students with one-on-one chess coaches for live lessons.",
             },
             {
               "@type": "WebSite",
@@ -158,24 +168,74 @@ export default async function Home() {
           ],
         }}
       />
-      {/* Hero */}
+      {/* Hero. Leads with the player's problem rather than the product: most
+          visitors want to get better, and only some of them have already decided
+          they want to pay a coach. The paid offer comes after the free proof. */}
       <section className="text-center space-y-6 max-w-2xl">
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-balance">
-          Learn faster with your best chess coach
+          Find out why you keep losing
         </h1>
         <p className="text-xl sm:text-2xl font-medium text-muted-foreground text-balance">
-          {hasTrials
-            ? `One-on-one lessons on a live board. Your first ${trialsRemaining} free.`
-            : "One-on-one lessons with real chess coaches, on a live synced board."}
+          Paste a game and see every mistake, free. Then fix the ones that keep costing you.
         </p>
-        <div className="pt-1">
-          <Link href="/search">
+        <div className="flex flex-wrap gap-3 justify-center pt-1">
+          <Link href="/review">
             <Button size="lg" className="gap-1.5">
-              Find your coach
+              Review your game
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
+          <Link href="/search">
+            <Button size="lg" variant="outline">
+              Find a coach
+            </Button>
+          </Link>
         </div>
+      </section>
+
+      {/* The three things the site does, ordered as the funnel rather than as a
+          flat feature menu: diagnose free, drill the pattern, then fix the habit
+          with a coach. Each step motivates the next. */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-14 max-w-4xl w-full">
+        {[
+          {
+            href: "/review",
+            icon: ScanSearch,
+            title: "Review a game",
+            body: "Paste any game and get an instant engine review. Every blunder, mistake, and missed win, with no account needed.",
+            cta: "Analyse a game",
+          },
+          {
+            href: "/puzzles",
+            icon: Puzzle,
+            title: "Train tactics",
+            body: "Hand-picked puzzles across five difficulty tiers. Work the ladder and drill the patterns you keep missing.",
+            cta: "Solve puzzles",
+          },
+          {
+            href: "/search",
+            icon: MonitorPlay,
+            title: "Work with a coach",
+            body: hasTrials
+              ? `One-on-one lessons on a live, shared board. Your first ${trialsRemaining} are free.`
+              : "One-on-one lessons on a live, shared board with a coach in your rating range.",
+            cta: "Browse coaches",
+          },
+        ].map((card) => (
+          <Link
+            key={card.href}
+            href={card.href}
+            className="group rounded-lg border p-5 text-left space-y-2 transition-colors hover:bg-accent"
+          >
+            <card.icon className="h-6 w-6" />
+            <h2 className="font-semibold">{card.title}</h2>
+            <p className="text-sm text-muted-foreground">{card.body}</p>
+            <span className="text-sm font-medium inline-flex items-center gap-1 pt-1">
+              {card.cta}
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </Link>
+        ))}
       </section>
 
       {/* Honest value bar */}
@@ -227,7 +287,7 @@ export default async function Home() {
 
       {/* How it works */}
       <section className="mt-20 max-w-4xl w-full">
-        <h2 className="text-2xl font-semibold text-center mb-10">How it works</h2>
+        <h2 className="text-2xl font-semibold text-center mb-10">How coaching works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div className="flex flex-col items-center text-center space-y-3">
             <div className="rounded-full bg-muted p-4">
