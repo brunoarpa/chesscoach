@@ -130,7 +130,14 @@ export default async function AdminPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-3xl font-bold mb-8 text-destructive">Admin Panel</h1>
+      <div className="flex items-center justify-between mb-8 gap-4">
+        <h1 className="text-3xl font-bold text-destructive">Admin Panel</h1>
+        {/* Puzzles live on their own page: the editor pulls in a chessboard, which
+            has no business loading on the main admin dashboard. */}
+        <Link href="/admin/puzzles" className="text-sm underline hover:no-underline">
+          Manage puzzles
+        </Link>
+      </div>
 
       <Tabs defaultValue="flags">
         <TabsList className="mb-6">

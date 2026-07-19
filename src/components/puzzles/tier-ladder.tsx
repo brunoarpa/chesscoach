@@ -1,0 +1,144 @@
+"use client";
+
+import { useMemo, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { Lock, Check, Star } from "lucide-react";
+import { unlockedCount } from "@/lib/puzzles";
+import {
+  subscribeGuestSolves,
+  guestSolvesSnapshot,
+  guestSolvesServerSnapshot,
+} from "@/lib/puzzle-progress";
+import { cn } from "@/lib/utils";
+
+interface LadderPuzzle {
+  id: string;
+  slug: string;
+  title: string | null;
+  theme: string | null;
+  moves: number;
+}
+
+interface Props {
+  tier: { difficulty: number; name: string; blurb: string };
+  puzzles: LadderPuzzle[];
+  serverSolvedIds: string[];
+  serverUnlocked: number;
+  isLoggedIn: boolean;
+}
+
+export function TierLadder({
+  tier,
+  puzzles,
+  serverSolvedIds,
+  serverUnlocked,
+  isLoggedIn,
+}: Props) {
+  // Signed-in progress comes from the server. Guests have theirs in
+  // sessionStorage, read through useSyncExternalStore so the first paint matches
+  // the server markup (empty ladder) and then swaps in on hydration.
+  const guestRaw = useSyncExternalStore(
+    subscribeGuestSolves,
+    guestSolvesSnapshot,
+    guestSolvesServerSnapshot,
+  );
+
+  const { solved, unlocked } = useMemo(() => {
+    if (isLoggedIn) {
+      return { solved: new Set(serverSolvedIds), unlocked: serverUnlocked };
+    }
+
+    let ids: string[] = [];
+    try {
+      const parsed: unknown = guestRaw ? JSON.parse(guestRaw) : [];
+      if (Array.isArray(parsed)) ids = parsed.filter((x): x is string => typeof x === "string");
+    } catch {
+      ids = [];
+    }
+
+    const guestSolved = new Set(ids);
+    return {
+      solved: guestSolved,
+      unlocked: unlockedCount(
+        puzzles.map((p) => p.id),
+        guestSolved,
+      ),
+    };
+  }, [guestRaw, isLoggedIn, puzzles, serverSolvedIds, serverUnlocked]);
+
+  const solvedInTier = puzzles.filter((p) => solved.has(p.id)).length;
+  const nextPuzzle = puzzles[Math.min(unlocked - 1, puzzles.length - 1)];
+  const complete = solvedInTier === puzzles.length;
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="flex" aria-label={`${tier.difficulty} of 5 difficulty`}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={cn(
+                    "h-4 w-4",
+                    i < tier.difficulty
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-muted-foreground/30",
+                  )}
+                />
+              ))}
+            </div>
+            <h2 className="text-xl font-semibold">{tier.name}</h2>
+          </div>
+          <p className="text-sm text-muted-foreground max-w-xl">{tier.blurb}</p>
+        </div>
+        <div className="text-sm text-muted-foreground shrink-0">
+          {solvedInTier} / {puzzles.length}
+          {complete && " done"}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+        {puzzles.map((puzzle, i) => {
+          const isSolved = solved.has(puzzle.id);
+          const isLocked = i >= unlocked;
+          const isNext = !isSolved && !isLocked && puzzle.id === nextPuzzle?.id;
+
+          if (isLocked) {
+            return (
+              <div
+                key={puzzle.id}
+                title="Solve the puzzle before this one to unlock it"
+                className="aspect-square rounded-md border border-dashed flex flex-col items-center justify-center text-muted-foreground/50 cursor-not-allowed"
+              >
+                <Lock className="h-4 w-4" />
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={puzzle.id}
+              href={`/puzzles/${puzzle.slug}`}
+              title={puzzle.title ?? `Puzzle ${i + 1}`}
+              className={cn(
+                "aspect-square rounded-md border flex flex-col items-center justify-center gap-0.5 transition-colors hover:bg-accent",
+                isSolved && "border-emerald-500/60 bg-emerald-500/10",
+                isNext && "ring-2 ring-primary",
+              )}
+            >
+              <span className="text-sm font-medium">{i + 1}</span>
+              {isSolved ? (
+                <Check className="h-3.5 w-3.5 text-emerald-600" />
+              ) : (
+                <span className="text-[10px] text-muted-foreground">
+                  {puzzle.moves === 1 ? "1 move" : `${puzzle.moves} moves`}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

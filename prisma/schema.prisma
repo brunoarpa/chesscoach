@@ -214,6 +214,7 @@ model User {
   conversationsA         Conversation[]  @relation("ConvA")
   conversationsB         Conversation[]  @relation("ConvB")
   directMessagesSent     DirectMessage[] @relation("DMSender")
+  puzzleSolves           PuzzleSolve[]
 
   @@index([coachElo(sort: Desc)])
   @@index([lastActiveAt])
@@ -632,4 +633,62 @@ model DirectMessage {
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+// A hand-curated tactics puzzle. `fen` is the position the solver starts from and
+// `solution` is the line from there in SAN: even indices are the moves the solver
+// has to find, odd indices are the opponent replies we auto-play. Both are derived
+// by the admin form from `sourcePgn` plus a solution length, so a puzzle can run
+// several moves deep instead of being a single tactic shot.
+model Puzzle {
+  id         String @id @default(cuid())
+  slug       String @unique
+
+  // 1-5 stars. Every tier is playable from the start (a strong solver should not
+  // have to grind 1-star puzzles first); `orderIndex` is the position inside the
+  // tier, and puzzle N+1 only unlocks once N is solved.
+  difficulty Int
+  orderIndex Int
+
+  fen        String
+  solution   String[]
+  // "w" or "b": the side the solver plays. Also the board orientation.
+  sideToMove String
+
+  title      String?
+  theme      String?
+  sourcePgn  String?
+
+  published  Boolean @default(false)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  solves     PuzzleSolve[]
+
+  // Not unique on [difficulty, orderIndex]: reordering swaps positions, and a
+  // unique constraint would reject the intermediate state mid-swap.
+  @@index([difficulty, orderIndex])
+  @@index([published])
+}
+
+// One row per user per solved puzzle. Absence means unsolved, so the ladder only
+// needs the set of puzzle ids this user has cleared. Guests accumulate the same
+// ids in sessionStorage and merge them here if they sign up before leaving.
+model PuzzleSolve {
+  id       String @id @default(cuid())
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  puzzleId String
+  puzzle   Puzzle @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+
+  // How many wrong tries before it fell. 1 means first attempt.
+  attempts Int      @default(1)
+  solvedAt DateTime @default(now())
+
+  @@unique([userId, puzzleId])
+  @@index([userId])
+  @@index([puzzleId])
 }

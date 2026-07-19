@@ -48,6 +48,9 @@ export function MobileNav({
           <MobileLink href="/review" onClose={() => setOpen(false)}>
             Review a game
           </MobileLink>
+          <MobileLink href="/puzzles" onClose={() => setOpen(false)}>
+            Puzzles
+          </MobileLink>
           <MobileLink href="/blog" onClose={() => setOpen(false)}>
             Blog
           </MobileLink>

@@ -13,6 +13,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/`, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/search`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${SITE_URL}/puzzles`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${SITE_URL}/review`, changeFrequency: "monthly", priority: 0.8 },
     ...COACH_CATEGORIES.map((c) => ({
       url: `${SITE_URL}/coaches/${c.slug}`,
       changeFrequency: "weekly" as const,
@@ -43,6 +45,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
+  // Every published puzzle is its own indexable page: they are long-tail landing
+  // pages ("white to play and win" style queries) that funnel into coaching.
+  const puzzles = await prisma.puzzle.findMany({
+    where: { published: true },
+    select: { slug: true, updatedAt: true },
+  });
+
+  const puzzleRoutes: MetadataRoute.Sitemap = puzzles.map((puzzle) => ({
+    url: `${SITE_URL}/puzzles/${puzzle.slug}`,
+    lastModified: puzzle.updatedAt,
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
   const posts = await getAllPosts();
   const blogRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${SITE_URL}/blog/${post.slug}`,
@@ -51,5 +67,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...coachRoutes, ...blogRoutes];
+  return [...staticRoutes, ...coachRoutes, ...puzzleRoutes, ...blogRoutes];
 }
