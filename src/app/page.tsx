@@ -8,7 +8,6 @@ import {
   Puzzle,
   ScanSearch,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
@@ -30,10 +29,10 @@ export const metadata: Metadata = {
   // search campaign competes on, even though the page now leads with the free
   // improvement tools rather than the booking flow.
   title: {
-    absolute: "Improve at Chess: Free Game Review, Puzzles and Coaching | EloChaser",
+    absolute: "Improve at Chess Faster: Free Game Review, Puzzles and Coaching | EloChaser",
   },
   description:
-    "See every mistake in your games with a free engine review, drill tactics puzzles, then fix what keeps costing you with a one-on-one chess coach on a live board.",
+    "Stuck at the same rating? Find what is holding you back with a free engine game review, drill the patterns you miss, and fix the rest with a one-on-one chess coach.",
   alternates: { canonical: "/" },
 };
 
@@ -82,31 +81,23 @@ export default async function Home() {
   }
   const hasTrials = trialsRemaining > 0;
 
-  const [eloAgg, lessonsAgg, sampleCoaches] = await Promise.all([
-    prisma.user.aggregate({
-      where: { ...COACH_WHERE, chessRating: { not: null } },
-      _min: { chessRating: true },
-      _max: { chessRating: true },
-    }),
-    prisma.user.aggregate({ where: COACH_WHERE, _sum: { lessonsGiven: true } }),
-    prisma.user.findMany({
-      where: COACH_WHERE,
-      // Same order as the search page: top by coaching rating (coachElo). We
-      // pull a few extra so we can float bookable coaches first, then take 4,
-      // mirroring exactly what shows at the top of "Find a Coach".
-      orderBy: { coachElo: "desc" },
-      take: 12,
-      select: {
-        id: true,
-        username: true,
-        image: true,
-        chessRating: true,
-        coachChatPrice: true,
-        coachCallPrice: true,
-        coachAvailability: true,
-      },
-    }),
-  ]);
+  const sampleCoaches = await prisma.user.findMany({
+    where: COACH_WHERE,
+    // Same order as the search page: top by coaching rating (coachElo). We
+    // pull a few extra so we can float bookable coaches first, then take 4,
+    // mirroring exactly what shows at the top of "Find a Coach".
+    orderBy: { coachElo: "desc" },
+    take: 12,
+    select: {
+      id: true,
+      username: true,
+      image: true,
+      chessRating: true,
+      coachChatPrice: true,
+      coachCallPrice: true,
+      coachAvailability: true,
+    },
+  });
 
   // Bookable coaches first (stable), matching the search page's sort, then the
   // top 4 of that. These are the most attractive coaches to a new visitor.
@@ -117,24 +108,6 @@ export default async function Home() {
         Number(getEffectiveAvailability(a.coachAvailability, a.coachChatPrice, a.coachCallPrice) === "AVAILABLE"),
     )
     .slice(0, 4);
-
-  const minElo = eloAgg._min.chessRating;
-  const maxElo = eloAgg._max.chessRating;
-  const lessonsTaught = lessonsAgg._sum.lessonsGiven ?? 0;
-
-  // Honest value chips: a real ELO range when we have one, plus product promises
-  // that stay true no matter how small the marketplace is today.
-  const stats: { label: string; sub: string }[] = [];
-  if (minElo != null && maxElo != null) {
-    stats.push({ label: `${minElo}–${maxElo}`, sub: "Coach ELO range" });
-  }
-  stats.push({ label: "First 3", sub: "lessons free" });
-  stats.push({ label: "Live board", sub: "synced in every lesson" });
-  if (lessonsTaught >= 25) {
-    stats.push({ label: `${lessonsTaught}+`, sub: "lessons taught" });
-  } else {
-    stats.push({ label: "/ 30 min", sub: "pay per slot, no subscription" });
-  }
 
   return (
     <div className="flex flex-col items-center px-4 pt-12 pb-20">
@@ -173,24 +146,11 @@ export default async function Home() {
           they want to pay a coach. The paid offer comes after the free proof. */}
       <section className="text-center space-y-6 max-w-2xl">
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-balance">
-          Find out why you keep losing
+          The fastest way to improve at chess
         </h1>
         <p className="text-xl sm:text-2xl font-medium text-muted-foreground text-balance">
-          Paste a game and see every mistake, free. Then fix the ones that keep costing you.
+          Stuck at the same rating? Find what is holding you back and fix it. Start free.
         </p>
-        <div className="flex flex-wrap gap-3 justify-center pt-1">
-          <Link href="/review">
-            <Button size="lg" className="gap-1.5">
-              Review your game
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href="/search">
-            <Button size="lg" variant="outline">
-              Find a coach
-            </Button>
-          </Link>
-        </div>
       </section>
 
       {/* The three things the site does, ordered as the funnel rather than as a
@@ -235,16 +195,6 @@ export default async function Home() {
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </span>
           </Link>
-        ))}
-      </section>
-
-      {/* Honest value bar */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-14 max-w-4xl w-full">
-        {stats.map((s) => (
-          <div key={s.sub} className="text-center rounded-lg border p-4">
-            <div className="text-2xl font-bold tracking-tight">{s.label}</div>
-            <div className="text-sm text-muted-foreground mt-0.5">{s.sub}</div>
-          </div>
         ))}
       </section>
 

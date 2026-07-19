@@ -15,6 +15,8 @@ import { COACH_CATEGORIES } from "@/lib/coach-categories";
 import { auth } from "@/lib/auth";
 import { filterValidLanguages } from "@/lib/languages";
 import { getEffectiveAvailability } from "@/lib/utils";
+import { JsonLd } from "@/components/json-ld";
+import { SITE_URL } from "@/lib/site";
 
 interface SearchParams {
   q?: string;
@@ -212,14 +214,65 @@ export default async function SearchPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Marks the page up as a coach listing. Only the unfiltered page is
+          canonical, so this describes the default ranking rather than whatever
+          filters happen to be applied. */}
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          "@id": `${SITE_URL}/search#collection`,
+          url: `${SITE_URL}/search`,
+          name: "Find an Online Chess Coach",
+          description:
+            "Browse online chess coaches by rating, price, language and availability. One-on-one lessons on a live board, paid per 30-minute slot.",
+          isPartOf: { "@id": `${SITE_URL}/#website` },
+          mainEntity: {
+            "@type": "ItemList",
+            itemListOrder: "https://schema.org/ItemListOrderDescending",
+            numberOfItems: sortedCoaches.length,
+            itemListElement: sortedCoaches
+              .filter((c) => c.username)
+              .map((c, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                url: `${SITE_URL}/profile/${c.username}`,
+                name: c.username,
+              })),
+          },
+        }}
+      />
+      {/* This is the paid-search landing page as well as the browse page, so it
+          has to sell before it filters: cold ad traffic arrives knowing nothing
+          and used to land on a bare filter list. */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Find a Coach</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-3xl font-bold">Find an Online Chess Coach</h1>
+        <p className="text-muted-foreground mt-2 max-w-2xl">
+          One-on-one lessons on a live, shared board. Filter by rating, price and language,
+          message any coach free, and pay per 30-minute slot with no subscription.
+        </p>
+        <p className="text-sm text-muted-foreground mt-3">
           {coaches.length === 0
             ? "No coaches match your filters yet."
             : `${coaches.length} coach${coaches.length === 1 ? "" : "es"} available`}
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        {/* Product promises rather than marketplace stats, so they stay true at
+            any size and cost no query on a page that already runs several. */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+          {[
+            { label: "Free", sub: "first lessons" },
+            { label: "Live board", sub: "synced in every lesson" },
+            { label: "/ 30 min", sub: "pay per slot, no subscription" },
+            { label: "Message free", sub: "before you book" },
+          ].map((s) => (
+            <div key={s.sub} className="rounded-lg border p-3 text-center">
+              <div className="font-bold tracking-tight">{s.label}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{s.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
           {COACH_CATEGORIES.map((c) => (
             <Link
               key={c.slug}
