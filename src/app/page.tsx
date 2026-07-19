@@ -144,12 +144,16 @@ export default async function Home() {
       {/* Hero. Leads with the player's problem rather than the product: most
           visitors want to get better, and only some of them have already decided
           they want to pay a coach. The paid offer comes after the free proof. */}
-      <section className="text-center space-y-6 max-w-2xl">
+      {/* The headline gets the full width so it lands on one line on desktop,
+          and the subhead is deliberately narrower and smaller. Both previously
+          sat in the same max-w-2xl and wrapped to two similar-length lines, so
+          four near-identical lines stacked up with no hierarchy between them. */}
+      <section className="text-center space-y-5 max-w-4xl">
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-balance">
           The fastest way to improve at chess
         </h1>
-        <p className="text-xl sm:text-2xl font-medium text-muted-foreground text-balance">
-          Stuck at the same rating? Find what is holding you back and fix it. Start free.
+        <p className="text-lg sm:text-xl text-muted-foreground text-balance max-w-xl mx-auto">
+          Stuck at the same rating? Find what is holding you back and fix it. Try for free.
         </p>
       </section>
 
