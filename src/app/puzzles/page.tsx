@@ -47,15 +47,13 @@ export default async function PuzzlesPage() {
   const totalSolved = serverSolved.length;
 
   return (
-    <div className="container max-w-5xl py-8 md:py-12 space-y-8">
+    <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl space-y-8">
       {userId && <GuestSolveMerger />}
 
       <header className="space-y-3">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Chess puzzles</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Hand-picked tactics, sorted into five tiers. Every tier is open from the start, so if
-          one-movers bore you, go straight to the brutal end. Inside a tier you work down the
-          ladder in order.
+          Five difficulty tiers, each worked through in order. Start wherever you like.
         </p>
         {!userId && (
           <div className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">

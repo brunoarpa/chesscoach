@@ -650,10 +650,18 @@ model Puzzle {
   difficulty Int
   orderIndex Int
 
+  // The position the solver faces, i.e. after `setupMove` has been played.
   fen        String
   solution   String[]
-  // "w" or "b": the side the solver plays. Also the board orientation.
+  // "w" or "b": the side the solver plays. Also the board orientation, so the
+  // solver always sits at the bottom of the board.
   sideToMove String
+
+  // The opponent's move immediately before the puzzle, played automatically on
+  // load from `setupFen` so the solver watches the position arrive instead of
+  // being dropped into it cold. Null only when the puzzle starts at ply 1.
+  setupFen   String?
+  setupMove  String?
 
   title      String?
   theme      String?

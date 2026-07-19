@@ -24,6 +24,10 @@ export interface DerivedPuzzle {
   fen: string;
   solution: string[];
   sideToMove: "w" | "b";
+  // The opponent move that leads into the puzzle, and the position it is played
+  // from. Null when the solution starts at the very first ply of the game.
+  setupFen: string | null;
+  setupMove: string | null;
 }
 
 /**
@@ -68,10 +72,26 @@ export function derivePuzzle(pgn: string, solutionPlies: number): DerivedPuzzle 
     replay.move(history[i].san);
   }
 
+  // Back up one further ply, if there is one, to capture the opponent move that
+  // sets the puzzle up. Puzzle convention (lichess, chess.com) is to play that
+  // move for the solver on load so they see what just happened.
+  let setupFen: string | null = null;
+  let setupMove: string | null = null;
+  if (startIdx > 0) {
+    const before = new Chess();
+    for (let i = 0; i < startIdx - 1; i++) {
+      before.move(history[i].san);
+    }
+    setupFen = before.fen();
+    setupMove = history[startIdx - 1].san;
+  }
+
   return {
     fen: replay.fen(),
     solution: history.slice(startIdx).map((m) => m.san),
     sideToMove: replay.turn(),
+    setupFen,
+    setupMove,
   };
 }
 

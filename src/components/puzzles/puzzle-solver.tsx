@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
 import {
   Chessboard,
   type PieceDropHandlerArgs,
@@ -12,20 +12,34 @@ import {
 import { Button } from "@/components/ui/button";
 import { MOVE_CLASS_STYLE } from "@/components/lesson/move-class-style";
 import { recordSolve } from "@/lib/actions/puzzles";
-import { isCorrectMove } from "@/lib/puzzles";
 import { addGuestSolve } from "@/lib/puzzle-progress";
-import { ArrowRight, Check, Eye, RotateCcw, Search, X } from "lucide-react";
+import { isCorrectMove } from "@/lib/puzzles";
+import {
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  RotateCcw,
+  Search,
+  X,
+} from "lucide-react";
 
-// How long the opponent's reply waits before it plays, so the solver can see
-// their own move land before the position changes under them.
+// Same tints the lesson/review board uses, so a puzzle looks and behaves like the
+// board people already know from the game review.
+const LAST_MOVE_TINT = "rgba(255,213,0,0.42)";
+const SELECTED_TINT = "rgba(255, 255, 0, 0.4)";
+const RIGHT_CLICK_TINT = "rgba(235, 97, 80, 0.8)";
+
+// The opponent's setup move waits a beat on load so it reads as a move being
+// played rather than the starting position.
+const SETUP_DELAY_MS = 600;
+// How long the opponent's reply waits, so your own move lands visibly first.
 const REPLY_DELAY_MS = 450;
-// How long a wrong move stays on the board before it is taken back.
+// How long a wrong move sits on the board before it is taken back.
 const WRONG_MOVE_MS = 550;
 
-const BRILLIANT = MOVE_CLASS_STYLE.brilliant.badge;
-const BLUNDER = MOVE_CLASS_STYLE.blunder.badge;
-
-type Status = "solving" | "wrong" | "solved" | "revealed";
+type Status = "solving" | "wrong" | "solved";
 
 interface Props {
   puzzle: {
@@ -33,6 +47,8 @@ interface Props {
     fen: string;
     solution: string[];
     sideToMove: string;
+    setupFen: string | null;
+    setupMove: string | null;
     difficulty: number;
     title: string | null;
   };
@@ -44,45 +60,72 @@ interface Props {
 export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Props) {
   const router = useRouter();
 
-  // `ply` is how far into the solution we are. Even values are the solver's turn.
-  const [ply, setPly] = useState(0);
-  const [position, setPosition] = useState(puzzle.fen);
+  const hasSetup = !!(puzzle.setupFen && puzzle.setupMove);
+  // Everything replays from here, so any position is reconstructible and we never
+  // hold a mutable Chess instance in state.
+  const baseFen = hasSetup ? puzzle.setupFen! : puzzle.fen;
+
+  const [setupDone, setSetupDone] = useState(!hasSetup);
+  // How many plies of the solution are on the board.
+  const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<Status>("solving");
   const [attempts, setAttempts] = useState(1);
-  const [wrongSquares, setWrongSquares] = useState<Record<string, React.CSSProperties>>({});
-  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
-  // Origin square of a click-to-move in progress.
-  const [selected, setSelected] = useState<string | null>(null);
-  // A solve only counts if the answer was never revealed. Deliberately sticky
-  // across Replay: once you have seen the line, replaying it is not a solve.
   const [usedHelp, setUsedHelp] = useState(false);
+  const [selected, setSelected] = useState<Square | null>(null);
+  const [highlighted, setHighlighted] = useState<Record<string, React.CSSProperties>>({});
+  // A wrong move is shown briefly before being taken back; this holds it.
+  const [wrongMove, setWrongMove] = useState<{ san: string; to: string } | null>(null);
+  // How far back the user has stepped. null means "following the live position".
+  const [viewIndex, setViewIndex] = useState<number | null>(null);
+
+  const rightClickStart = useRef<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Clear pending replies/take-backs on unmount so a fast navigation cannot set
-  // state on a dead component.
   useEffect(() => {
     const pending = timers.current;
     return () => pending.forEach(clearTimeout);
   }, []);
 
   const later = useCallback((fn: () => void, ms: number) => {
-    const t = setTimeout(fn, ms);
-    timers.current.push(t);
+    timers.current.push(setTimeout(fn, ms));
   }, []);
 
-  const orientation = puzzle.sideToMove === "b" ? "black" : "white";
-  const solverToMove = status === "solving" && ply % 2 === 0;
+  // Play the opponent's setup move shortly after mount.
+  useEffect(() => {
+    if (!hasSetup || setupDone) return;
+    const t = setTimeout(() => setSetupDone(true), SETUP_DELAY_MS);
+    timers.current.push(t);
+    return () => clearTimeout(t);
+  }, [hasSetup, setupDone]);
 
-  // Rebuild the game state for the current ply. Cheap (a handful of moves) and
-  // avoids holding a mutable Chess instance in state.
-  const gameAt = useCallback(
-    (upTo: number) => {
-      const g = new Chess(puzzle.fen);
-      for (let i = 0; i < upTo; i++) g.move(puzzle.solution[i]);
-      return g;
-    },
-    [puzzle.fen, puzzle.solution],
-  );
+  // Every ply currently on the board, oldest first.
+  const plies = useMemo(() => {
+    const list: string[] = [];
+    if (hasSetup && setupDone) list.push(puzzle.setupMove!);
+    list.push(...puzzle.solution.slice(0, progress));
+    if (wrongMove) list.push(wrongMove.san);
+    return list;
+  }, [hasSetup, setupDone, puzzle.setupMove, puzzle.solution, progress, wrongMove]);
+
+  const shownCount = viewIndex ?? plies.length;
+  const atLive = shownCount === plies.length;
+
+  // The game as currently displayed.
+  const game = useMemo(() => {
+    const g = new Chess(baseFen);
+    for (let i = 0; i < shownCount; i++) g.move(plies[i]);
+    return g;
+  }, [baseFen, plies, shownCount]);
+
+  const lastMove = useMemo(() => {
+    if (shownCount === 0) return null;
+    const verbose = game.history({ verbose: true });
+    const last = verbose[verbose.length - 1];
+    return last ? { from: last.from as string, to: last.to as string } : null;
+  }, [game, shownCount]);
+
+  const solverToMove =
+    atLive && setupDone && !wrongMove && status !== "solved" && progress % 2 === 0;
 
   const finish = useCallback(async () => {
     setStatus("solved");
@@ -100,191 +143,270 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     }
   }, [attempts, isLoggedIn, puzzle.id, router, usedHelp]);
 
+  // Advance past the solver's move at `from`, auto-playing the opponent's reply.
   const advance = useCallback(
-    (fromPly: number) => {
-      const next = fromPly + 1;
-      // Solution exhausted: the last ply is always the solver's.
+    (from: number) => {
+      const next = from + 1;
+      setProgress(next);
+
       if (next >= puzzle.solution.length) {
-        setPly(next);
         void finish();
         return;
       }
 
-      // Play the opponent's reply, then hand the board back.
       later(() => {
-        const g = gameAt(next);
-        const replied = g.move(puzzle.solution[next]);
-        setPosition(g.fen());
-        if (replied) setLastMove({ from: replied.from, to: replied.to });
         const after = next + 1;
-        setPly(after);
+        setProgress(after);
         if (after >= puzzle.solution.length) void finish();
       }, REPLY_DELAY_MS);
-
-      setPly(next);
     },
-    [finish, gameAt, later, puzzle.solution],
+    [finish, later, puzzle.solution.length],
   );
 
-  // Shared by dragging and click-to-move, so both input styles behave identically.
-  const attemptMove = useCallback(
-    (sourceSquare: string, targetSquare: string | null) => {
-      if (!targetSquare || !solverToMove) return false;
+  const legalTargets = useMemo(
+    () => (selected ? game.moves({ square: selected, verbose: true }).map((m) => m.to) : []),
+    [game, selected],
+  );
 
-      const expected = puzzle.solution[ply];
-      const game = gameAt(ply);
-      const baseFen = game.fen();
+  const attemptMove = useCallback(
+    (from: string, to: string) => {
+      if (!solverToMove) return false;
+
+      const expected = puzzle.solution[progress];
+      const board = new Chess(game.fen());
 
       // Take the promotion piece from the expected move so underpromotion puzzles
       // work; anything else defaults to a queen.
-      const promotionMatch = expected.match(/=([QRBN])/);
-      const promotion = (promotionMatch?.[1] ?? "Q").toLowerCase();
+      const promotion = (expected.match(/=([QRBN])/)?.[1] ?? "Q").toLowerCase();
 
       let played;
       try {
-        played = game.move({ from: sourceSquare, to: targetSquare, promotion });
+        played = board.move({ from, to, promotion });
       } catch {
         return false;
       }
       if (!played) return false;
 
-      if (isCorrectMove(baseFen, played.san, expected)) {
-        setPosition(game.fen());
-        setLastMove({ from: played.from, to: played.to });
+      setSelected(null);
+      setHighlighted({});
+
+      if (isCorrectMove(game.fen(), played.san, expected)) {
         setStatus("solving");
-        setWrongSquares({});
-        advance(ply);
+        advance(progress);
         return true;
       }
 
-      // Wrong: show it briefly in blunder red, then take it back.
-      setPosition(game.fen());
+      // Wrong: leave it on the board briefly, then take it back.
       setStatus("wrong");
       setAttempts((a) => a + 1);
-      setWrongSquares({
-        [targetSquare]: { backgroundColor: MOVE_CLASS_STYLE.blunder.tint },
-      });
+      setWrongMove({ san: played.san, to: played.to });
       later(() => {
-        setPosition(gameAt(ply).fen());
-        setWrongSquares({});
+        setWrongMove(null);
         setStatus("solving");
       }, WRONG_MOVE_MS);
       return true;
     },
-    [advance, gameAt, later, ply, puzzle.solution, solverToMove],
+    [advance, game, later, progress, puzzle.solution, solverToMove],
   );
 
   const onPieceDrop = useCallback(
-    ({ sourceSquare, targetSquare }: PieceDropHandlerArgs) => {
-      setSelected(null);
-      return attemptMove(sourceSquare, targetSquare);
-    },
+    ({ sourceSquare, targetSquare }: PieceDropHandlerArgs) =>
+      targetSquare ? attemptMove(sourceSquare, targetSquare) : false,
     [attemptMove],
   );
 
-  // Click-to-move: tap a piece, tap where it goes. What most people expect from
-  // chess.com and lichess, and the only workable input on a phone.
+  // Click a piece to see its legal moves, click a target to play it. Mirrors the
+  // review board, and is the only workable input on a phone.
   const onSquareClick = useCallback(
-    ({ square, piece }: SquareHandlerArgs) => {
+    ({ square }: SquareHandlerArgs) => {
+      if (Object.keys(highlighted).length > 0) setHighlighted({});
       if (!solverToMove) return;
 
-      if (selected === square) {
-        setSelected(null);
-        return;
-      }
-
       if (selected) {
-        const moved = attemptMove(selected, square);
-        // Missing the target with another of your own pieces re-aims rather than
-        // burning an attempt.
-        setSelected(moved ? null : piece ? square : null);
-        return;
+        if (legalTargets.includes(square as Square)) {
+          attemptMove(selected, square);
+          return;
+        }
+        if (square === selected) {
+          setSelected(null);
+          return;
+        }
       }
 
-      // Only your own pieces can start a move.
-      const turn = gameAt(ply).turn();
-      if (piece && piece.pieceType[0] === turn) setSelected(square);
+      const piece = game.get(square as Square);
+      setSelected(piece && piece.color === game.turn() ? (square as Square) : null);
     },
-    [attemptMove, gameAt, ply, selected, solverToMove],
+    [attemptMove, game, highlighted, legalTargets, selected, solverToMove],
   );
 
-  const reset = useCallback(() => {
-    setSelected(null);
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    setPly(0);
-    setPosition(puzzle.fen);
-    setStatus("solving");
-    setWrongSquares({});
-    setLastMove(null);
-  }, [puzzle.fen]);
+  // Right-click paints a square red, same as the review board.
+  const onSquareMouseDown = useCallback(({ square }: SquareHandlerArgs, e: React.MouseEvent) => {
+    if (e.button === 2) rightClickStart.current = square;
+  }, []);
 
-  const reveal = useCallback(() => {
-    setUsedHelp(true);
+  const onSquareMouseUp = useCallback(({ square }: SquareHandlerArgs, e: React.MouseEvent) => {
+    if (e.button !== 2 || !rightClickStart.current) return;
+    if (rightClickStart.current === square) {
+      setSelected(null);
+      setHighlighted((prev) => {
+        const copy = { ...prev };
+        if (copy[square]) delete copy[square];
+        else copy[square] = { backgroundColor: RIGHT_CLICK_TINT };
+        return copy;
+      });
+    }
+    rightClickStart.current = null;
+  }, []);
+
+  const canBack = shownCount > 0;
+  const canForward = !atLive;
+
+  const goBack = useCallback(() => {
+    setSelected(null);
+    setViewIndex((v) => Math.max(0, (v ?? plies.length) - 1));
+  }, [plies.length]);
+
+  const goForward = useCallback(() => {
+    setSelected(null);
+    setViewIndex((v) => {
+      if (v === null) return null;
+      const next = v + 1;
+      return next >= plies.length ? null : next;
+    });
+  }, [plies.length]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goBack();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goForward();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goBack, goForward]);
+
+  const reset = useCallback(() => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    const g = gameAt(puzzle.solution.length);
-    setPosition(g.fen());
-    setPly(puzzle.solution.length);
-    setStatus("revealed");
-    setWrongSquares({});
-    const history = g.history({ verbose: true });
-    const final = history[history.length - 1];
-    if (final) setLastMove({ from: final.from, to: final.to });
-  }, [gameAt, puzzle.solution.length]);
+    setProgress(0);
+    setStatus("solving");
+    setSelected(null);
+    setHighlighted({});
+    setWrongMove(null);
+    setViewIndex(null);
+    setSetupDone(!hasSetup);
+  }, [hasSetup]);
+
+  // Reveal one move at a time rather than dumping the whole line: the point is to
+  // get unstuck on this move, not to be shown the ending.
+  const revealNext = useCallback(() => {
+    if (!setupDone || progress >= puzzle.solution.length) return;
+    setUsedHelp(true);
+    setViewIndex(null);
+    setSelected(null);
+    setWrongMove(null);
+    setStatus("solving");
+    advance(progress);
+  }, [advance, progress, puzzle.solution.length, setupDone]);
 
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
+
     if (lastMove) {
-      const tint =
-        status === "solved" || status === "revealed"
-          ? MOVE_CLASS_STYLE.brilliant.tint
-          : "rgba(255, 213, 79, 0.42)";
+      const tint = wrongMove ? MOVE_CLASS_STYLE.blunder.tint : LAST_MOVE_TINT;
       styles[lastMove.from] = { backgroundColor: tint };
       styles[lastMove.to] = { backgroundColor: tint };
     }
-    if (selected) {
-      styles[selected] = { backgroundColor: "rgba(56, 189, 248, 0.45)" };
-    }
-    return { ...styles, ...wrongSquares };
-  }, [lastMove, selected, status, wrongSquares]);
 
-  // Which of the solver's moves they are on, for "Move 2 of 3".
+    if (selected) {
+      styles[selected] = { ...styles[selected], backgroundColor: SELECTED_TINT };
+      for (const sq of legalTargets) {
+        styles[sq] = {
+          ...styles[sq],
+          background: game.get(sq as Square)
+            ? "radial-gradient(circle, transparent 55%, rgba(0, 0, 0, 0.3) 55%)"
+            : "radial-gradient(circle, rgba(0, 0, 0, 0.2) 25%, transparent 25%)",
+        };
+      }
+    }
+
+    // Right-click marks win, so they are always visible.
+    return { ...styles, ...highlighted };
+  }, [game, highlighted, lastMove, legalTargets, selected, wrongMove]);
+
   const solverMoves = Math.ceil(puzzle.solution.length / 2);
-  const currentSolverMove = Math.min(Math.floor(ply / 2) + 1, solverMoves);
+  const currentSolverMove = Math.min(Math.floor(progress / 2) + 1, solverMoves);
+  const solved = status === "solved";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="mx-auto w-full max-w-[560px]">
-        <Chessboard
-          options={{
-            id: "puzzle-board",
-            position,
-            onPieceDrop,
-            onSquareClick,
-            boardOrientation: orientation,
-            squareStyles,
-            allowDragging: solverToMove,
-            allowDrawingArrows: true,
-            animationDurationInMs: 200,
-          }}
-        />
+      <div className="mx-auto w-full max-w-[560px] space-y-3">
+        <div onContextMenu={(e) => e.preventDefault()}>
+          <Chessboard
+            options={{
+              id: "puzzle-board",
+              position: game.fen(),
+              onPieceDrop,
+              onSquareClick,
+              onSquareMouseDown,
+              onSquareMouseUp,
+              boardOrientation: puzzle.sideToMove === "b" ? "black" : "white",
+              squareStyles,
+              allowDragging: solverToMove,
+              allowDrawingArrows: true,
+              animationDurationInMs: 200,
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={goBack}
+            disabled={!canBack}
+            title="Previous move (left arrow)"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={goForward}
+            disabled={!canForward}
+            title="Next move (right arrow)"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <aside className="space-y-4">
         <div className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold">
-              {orientation === "white" ? "White" : "Black"} to play
+              {puzzle.sideToMove === "b" ? "Black" : "White"} to play
             </p>
-            {solverMoves > 1 && status !== "solved" && status !== "revealed" && (
+            {solverMoves > 1 && !solved && (
               <p className="text-xs text-muted-foreground">
                 Move {currentSolverMove} of {solverMoves}
               </p>
             )}
           </div>
 
-          {status === "solving" && (
+          {!atLive && (
+            <p className="text-sm text-muted-foreground">
+              Reviewing an earlier position. Step forward to play on.
+            </p>
+          )}
+
+          {atLive && status === "solving" && !solved && (
             <p className="text-sm text-muted-foreground">
               {solverMoves > 1
                 ? "Find the whole line. Each correct move gets a reply."
@@ -292,60 +414,59 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
             </p>
           )}
 
-          {status === "wrong" && (
-            <p className="text-sm font-medium flex items-center gap-1.5" style={{ color: BLUNDER }}>
+          {atLive && status === "wrong" && (
+            <p
+              className="text-sm font-medium flex items-center gap-1.5"
+              style={{ color: MOVE_CLASS_STYLE.blunder.badge }}
+            >
               <X className="h-4 w-4" />
               Not that one. Try again.
             </p>
           )}
 
-          {status === "solved" && (
+          {solved && (
             <div className="space-y-2">
               <p
                 className="text-sm font-semibold flex items-center gap-1.5"
-                style={{ color: BRILLIANT }}
+                style={{ color: MOVE_CLASS_STYLE.brilliant.badge }}
               >
                 <Check className="h-4 w-4" />
-                {attempts === 1 ? "Solved, first try." : "Solved."}
+                {usedHelp ? "Line complete." : attempts === 1 ? "Solved, first try." : "Solved."}
               </p>
-              {!isLoggedIn && !usedHelp && (
+              {usedHelp && (
+                <p className="text-xs text-muted-foreground">
+                  You used a hint, so this one is not ticked off. Replay it to claim it.
+                </p>
+              )}
+              {!usedHelp && !isLoggedIn && (
                 <p className="text-xs text-muted-foreground">
                   Saved for this visit only. Make an account to keep it.
                 </p>
               )}
-              {alreadySolved && (
+              {!usedHelp && alreadySolved && (
                 <p className="text-xs text-muted-foreground">You had already solved this one.</p>
               )}
             </div>
           )}
 
-          {status === "revealed" && (
-            <p className="text-sm text-muted-foreground">
-              This is the answer. Solve it yourself to tick it off.
-            </p>
+          {solved && (
+            <div className="text-xs text-muted-foreground">
+              Solution: <span className="font-mono">{puzzle.solution.join(" ")}</span>
+            </div>
           )}
-
-          <div className="text-xs text-muted-foreground">
-            Solution:{" "}
-            {status === "solved" || status === "revealed" ? (
-              <span className="font-mono">{puzzle.solution.join(" ")}</span>
-            ) : (
-              <span>{puzzle.solution.length} half-moves</span>
-            )}
-          </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" variant="outline" onClick={reset}>
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-              {status === "solved" || status === "revealed" ? "Replay" : "Restart"}
+              {solved ? "Replay" : "Restart"}
             </Button>
-            {status !== "solved" && status !== "revealed" && (
-              <Button size="sm" variant="ghost" onClick={reveal}>
+            {!solved && (
+              <Button size="sm" variant="ghost" onClick={revealNext} disabled={!setupDone}>
                 <Eye className="h-3.5 w-3.5 mr-1.5" />
-                Show answer
+                Show next move
               </Button>
             )}
-            {nextSlug && (status === "solved" || status === "revealed") && (
+            {nextSlug && solved && (
               <Button size="sm" asChild>
                 <Link href={`/puzzles/${nextSlug}`}>
                   Next puzzle
@@ -356,7 +477,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
           </div>
         </div>
 
-        {status === "solved" && !isLoggedIn && (
+        {solved && !usedHelp && !isLoggedIn && (
           <div className="rounded-lg border p-4 space-y-2">
             <h2 className="font-semibold text-sm">Keep your progress</h2>
             <p className="text-xs text-muted-foreground">
@@ -369,7 +490,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
           </div>
         )}
 
-        {(status === "revealed" || (status === "solved" && attempts > 2)) && (
+        {(usedHelp || (solved && attempts > 2)) && (
           <div className="rounded-lg border p-4 space-y-2">
             <h2 className="font-semibold text-sm">Tactics keep costing you games?</h2>
             <p className="text-xs text-muted-foreground">

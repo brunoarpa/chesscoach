@@ -22,6 +22,8 @@ async function getPuzzle(slug: string) {
       fen: true,
       solution: true,
       sideToMove: true,
+      setupFen: true,
+      setupMove: true,
       difficulty: true,
       orderIndex: true,
       title: true,
@@ -76,7 +78,7 @@ export default async function PuzzlePage({ params }: Props) {
   const tier = tierFor(puzzle.difficulty);
 
   return (
-    <div className="container max-w-5xl py-8 space-y-6">
+    <div className="container mx-auto px-4 py-8 max-w-5xl space-y-6">
       {userId && <GuestSolveMerger />}
 
       <div className="space-y-1">
@@ -102,6 +104,8 @@ export default async function PuzzlePage({ params }: Props) {
           fen: puzzle.fen,
           solution: puzzle.solution,
           sideToMove: puzzle.sideToMove,
+          setupFen: puzzle.setupFen,
+          setupMove: puzzle.setupMove,
           difficulty: puzzle.difficulty,
           title: puzzle.title,
         }}

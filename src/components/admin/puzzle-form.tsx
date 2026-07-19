@@ -191,6 +191,14 @@ export function PuzzleForm({ puzzle, onDone }: Props) {
                 {preview.sideToMove === "b" ? "Black" : "White"}
               </p>
               <p>
+                <span className="text-muted-foreground">Opponent plays in first: </span>
+                {preview.setupMove ? (
+                  <span className="font-mono">{preview.setupMove}</span>
+                ) : (
+                  <span className="text-muted-foreground">nothing (puzzle starts the game)</span>
+                )}
+              </p>
+              <p>
                 <span className="text-muted-foreground">Line: </span>
                 <span className="font-mono">{preview.solution.join(" ")}</span>
               </p>

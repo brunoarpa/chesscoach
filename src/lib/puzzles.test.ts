@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Chess } from "chess.js";
 import { derivePuzzle, isCorrectMove, puzzleSlug, unlockedCount } from "@/lib/puzzles";
 
 // Scholar's mate: 1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#
@@ -29,6 +30,24 @@ describe("derivePuzzle", () => {
   it("produces a legal, replayable start position", () => {
     const p = derivePuzzle(SCHOLARS, 3);
     expect(isCorrectMove(p.fen, "Qh5", p.solution[0])).toBe(true);
+  });
+
+  it("captures the opponent move that leads into the puzzle", () => {
+    const p = derivePuzzle(SCHOLARS, 1);
+    // The ply before Qxf7# is Black's ...Nf6.
+    expect(p.setupMove).toBe("Nf6");
+    // Played from a position where it is Black's turn.
+    expect(p.setupFen).toContain(" b ");
+    // And replaying it must land exactly on the puzzle position.
+    const board = new Chess(p.setupFen!);
+    board.move(p.setupMove!);
+    expect(board.fen()).toBe(p.fen);
+  });
+
+  it("has no setup move when the solution is the whole game", () => {
+    const p = derivePuzzle("1. f3 e5 2. g4 Qh4#", 4);
+    expect(p.setupMove).toBeNull();
+    expect(p.setupFen).toBeNull();
   });
 
   it("rejects a solution longer than the game", () => {

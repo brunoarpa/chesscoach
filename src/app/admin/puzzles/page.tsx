@@ -33,7 +33,7 @@ export default async function AdminPuzzlesPage() {
   });
 
   return (
-    <div className="container max-w-5xl py-8 space-y-8">
+    <div className="container mx-auto px-4 py-8 max-w-5xl space-y-8">
       <div className="space-y-1">
         <Link
           href="/admin"
