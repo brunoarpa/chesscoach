@@ -248,14 +248,13 @@ export default async function SearchPage({
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Find an Online Chess Coach</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
-          One-on-one lessons on a live, shared board. Filter by rating, price and language,
-          message any coach free, and pay per 30-minute slot with no subscription.
+          Book one-on-one chess lessons with a coach in your rating range and budget.
         </p>
-        <p className="text-sm text-muted-foreground mt-3">
-          {coaches.length === 0
-            ? "No coaches match your filters yet."
-            : `${coaches.length} coach${coaches.length === 1 ? "" : "es"} available`}
-        </p>
+        {coaches.length === 0 && (
+          <p className="text-sm text-muted-foreground mt-3">
+            No coaches match your filters yet.
+          </p>
+        )}
         {/* Product promises rather than marketplace stats, so they stay true at
             any size and cost no query on a page that already runs several. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
