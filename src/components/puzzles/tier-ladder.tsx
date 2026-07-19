@@ -17,7 +17,6 @@ interface LadderPuzzle {
   slug: string;
   title: string | null;
   theme: string | null;
-  moves: number;
 }
 
 interface Props {
@@ -117,13 +116,7 @@ export function TierLadder({
               )}
             >
               <span className="text-sm font-medium">{i + 1}</span>
-              {isSolved ? (
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-              ) : (
-                <span className="text-[10px] text-muted-foreground">
-                  {puzzle.moves === 1 ? "1 move" : `${puzzle.moves} moves`}
-                </span>
-              )}
+              {isSolved && <Check className="h-3.5 w-3.5 text-emerald-600" />}
             </Link>
           );
         })}

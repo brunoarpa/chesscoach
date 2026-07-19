@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { tierFor } from "@/lib/puzzles";
+import { tierFor, puzzleDisplayName } from "@/lib/puzzles";
 import { PuzzleSolver } from "@/components/puzzles/puzzle-solver";
 import { TierStars } from "@/components/puzzles/tier-stars";
 import { GuestSolveMerger } from "@/components/puzzles/guest-solve-merger";
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tier = tierFor(puzzle.difficulty);
   const moves = Math.ceil(puzzle.solution.length / 2);
   const side = puzzle.sideToMove === "b" ? "Black" : "White";
-  const name = puzzle.title ?? `${tier?.name ?? "Chess"} puzzle ${puzzle.orderIndex}`;
+  const name = puzzleDisplayName(puzzle.difficulty, puzzle.orderIndex, puzzle.title);
 
   return {
     title: `${name}: ${side} to Play and Win (${moves}-Move Chess Puzzle)`,
@@ -91,7 +91,7 @@ export default async function PuzzlePage({ params }: Props) {
           All puzzles
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-          {puzzle.title ?? `${tier?.name ?? "Puzzle"} ${puzzle.orderIndex}`}
+          {puzzleDisplayName(puzzle.difficulty, puzzle.orderIndex, puzzle.title)}
         </h1>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <TierStars difficulty={puzzle.difficulty} />

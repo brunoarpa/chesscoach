@@ -30,7 +30,6 @@ export default async function PuzzlesPage() {
         orderIndex: true,
         title: true,
         theme: true,
-        solution: true,
       },
     }),
     userId
@@ -52,9 +51,6 @@ export default async function PuzzlesPage() {
 
       <header className="space-y-3">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Chess puzzles</h1>
-        <p className="text-muted-foreground max-w-2xl">
-          Five difficulty tiers, each worked through in order. Start wherever you like.
-        </p>
         {!userId && (
           <div className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <p className="text-sm text-muted-foreground">
@@ -93,7 +89,6 @@ export default async function PuzzlesPage() {
                   slug: p.slug,
                   title: p.title,
                   theme: p.theme,
-                  moves: Math.ceil(p.solution.length / 2),
                 }))}
                 serverSolvedIds={serverSolved}
                 serverUnlocked={unlocked}

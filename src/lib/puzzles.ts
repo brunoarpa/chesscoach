@@ -20,6 +20,19 @@ export function tierFor(difficulty: number): PuzzleTier | undefined {
   return PUZZLE_TIERS.find((t) => t.difficulty === difficulty);
 }
 
+/**
+ * What a puzzle is called on screen. Falls back to its tier and position
+ * ("Tricky #3") when it has no title of its own.
+ */
+export function puzzleDisplayName(
+  difficulty: number,
+  orderIndex: number,
+  title?: string | null,
+): string {
+  if (title?.trim()) return title.trim();
+  return `${tierFor(difficulty)?.name ?? "Puzzle"} #${orderIndex}`;
+}
+
 export interface DerivedPuzzle {
   fen: string;
   solution: string[];
