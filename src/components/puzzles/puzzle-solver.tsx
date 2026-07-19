@@ -22,6 +22,7 @@ import {
   Eye,
   RotateCcw,
   Search,
+  Undo2,
   X,
 } from "lucide-react";
 
@@ -30,14 +31,18 @@ import {
 const LAST_MOVE_TINT = "rgba(255,213,0,0.42)";
 const SELECTED_TINT = "rgba(255, 255, 0, 0.4)";
 const RIGHT_CLICK_TINT = "rgba(235, 97, 80, 0.8)";
+// Right and wrong read off the board instantly, before anyone reads the sidebar:
+// your correct moves land green, a wrong one lands red and stays there.
+const CORRECT_TINT = MOVE_CLASS_STYLE.best.tint;
+const WRONG_TINT = MOVE_CLASS_STYLE.blunder.tint;
+const CORRECT_COLOR = MOVE_CLASS_STYLE.best.badge;
+const WRONG_COLOR = MOVE_CLASS_STYLE.blunder.badge;
 
 // The opponent's setup move waits a beat on load so it reads as a move being
 // played rather than the starting position.
 const SETUP_DELAY_MS = 600;
 // How long the opponent's reply waits, so your own move lands visibly first.
 const REPLY_DELAY_MS = 450;
-// How long a wrong move sits on the board before it is taken back.
-const WRONG_MOVE_MS = 550;
 
 type Status = "solving" | "wrong" | "solved";
 
@@ -98,12 +103,15 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     return () => clearTimeout(t);
   }, [hasSetup, setupDone]);
 
-  // Every ply currently on the board, oldest first.
+  // Every ply currently on the board, oldest first. `kind` drives the square tint,
+  // so a correct move is green the instant it lands and a wrong one is red.
   const plies = useMemo(() => {
-    const list: string[] = [];
-    if (hasSetup && setupDone) list.push(puzzle.setupMove!);
-    list.push(...puzzle.solution.slice(0, progress));
-    if (wrongMove) list.push(wrongMove.san);
+    const list: { san: string; kind: "setup" | "solver" | "opponent" | "wrong" }[] = [];
+    if (hasSetup && setupDone) list.push({ san: puzzle.setupMove!, kind: "setup" });
+    puzzle.solution.slice(0, progress).forEach((san, i) => {
+      list.push({ san, kind: i % 2 === 0 ? "solver" : "opponent" });
+    });
+    if (wrongMove) list.push({ san: wrongMove.san, kind: "wrong" });
     return list;
   }, [hasSetup, setupDone, puzzle.setupMove, puzzle.solution, progress, wrongMove]);
 
@@ -113,16 +121,41 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
   // The game as currently displayed.
   const game = useMemo(() => {
     const g = new Chess(baseFen);
-    for (let i = 0; i < shownCount; i++) g.move(plies[i]);
+    for (let i = 0; i < shownCount; i++) g.move(plies[i].san);
     return g;
   }, [baseFen, plies, shownCount]);
 
-  const lastMove = useMemo(() => {
-    if (shownCount === 0) return null;
+  // Squares tinted by what happened on them. Your latest correct move stays green
+  // even after the opponent answers, so the "that was right" signal is not wiped
+  // half a second later by their reply.
+  const moveHighlights = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
+    if (shownCount === 0) return styles;
+
     const verbose = game.history({ verbose: true });
-    const last = verbose[verbose.length - 1];
-    return last ? { from: last.from as string, to: last.to as string } : null;
-  }, [game, shownCount]);
+    const paint = (i: number, tint: string) => {
+      const m = verbose[i];
+      if (!m) return;
+      styles[m.from as string] = { backgroundColor: tint };
+      styles[m.to as string] = { backgroundColor: tint };
+    };
+
+    // Your most recent correct move, green.
+    for (let i = shownCount - 1; i >= 0; i--) {
+      if (plies[i].kind === "solver") {
+        paint(i, CORRECT_TINT);
+        break;
+      }
+    }
+
+    // Then whatever actually moved last, so the board still reads "this just
+    // happened". A wrong move is red; the opponent's is the neutral yellow.
+    const lastKind = plies[shownCount - 1].kind;
+    if (lastKind === "wrong") paint(shownCount - 1, WRONG_TINT);
+    else if (lastKind !== "solver") paint(shownCount - 1, LAST_MOVE_TINT);
+
+    return styles;
+  }, [game, plies, shownCount]);
 
   const solverToMove =
     atLive && setupDone && !wrongMove && status !== "solved" && progress % 2 === 0;
@@ -196,18 +229,24 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
         return true;
       }
 
-      // Wrong: leave it on the board briefly, then take it back.
+      // Wrong: it stays on the board in red until the solver takes it back
+      // themselves, so they can look at the position they actually created
+      // instead of having it yanked away.
       setStatus("wrong");
       setAttempts((a) => a + 1);
       setWrongMove({ san: played.san, to: played.to });
-      later(() => {
-        setWrongMove(null);
-        setStatus("solving");
-      }, WRONG_MOVE_MS);
       return true;
     },
-    [advance, game, later, progress, puzzle.solution, solverToMove],
+    [advance, game, progress, puzzle.solution, solverToMove],
   );
+
+  // Undo a wrong move and hand the board back.
+  const retract = useCallback(() => {
+    setWrongMove(null);
+    setStatus("solving");
+    setSelected(null);
+    setViewIndex(null);
+  }, []);
 
   const onPieceDrop = useCallback(
     ({ sourceSquare, targetSquare }: PieceDropHandlerArgs) =>
@@ -263,8 +302,14 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
   const goBack = useCallback(() => {
     setSelected(null);
+    // Stepping back off a wrong move undoes it rather than just previewing the
+    // position before it, which is what "go back and try again" means here.
+    if (wrongMove && atLive) {
+      retract();
+      return;
+    }
     setViewIndex((v) => Math.max(0, (v ?? plies.length) - 1));
-  }, [plies.length]);
+  }, [atLive, plies.length, retract, wrongMove]);
 
   const goForward = useCallback(() => {
     setSelected(null);
@@ -314,13 +359,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
   }, [advance, progress, puzzle.solution.length, setupDone]);
 
   const squareStyles = useMemo(() => {
-    const styles: Record<string, React.CSSProperties> = {};
-
-    if (lastMove) {
-      const tint = wrongMove ? MOVE_CLASS_STYLE.blunder.tint : LAST_MOVE_TINT;
-      styles[lastMove.from] = { backgroundColor: tint };
-      styles[lastMove.to] = { backgroundColor: tint };
-    }
+    const styles: Record<string, React.CSSProperties> = { ...moveHighlights };
 
     if (selected) {
       styles[selected] = { ...styles[selected], backgroundColor: SELECTED_TINT };
@@ -336,7 +375,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
     // Right-click marks win, so they are always visible.
     return { ...styles, ...highlighted };
-  }, [game, highlighted, lastMove, legalTargets, selected, wrongMove]);
+  }, [game, highlighted, legalTargets, moveHighlights, selected]);
 
   const solverMoves = Math.ceil(puzzle.solution.length / 2);
   const currentSolverMove = Math.min(Math.floor(progress / 2) + 1, solverMoves);
@@ -415,22 +454,28 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
           )}
 
           {atLive && status === "wrong" && (
-            <p
-              className="text-sm font-medium flex items-center gap-1.5"
-              style={{ color: MOVE_CLASS_STYLE.blunder.badge }}
-            >
-              <X className="h-4 w-4" />
-              Not that one. Try again.
-            </p>
+            <div className="space-y-2">
+              <p
+                className="text-sm font-semibold flex items-center gap-1.5"
+                style={{ color: WRONG_COLOR }}
+              >
+                <X className="h-4 w-4" />
+                Not that one.
+              </p>
+              <Button size="sm" variant="outline" onClick={retract}>
+                <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                Take it back
+              </Button>
+            </div>
           )}
 
           {solved && (
             <div className="space-y-2">
               <p
-                className="text-sm font-semibold flex items-center gap-1.5"
-                style={{ color: MOVE_CLASS_STYLE.brilliant.badge }}
+                className="text-base font-bold flex items-center gap-1.5"
+                style={{ color: CORRECT_COLOR }}
               >
-                <Check className="h-4 w-4" />
+                <Check className="h-5 w-5" />
                 {usedHelp ? "Line complete." : attempts === 1 ? "Solved, first try." : "Solved."}
               </p>
               {usedHelp && (

@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { tierFor } from "@/lib/puzzles";
 import { PuzzleSolver } from "@/components/puzzles/puzzle-solver";
+import { TierStars } from "@/components/puzzles/tier-stars";
 import { GuestSolveMerger } from "@/components/puzzles/guest-solve-merger";
 import { SITE_URL } from "@/lib/site";
 
@@ -92,10 +93,11 @@ export default async function PuzzlePage({ params }: Props) {
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           {puzzle.title ?? `${tier?.name ?? "Puzzle"} ${puzzle.orderIndex}`}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {tier ? `${tier.name} (${puzzle.difficulty}/5)` : `Difficulty ${puzzle.difficulty}/5`}
-          {puzzle.theme ? ` - ${puzzle.theme}` : ""}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <TierStars difficulty={puzzle.difficulty} />
+          {tier && <span>{tier.name}</span>}
+          {puzzle.theme && <span>- {puzzle.theme}</span>}
+        </div>
       </div>
 
       <PuzzleSolver

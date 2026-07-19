@@ -2,7 +2,8 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Lock, Check, Star } from "lucide-react";
+import { Lock, Check } from "lucide-react";
+import { TierStars } from "@/components/puzzles/tier-stars";
 import { unlockedCount } from "@/lib/puzzles";
 import {
   subscribeGuestSolves,
@@ -75,19 +76,7 @@ export function TierLadder({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="flex" aria-label={`${tier.difficulty} of 5 difficulty`}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={cn(
-                    "h-4 w-4",
-                    i < tier.difficulty
-                      ? "fill-amber-400 text-amber-400"
-                      : "text-muted-foreground/30",
-                  )}
-                />
-              ))}
-            </div>
+            <TierStars difficulty={tier.difficulty} />
             <h2 className="text-xl font-semibold">{tier.name}</h2>
           </div>
           <p className="text-sm text-muted-foreground max-w-xl">{tier.blurb}</p>
