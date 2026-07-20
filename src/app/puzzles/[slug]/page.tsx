@@ -33,6 +33,17 @@ async function getPuzzle(slug: string) {
   });
 }
 
+/**
+ * The 1-based position of a puzzle within its published tier. Used for the display
+ * name so it stays gap-free after a deletion (which leaves a hole in orderIndex)
+ * and matches the number on the ladder tile.
+ */
+async function puzzlePosition(difficulty: number, orderIndex: number) {
+  return prisma.puzzle.count({
+    where: { published: true, difficulty, orderIndex: { lte: orderIndex } },
+  });
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const puzzle = await getPuzzle(slug);
@@ -41,7 +52,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tier = tierFor(puzzle.difficulty);
   const moves = Math.ceil(puzzle.solution.length / 2);
   const side = puzzle.sideToMove === "b" ? "Black" : "White";
-  const name = puzzleDisplayName(puzzle.difficulty, puzzle.orderIndex, puzzle.title);
+  const position = await puzzlePosition(puzzle.difficulty, puzzle.orderIndex);
+  const name = puzzleDisplayName(puzzle.difficulty, position, puzzle.title);
 
   return {
     title: `${name}: ${side} to Play and Win (${moves}-Move Chess Puzzle)`,
@@ -58,7 +70,7 @@ export default async function PuzzlePage({ params }: Props) {
   const userId = session?.user?.id;
 
   // The next puzzle in the same tier, for the "Next puzzle" button.
-  const [next, solve] = await Promise.all([
+  const [next, solve, position] = await Promise.all([
     prisma.puzzle.findFirst({
       where: {
         published: true,
@@ -74,6 +86,7 @@ export default async function PuzzlePage({ params }: Props) {
           select: { id: true },
         })
       : Promise.resolve(null),
+    puzzlePosition(puzzle.difficulty, puzzle.orderIndex),
   ]);
 
   const tier = tierFor(puzzle.difficulty);
@@ -91,7 +104,7 @@ export default async function PuzzlePage({ params }: Props) {
           All puzzles
         </Link>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-          {puzzleDisplayName(puzzle.difficulty, puzzle.orderIndex, puzzle.title)}
+          {puzzleDisplayName(puzzle.difficulty, position, puzzle.title)}
         </h1>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <TierStars difficulty={puzzle.difficulty} />

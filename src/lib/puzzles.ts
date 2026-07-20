@@ -23,14 +23,18 @@ export function tierFor(difficulty: number): PuzzleTier | undefined {
 /**
  * What a puzzle is called on screen. Falls back to its tier and position
  * ("Tricky #3") when it has no title of its own.
+ *
+ * `position` is the 1-based rank of the puzzle within its published tier, not the
+ * stored `orderIndex`: deleting a puzzle leaves a gap in `orderIndex`, but the
+ * visible number should stay gap-free and match the ladder tile.
  */
 export function puzzleDisplayName(
   difficulty: number,
-  orderIndex: number,
+  position: number,
   title?: string | null,
 ): string {
   if (title?.trim()) return title.trim();
-  return `${tierFor(difficulty)?.name ?? "Puzzle"} #${orderIndex}`;
+  return `${tierFor(difficulty)?.name ?? "Puzzle"} #${position}`;
 }
 
 export interface DerivedPuzzle {
