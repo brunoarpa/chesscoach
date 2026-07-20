@@ -49,14 +49,15 @@ const prisma = new PrismaClient({ adapter });
 
 const PER_TIER = 50;
 
-// Rating buckets -> difficulty. Standard spread matching the tier blurbs in
-// src/lib/puzzles.ts (Warm-up ... Brilliant).
+// Rating buckets -> difficulty. Shifted up from a beginner spread: the low bands
+// (a sub-1000 mate-in-1 is trivial) made Warm-up and Sharp too obvious. These are
+// Lichess puzzle ratings, which run a touch higher than chess.com player strength.
 const TIERS: { difficulty: number; min: number; max: number; maxPlies: number }[] = [
-  { difficulty: 1, min: 0, max: 1000, maxPlies: 2 }, // Warm-up: one-move shots
-  { difficulty: 2, min: 1000, max: 1400, maxPlies: 3 }, // Sharp
-  { difficulty: 3, min: 1400, max: 1800, maxPlies: 5 }, // Tricky
-  { difficulty: 4, min: 1800, max: 2200, maxPlies: 7 }, // Brutal
-  { difficulty: 5, min: 2200, max: 10000, maxPlies: 9 }, // Brilliant
+  { difficulty: 1, min: 1200, max: 1500, maxPlies: 2 }, // Warm-up: one move, but not an obvious one
+  { difficulty: 2, min: 1500, max: 1800, maxPlies: 3 }, // Sharp
+  { difficulty: 3, min: 1800, max: 2100, maxPlies: 5 }, // Tricky
+  { difficulty: 4, min: 2100, max: 2400, maxPlies: 7 }, // Brutal
+  { difficulty: 5, min: 2400, max: 10000, maxPlies: 9 }, // Brilliant
 ];
 
 // Quality gate. Popularity is Lichess's upvote score (-100..100); NbPlays is how
