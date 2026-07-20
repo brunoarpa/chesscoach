@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { mergeGuestSolves } from "@/lib/actions/puzzles";
-import { readGuestSolves, clearGuestSolves } from "@/lib/puzzle-progress";
+import { readGuestSolves, readGuestHints, clearGuestSolves } from "@/lib/puzzle-progress";
 
 // Mounted on the puzzle pages for signed-in users only. If they solved puzzles as
 // a guest and then signed up in the same session, this claims those solves for
@@ -19,12 +19,13 @@ export function GuestSolveMerger() {
 
     const pending = readGuestSolves();
     if (pending.length === 0) return;
+    const hinted = readGuestHints();
 
     // Clear first: if the merge fails we would rather drop the guest progress
     // than retry forever on every navigation.
     clearGuestSolves();
 
-    mergeGuestSolves(pending)
+    mergeGuestSolves(pending, hinted)
       .then((res) => {
         if (res.merged > 0) router.refresh();
       })

@@ -35,7 +35,7 @@ export default async function PuzzlesPage() {
     userId
       ? prisma.puzzleSolve.findMany({
           where: { userId },
-          select: { puzzleId: true },
+          select: { puzzleId: true, usedHint: true },
         })
       : Promise.resolve([]),
   ]);
@@ -43,6 +43,7 @@ export default async function PuzzlesPage() {
   // Signed-in progress comes from the DB. Guests get theirs hydrated client-side
   // from sessionStorage, since it must not survive them leaving the site.
   const serverSolved = solves.map((s) => s.puzzleId);
+  const serverHinted = solves.filter((s) => s.usedHint).map((s) => s.puzzleId);
   const totalSolved = serverSolved.length;
 
   return (
@@ -91,6 +92,7 @@ export default async function PuzzlesPage() {
                   theme: p.theme,
                 }))}
                 serverSolvedIds={serverSolved}
+                serverHintedIds={serverHinted}
                 serverUnlocked={unlocked}
                 isLoggedIn={!!userId}
               />

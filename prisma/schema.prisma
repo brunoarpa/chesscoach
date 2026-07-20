@@ -699,6 +699,11 @@ model PuzzleSolve {
 
   // How many wrong tries before it fell. 1 means first attempt.
   attempts Int      @default(1)
+  // Whether a hint ("show next move") was used. The solve still counts and still
+  // unlocks the next puzzle, so a hinted puzzle never leaves a gap that hides the
+  // solved puzzles after it; the ladder just tints it differently. Solving it again
+  // cleanly clears the flag.
+  usedHint Boolean  @default(false)
   solvedAt DateTime @default(now())
 
   @@unique([userId, puzzleId])

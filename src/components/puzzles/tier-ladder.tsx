@@ -8,6 +8,7 @@ import { unlockedCount } from "@/lib/puzzles";
 import {
   subscribeGuestSolves,
   guestSolvesSnapshot,
+  guestHintsSnapshot,
   guestSolvesServerSnapshot,
 } from "@/lib/puzzle-progress";
 import { cn } from "@/lib/utils";
@@ -23,14 +24,25 @@ interface Props {
   tier: { difficulty: number; name: string; blurb: string };
   puzzles: LadderPuzzle[];
   serverSolvedIds: string[];
+  serverHintedIds: string[];
   serverUnlocked: number;
   isLoggedIn: boolean;
+}
+
+function parseIds(raw: string | null): string[] {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export function TierLadder({
   tier,
   puzzles,
   serverSolvedIds,
+  serverHintedIds,
   serverUnlocked,
   isLoggedIn,
 }: Props) {
@@ -42,29 +54,31 @@ export function TierLadder({
     guestSolvesSnapshot,
     guestSolvesServerSnapshot,
   );
+  const guestHintsRaw = useSyncExternalStore(
+    subscribeGuestSolves,
+    guestHintsSnapshot,
+    guestSolvesServerSnapshot,
+  );
 
-  const { solved, unlocked } = useMemo(() => {
+  const { solved, hinted, unlocked } = useMemo(() => {
     if (isLoggedIn) {
-      return { solved: new Set(serverSolvedIds), unlocked: serverUnlocked };
+      return {
+        solved: new Set(serverSolvedIds),
+        hinted: new Set(serverHintedIds),
+        unlocked: serverUnlocked,
+      };
     }
 
-    let ids: string[] = [];
-    try {
-      const parsed: unknown = guestRaw ? JSON.parse(guestRaw) : [];
-      if (Array.isArray(parsed)) ids = parsed.filter((x): x is string => typeof x === "string");
-    } catch {
-      ids = [];
-    }
-
-    const guestSolved = new Set(ids);
+    const guestSolved = new Set(parseIds(guestRaw));
     return {
       solved: guestSolved,
+      hinted: new Set(parseIds(guestHintsRaw)),
       unlocked: unlockedCount(
         puzzles.map((p) => p.id),
         guestSolved,
       ),
     };
-  }, [guestRaw, isLoggedIn, puzzles, serverSolvedIds, serverUnlocked]);
+  }, [guestRaw, guestHintsRaw, isLoggedIn, puzzles, serverSolvedIds, serverHintedIds, serverUnlocked]);
 
   const solvedInTier = puzzles.filter((p) => solved.has(p.id)).length;
   const nextPuzzle = puzzles[Math.min(unlocked - 1, puzzles.length - 1)];
@@ -89,6 +103,7 @@ export function TierLadder({
       <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-16 gap-1.5">
         {puzzles.map((puzzle, i) => {
           const isSolved = solved.has(puzzle.id);
+          const isHinted = isSolved && hinted.has(puzzle.id);
           const isLocked = i >= unlocked;
           const isNext = !isSolved && !isLocked && puzzle.id === nextPuzzle?.id;
 
@@ -108,13 +123,18 @@ export function TierLadder({
             <Link
               key={puzzle.id}
               href={`/puzzles/${puzzle.slug}`}
-              title={`${tier.name} #${i + 1}`}
               className={cn(
                 "aspect-square rounded border flex items-center justify-center text-xs font-medium transition-colors hover:bg-accent",
                 isSolved &&
+                  !isHinted &&
                   "border-emerald-500/60 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+                // Solved, but with a hint: amber instead of green so it still shows
+                // as done and unlocks on, but reads as "come back and earn this".
+                isHinted &&
+                  "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400",
                 isNext && "ring-2 ring-primary",
               )}
+              title={`${tier.name} #${i + 1}${isHinted ? " (solved with a hint)" : ""}`}
             >
               {i + 1}
             </Link>

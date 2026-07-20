@@ -4,15 +4,19 @@
 // signup pitch, so it has to actually be true.
 
 const KEY = "chesscoach:guest-puzzle-solves";
+// Ids from KEY that were solved with a hint. A subset of the solves; used only to
+// tint those tiles differently. Kept separate so the solves format (a plain id
+// array) stays unchanged.
+const HINT_KEY = "chesscoach:guest-puzzle-hints";
 
 function available(): boolean {
   return typeof window !== "undefined" && !!window.sessionStorage;
 }
 
-export function readGuestSolves(): string[] {
+function readIds(key: string): string[] {
   if (!available()) return [];
   try {
-    const raw = window.sessionStorage.getItem(KEY);
+    const raw = window.sessionStorage.getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
@@ -22,12 +26,30 @@ export function readGuestSolves(): string[] {
   }
 }
 
-export function addGuestSolve(puzzleId: string): void {
+export function readGuestSolves(): string[] {
+  return readIds(KEY);
+}
+
+export function readGuestHints(): string[] {
+  return readIds(HINT_KEY);
+}
+
+export function addGuestSolve(puzzleId: string, usedHint = false): void {
   if (!available()) return;
   try {
-    const current = readGuestSolves();
-    if (current.includes(puzzleId)) return;
-    window.sessionStorage.setItem(KEY, JSON.stringify([...current, puzzleId]));
+    const solves = readGuestSolves();
+    if (!solves.includes(puzzleId)) {
+      window.sessionStorage.setItem(KEY, JSON.stringify([...solves, puzzleId]));
+    }
+
+    // Track the hint status so the tile can be tinted, and let a clean re-solve
+    // clear a previous hint (mirrors the server's hinted -> clean upgrade).
+    const hints = readGuestHints();
+    if (usedHint && !hints.includes(puzzleId)) {
+      window.sessionStorage.setItem(HINT_KEY, JSON.stringify([...hints, puzzleId]));
+    } else if (!usedHint && hints.includes(puzzleId)) {
+      window.sessionStorage.setItem(HINT_KEY, JSON.stringify(hints.filter((id) => id !== puzzleId)));
+    }
     emit();
   } catch {
     // Storage full or disabled: progress just does not persist. Not fatal.
@@ -38,6 +60,7 @@ export function clearGuestSolves(): void {
   if (!available()) return;
   try {
     window.sessionStorage.removeItem(KEY);
+    window.sessionStorage.removeItem(HINT_KEY);
     emit();
   } catch {
     // Nothing to do.
@@ -68,6 +91,16 @@ export function guestSolvesSnapshot(): string | null {
   if (!available()) return null;
   try {
     return window.sessionStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The raw hinted-ids string, read the same way as the solves snapshot. */
+export function guestHintsSnapshot(): string | null {
+  if (!available()) return null;
+  try {
+    return window.sessionStorage.getItem(HINT_KEY);
   } catch {
     return null;
   }

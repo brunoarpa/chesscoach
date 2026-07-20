@@ -95,6 +95,9 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
   const rightClickStart = useRef<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Mirror of usedHelp that finish() can read synchronously: a one-move hint-solve
+  // reveals and finishes in the same tick, before the usedHelp state has committed.
+  const usedHelpRef = useRef(false);
 
   useEffect(() => {
     const pending = timers.current;
@@ -172,19 +175,23 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
   const finish = useCallback(async () => {
     setStatus("solved");
-    if (usedHelp) return;
 
+    // A hinted solve still saves (as hinted), so the ladder always progresses and
+    // never hides the puzzles solved after a hinted one. Solving it again cleanly
+    // clears the hint mark. Read the ref, not usedHelp state, which may not have
+    // committed yet on a one-move hint-solve.
+    const hinted = usedHelpRef.current;
     if (isLoggedIn) {
       try {
-        await recordSolve(puzzle.id, attempts);
+        await recordSolve(puzzle.id, attempts, hinted);
         router.refresh();
       } catch {
         // A failed save should not break the celebration; the user can re-solve.
       }
     } else {
-      addGuestSolve(puzzle.id);
+      addGuestSolve(puzzle.id, hinted);
     }
-  }, [attempts, isLoggedIn, puzzle.id, router, usedHelp]);
+  }, [attempts, isLoggedIn, puzzle.id, router]);
 
   // Advance past the solver's move at `from`, auto-playing the opponent's reply.
   const advance = useCallback(
@@ -384,12 +391,17 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     setPromotion(null);
     setViewIndex(null);
     setSetupDone(!hasSetup);
+    // Replaying is a fresh attempt: a clean solve now should claim the puzzle
+    // (turn it green), so drop any hint used on the previous run.
+    usedHelpRef.current = false;
+    setUsedHelp(false);
   }, [hasSetup]);
 
   // Reveal one move at a time rather than dumping the whole line: the point is to
   // get unstuck on this move, not to be shown the ending.
   const revealNext = useCallback(() => {
     if (!setupDone || progress >= puzzle.solution.length) return;
+    usedHelpRef.current = true;
     setUsedHelp(true);
     setViewIndex(null);
     setSelected(null);
@@ -566,7 +578,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
                   </p>
                   {usedHelp && (
                     <p className="text-xs text-muted-foreground">
-                      You used a hint, so this one is not ticked off. Replay it to claim it.
+                      Saved with a hint (marked amber). Solve it again without help to turn it green.
                     </p>
                   )}
                   {!usedHelp && !isLoggedIn && (
@@ -624,7 +636,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
           </div>
         </div>
 
-        {solved && !usedHelp && !isLoggedIn && (
+        {solved && !isLoggedIn && (
           <div className="rounded-lg border p-4 space-y-2">
             <h2 className="font-semibold text-sm">Keep your progress</h2>
             <p className="text-xs text-muted-foreground">

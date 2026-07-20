@@ -210,11 +210,16 @@ export async function movePuzzle(id: string, direction: "up" | "down") {
  * Record that the signed-in user solved a puzzle. No-op for guests: their
  * progress lives in sessionStorage until they make an account.
  *
+ * A solve counts whether or not a hint was used, so it always unlocks the next
+ * puzzle and never leaves a gap that would hide the solved puzzles after it. The
+ * `usedHint` flag only changes how the tile is tinted; solving the puzzle again
+ * cleanly clears it.
+ *
  * Deliberately trusts the client's "I solved it". Puzzles award nothing but a
  * tick on a ladder, so validating the move list server-side would cost a request
  * per move to stop cheating that only hurts the cheater.
  */
-export async function recordSolve(puzzleId: string, attempts: number) {
+export async function recordSolve(puzzleId: string, attempts: number, usedHint = false) {
   const session = await auth();
   if (!session?.user?.id) return { saved: false };
 
@@ -222,10 +227,11 @@ export async function recordSolve(puzzleId: string, attempts: number) {
 
   await prisma.puzzleSolve.upsert({
     where: { userId_puzzleId: { userId: session.user.id, puzzleId } },
-    // Re-solving an already-solved puzzle should not overwrite the original
-    // attempt count, so the first clean solve stays on the record.
-    update: {},
-    create: { userId: session.user.id, puzzleId, attempts: safeAttempts },
+    // A clean re-solve claims a previously hinted puzzle (clears the flag); a
+    // hinted re-solve leaves an existing solve untouched, so it can only ever
+    // upgrade hinted -> clean, never the reverse. The original attempt count stays.
+    update: usedHint ? {} : { usedHint: false },
+    create: { userId: session.user.id, puzzleId, attempts: safeAttempts, usedHint },
   });
 
   revalidatePath("/puzzles");
@@ -237,7 +243,7 @@ export async function recordSolve(puzzleId: string, attempts: number) {
  * after signup/login so the ladder a visitor built before making an account does
  * not reset under them.
  */
-export async function mergeGuestSolves(puzzleIds: string[]) {
+export async function mergeGuestSolves(puzzleIds: string[], hintedIds: string[] = []) {
   const session = await auth();
   if (!session?.user?.id) return { merged: 0 };
   if (!Array.isArray(puzzleIds) || puzzleIds.length === 0) return { merged: 0 };
@@ -245,13 +251,20 @@ export async function mergeGuestSolves(puzzleIds: string[]) {
   // Cap the batch and drop unknown ids so a tampered sessionStorage payload
   // cannot mass-insert rows.
   const ids = [...new Set(puzzleIds.filter((id) => typeof id === "string"))].slice(0, 500);
+  const hinted = new Set(
+    (Array.isArray(hintedIds) ? hintedIds : []).filter((id) => typeof id === "string"),
+  );
   const known = await prisma.puzzle.findMany({
     where: { id: { in: ids }, published: true },
     select: { id: true },
   });
 
   const result = await prisma.puzzleSolve.createMany({
-    data: known.map((p) => ({ userId: session.user!.id!, puzzleId: p.id })),
+    data: known.map((p) => ({
+      userId: session.user!.id!,
+      puzzleId: p.id,
+      usedHint: hinted.has(p.id),
+    })),
     skipDuplicates: true,
   });
 
