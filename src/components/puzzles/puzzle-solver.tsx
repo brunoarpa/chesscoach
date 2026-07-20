@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chess, type Square } from "chess.js";
@@ -13,30 +13,18 @@ import { Button } from "@/components/ui/button";
 import { MOVE_CLASS_STYLE } from "@/components/lesson/move-class-style";
 import { recordSolve } from "@/lib/actions/puzzles";
 import { addGuestSolve } from "@/lib/puzzle-progress";
-import {
-  autoAdvanceServerSnapshot,
-  autoAdvanceSnapshot,
-  setAutoAdvance,
-  subscribeAutoAdvance,
-} from "@/lib/puzzle-prefs";
 import { isCorrectMove } from "@/lib/puzzles";
-import { cn } from "@/lib/utils";
 import {
   ArrowRight,
   Check,
   ChevronLeft,
   ChevronRight,
   Eye,
-  FastForward,
   RotateCcw,
   Search,
   Undo2,
   X,
 } from "lucide-react";
-
-// How long a clean solve stays on screen before auto-advance moves on: long enough
-// to see it land green, short enough to keep a grind flowing.
-const AUTO_ADVANCE_MS = 800;
 
 // Same tints the lesson/review board uses, so a puzzle looks and behaves like the
 // board people already know from the game review.
@@ -104,13 +92,6 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
   // How far back the user has stepped. null means "following the live position".
   const [viewIndex, setViewIndex] = useState<number | null>(null);
-
-  // When on, a clean solve jumps to the next puzzle on its own. Persisted in
-  // localStorage (read through an external store, not effect state) so it is set
-  // once and stays on across puzzles and visits.
-  const autoAdvance =
-    useSyncExternalStore(subscribeAutoAdvance, autoAdvanceSnapshot, autoAdvanceServerSnapshot) ===
-    "1";
 
   const rightClickStart = useRef<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -392,16 +373,6 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     return () => window.removeEventListener("keydown", onKey);
   }, [goBack, goForward, nextSlug, router, status]);
 
-  const toggleAutoAdvance = useCallback(() => setAutoAdvance(!autoAdvance), [autoAdvance]);
-
-  // Auto-advance only on a clean solve (no hint) and only when there is somewhere
-  // to go, so it never yanks the solver off the last puzzle in a tier.
-  useEffect(() => {
-    if (!autoAdvance || status !== "solved" || usedHelp || !nextSlug) return;
-    const t = setTimeout(() => router.push(`/puzzles/${nextSlug}`), AUTO_ADVANCE_MS);
-    return () => clearTimeout(t);
-  }, [autoAdvance, nextSlug, router, status, usedHelp]);
-
   const reset = useCallback(() => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
@@ -647,36 +618,10 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
             {solved && nextSlug && (
               <p className="text-center text-xs text-muted-foreground">
-                {autoAdvance ? "Moving to the next puzzle..." : "Press Enter for the next puzzle"}
+                Press Enter for the next puzzle
               </p>
             )}
           </div>
-
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoAdvance}
-            onClick={toggleAutoAdvance}
-            className="flex w-full items-center justify-between border-t pt-3 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <span className="flex items-center gap-1.5">
-              <FastForward className="h-3.5 w-3.5" />
-              Auto-advance
-            </span>
-            <span
-              className={cn(
-                "relative h-5 w-9 shrink-0 rounded-full transition-colors",
-                autoAdvance ? "bg-primary" : "bg-muted-foreground/30",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-0.5 h-4 w-4 rounded-full bg-background transition-transform",
-                  autoAdvance ? "translate-x-4" : "translate-x-0.5",
-                )}
-              />
-            </span>
-          </button>
         </div>
 
         {solved && !usedHelp && !isLoggedIn && (
