@@ -267,6 +267,9 @@ async function main() {
     const rows = picks.map((c) => {
       orderIndex++;
       return {
+        // The opening/theme feeds the SEO slug, but is NOT stored as the display
+        // title: on screen a puzzle is just "Tier #N" so the name never spoils the
+        // answer (e.g. "Mate in 2").
         slug: puzzleSlug(tier.difficulty, orderIndex, c.title),
         externalId: c.id,
         difficulty: tier.difficulty,
@@ -276,7 +279,7 @@ async function main() {
         sideToMove: c.derived.sideToMove,
         setupFen: c.derived.setupFen,
         setupMove: c.derived.setupMove,
-        title: c.title,
+        title: null,
         theme: c.themes || null,
         sourcePgn: null,
         published: true,

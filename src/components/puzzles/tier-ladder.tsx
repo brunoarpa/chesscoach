@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Lock, Check } from "lucide-react";
+import { Lock } from "lucide-react";
 import { TierStars } from "@/components/puzzles/tier-stars";
 import { unlockedCount } from "@/lib/puzzles";
 import {
@@ -86,7 +86,7 @@ export function TierLadder({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+      <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-16 gap-1.5">
         {puzzles.map((puzzle, i) => {
           const isSolved = solved.has(puzzle.id);
           const isLocked = i >= unlocked;
@@ -97,9 +97,9 @@ export function TierLadder({
               <div
                 key={puzzle.id}
                 title="Solve the puzzle before this one to unlock it"
-                className="aspect-square rounded-md border border-dashed flex flex-col items-center justify-center text-muted-foreground/50 cursor-not-allowed"
+                className="aspect-square rounded border border-dashed flex items-center justify-center text-muted-foreground/40 cursor-not-allowed"
               >
-                <Lock className="h-4 w-4" />
+                <Lock className="h-3 w-3" />
               </div>
             );
           }
@@ -108,15 +108,15 @@ export function TierLadder({
             <Link
               key={puzzle.id}
               href={`/puzzles/${puzzle.slug}`}
-              title={puzzle.title ?? `Puzzle ${i + 1}`}
+              title={`${tier.name} #${i + 1}`}
               className={cn(
-                "aspect-square rounded-md border flex flex-col items-center justify-center gap-0.5 transition-colors hover:bg-accent",
-                isSolved && "border-emerald-500/60 bg-emerald-500/10",
+                "aspect-square rounded border flex items-center justify-center text-xs font-medium transition-colors hover:bg-accent",
+                isSolved &&
+                  "border-emerald-500/60 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
                 isNext && "ring-2 ring-primary",
               )}
             >
-              <span className="text-sm font-medium">{i + 1}</span>
-              {isSolved && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+              {i + 1}
             </Link>
           );
         })}

@@ -44,6 +44,14 @@ const SETUP_DELAY_MS = 600;
 // How long the opponent's reply waits, so your own move lands visibly first.
 const REPLY_DELAY_MS = 450;
 
+// Piece glyphs for the promotion picker, per side.
+const PROMO_GLYPH: Record<"w" | "b", Record<PromoPiece, string>> = {
+  w: { q: "♕", r: "♖", b: "♗", n: "♘" },
+  b: { q: "♛", r: "♜", b: "♝", n: "♞" },
+};
+
+type PromoPiece = "q" | "r" | "b" | "n";
+
 type Status = "solving" | "wrong" | "solved";
 
 interface Props {
@@ -80,6 +88,8 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
   const [highlighted, setHighlighted] = useState<Record<string, React.CSSProperties>>({});
   // A wrong move is shown briefly before being taken back; this holds it.
   const [wrongMove, setWrongMove] = useState<{ san: string; to: string } | null>(null);
+  // A pending promotion waiting for the player to pick a piece.
+  const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
   // How far back the user has stepped. null means "following the live position".
   const [viewIndex, setViewIndex] = useState<number | null>(null);
 
@@ -201,20 +211,15 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     [game, selected],
   );
 
-  const attemptMove = useCallback(
-    (from: string, to: string) => {
-      if (!solverToMove) return false;
-
+  // Actually play a move (with the chosen promotion piece, if any) and judge it.
+  const playMove = useCallback(
+    (from: string, to: string, promo?: PromoPiece) => {
       const expected = puzzle.solution[progress];
       const board = new Chess(game.fen());
 
-      // Take the promotion piece from the expected move so underpromotion puzzles
-      // work; anything else defaults to a queen.
-      const promotion = (expected.match(/=([QRBN])/)?.[1] ?? "Q").toLowerCase();
-
       let played;
       try {
-        played = board.move({ from, to, promotion });
+        played = board.move({ from, to, ...(promo ? { promotion: promo } : {}) });
       } catch {
         return false;
       }
@@ -222,6 +227,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
       setSelected(null);
       setHighlighted({});
+      setPromotion(null);
 
       if (isCorrectMove(game.fen(), played.san, expected)) {
         setStatus("solving");
@@ -231,13 +237,41 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
       // Wrong: it stays on the board in red until the solver takes it back
       // themselves, so they can look at the position they actually created
-      // instead of having it yanked away.
+      // instead of having it yanked away. Promoting to the wrong piece counts as
+      // wrong, since the picker means the solver chose it.
       setStatus("wrong");
       setAttempts((a) => a + 1);
       setWrongMove({ san: played.san, to: played.to });
       return true;
     },
-    [advance, game, progress, puzzle.solution, solverToMove],
+    [advance, game, progress, puzzle.solution],
+  );
+
+  const attemptMove = useCallback(
+    (from: string, to: string) => {
+      if (!solverToMove || promotion) return false;
+
+      // A pawn reaching the last rank needs the player to choose what it becomes,
+      // so open the picker instead of silently queening.
+      const piece = game.get(from as Square);
+      const promotes = piece?.type === "p" && (to[1] === "8" || to[1] === "1");
+      if (promotes && game.moves({ square: from as Square, verbose: true }).some((m) => m.to === to)) {
+        setSelected(null);
+        setHighlighted({});
+        setPromotion({ from, to });
+        return true;
+      }
+
+      return playMove(from, to);
+    },
+    [game, playMove, promotion, solverToMove],
+  );
+
+  const choosePromotion = useCallback(
+    (promo: PromoPiece) => {
+      if (promotion) playMove(promotion.from, promotion.to, promo);
+    },
+    [playMove, promotion],
   );
 
   // Undo a wrong move and hand the board back.
@@ -259,7 +293,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
   const onSquareClick = useCallback(
     ({ square }: SquareHandlerArgs) => {
       if (Object.keys(highlighted).length > 0) setHighlighted({});
-      if (!solverToMove) return;
+      if (!solverToMove || promotion) return;
 
       if (selected) {
         if (legalTargets.includes(square as Square)) {
@@ -275,7 +309,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
       const piece = game.get(square as Square);
       setSelected(piece && piece.color === game.turn() ? (square as Square) : null);
     },
-    [attemptMove, game, highlighted, legalTargets, selected, solverToMove],
+    [attemptMove, game, highlighted, legalTargets, promotion, selected, solverToMove],
   );
 
   // Right-click paints a square red, same as the review board.
@@ -322,7 +356,12 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft") {
+      // Once solved, Enter jumps straight to the next puzzle so a solver can keep
+      // a rhythm going without reaching for the mouse.
+      if (e.key === "Enter" && status === "solved" && nextSlug) {
+        e.preventDefault();
+        router.push(`/puzzles/${nextSlug}`);
+      } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         goBack();
       } else if (e.key === "ArrowRight") {
@@ -332,7 +371,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goBack, goForward]);
+  }, [goBack, goForward, nextSlug, router, status]);
 
   const reset = useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -342,6 +381,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     setSelected(null);
     setHighlighted({});
     setWrongMove(null);
+    setPromotion(null);
     setViewIndex(null);
     setSetupDone(!hasSetup);
   }, [hasSetup]);
@@ -380,11 +420,12 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
   const solverMoves = Math.ceil(puzzle.solution.length / 2);
   const currentSolverMove = Math.min(Math.floor(progress / 2) + 1, solverMoves);
   const solved = status === "solved";
+  const side: "w" | "b" = puzzle.sideToMove === "b" ? "b" : "w";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="mx-auto w-full max-w-[560px] space-y-3">
-        <div onContextMenu={(e) => e.preventDefault()}>
+        <div className="relative" onContextMenu={(e) => e.preventDefault()}>
           <Chessboard
             options={{
               id: "puzzle-board",
@@ -395,11 +436,35 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
               onSquareMouseUp,
               boardOrientation: puzzle.sideToMove === "b" ? "black" : "white",
               squareStyles,
-              allowDragging: solverToMove,
+              allowDragging: solverToMove && !promotion,
               allowDrawingArrows: true,
               animationDurationInMs: 200,
             }}
           />
+
+          {promotion && (
+            <div
+              className="absolute inset-0 z-20 flex items-center justify-center bg-background/70"
+              onClick={() => setPromotion(null)}
+            >
+              <div
+                className="flex gap-2 rounded-lg border bg-background p-3 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(["q", "r", "b", "n"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => choosePromotion(p)}
+                    aria-label={`Promote to ${p}`}
+                    className="flex h-14 w-14 items-center justify-center rounded-md border text-4xl leading-none hover:bg-accent"
+                  >
+                    {PROMO_GLYPH[side][p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-1">
@@ -429,9 +494,17 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
       <aside className="space-y-4">
         <div className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">
-              {puzzle.sideToMove === "b" ? "Black" : "White"} to play
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">
+                {puzzle.sideToMove === "b" ? "Black" : "White"} to play
+              </p>
+              {alreadySolved && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <Check className="h-3 w-3" />
+                  Solved
+                </span>
+              )}
+            </div>
             {solverMoves > 1 && !solved && (
               <p className="text-xs text-muted-foreground">
                 Move {currentSolverMove} of {solverMoves}
@@ -471,25 +544,37 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
 
           {solved && (
             <div className="space-y-2">
-              <p
-                className="text-base font-bold flex items-center gap-1.5"
-                style={{ color: CORRECT_COLOR }}
-              >
-                <Check className="h-5 w-5" />
-                {usedHelp ? "Line complete." : attempts === 1 ? "Solved, first try." : "Solved."}
-              </p>
-              {usedHelp && (
-                <p className="text-xs text-muted-foreground">
-                  You used a hint, so this one is not ticked off. Replay it to claim it.
+              {alreadySolved ? (
+                // Already on their record, so this is a quiet confirmation rather
+                // than a celebration: no fresh dopamine for re-solving.
+                <p className="text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+                  <Check className="h-4 w-4" />
+                  Solved again.
                 </p>
-              )}
-              {!usedHelp && !isLoggedIn && (
-                <p className="text-xs text-muted-foreground">
-                  Saved for this visit only. Make an account to keep it.
-                </p>
-              )}
-              {!usedHelp && alreadySolved && (
-                <p className="text-xs text-muted-foreground">You had already solved this one.</p>
+              ) : (
+                <>
+                  <p
+                    className="text-base font-bold flex items-center gap-1.5"
+                    style={{ color: CORRECT_COLOR }}
+                  >
+                    <Check className="h-5 w-5" />
+                    {usedHelp
+                      ? "Line complete."
+                      : attempts === 1
+                        ? "Solved, first try."
+                        : "Solved."}
+                  </p>
+                  {usedHelp && (
+                    <p className="text-xs text-muted-foreground">
+                      You used a hint, so this one is not ticked off. Replay it to claim it.
+                    </p>
+                  )}
+                  {!usedHelp && !isLoggedIn && (
+                    <p className="text-xs text-muted-foreground">
+                      Saved for this visit only. Make an account to keep it.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -500,24 +585,41 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button size="sm" variant="outline" onClick={reset}>
-              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-              {solved ? "Replay" : "Restart"}
-            </Button>
-            {!solved && (
-              <Button size="sm" variant="ghost" onClick={revealNext} disabled={!setupDone}>
-                <Eye className="h-3.5 w-3.5 mr-1.5" />
-                Show next move
-              </Button>
-            )}
-            {nextSlug && solved && (
-              <Button size="sm" asChild>
+          <div className="space-y-2 pt-1">
+            {solved && nextSlug && (
+              <Button size="lg" className="w-full" asChild>
                 <Link href={`/puzzles/${nextSlug}`}>
                   Next puzzle
-                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                  <ArrowRight className="h-4 w-4 ml-1.5" />
                 </Link>
               </Button>
+            )}
+            {solved && !nextSlug && (
+              <Button size="lg" variant="outline" className="w-full" asChild>
+                <Link href="/puzzles">
+                  Back to all puzzles
+                  <ArrowRight className="h-4 w-4 ml-1.5" />
+                </Link>
+              </Button>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={reset}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                {solved ? "Replay" : "Restart"}
+              </Button>
+              {!solved && (
+                <Button size="sm" variant="ghost" onClick={revealNext} disabled={!setupDone}>
+                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                  Show next move
+                </Button>
+              )}
+            </div>
+
+            {solved && nextSlug && (
+              <p className="text-center text-xs text-muted-foreground">
+                Press Enter for the next puzzle
+              </p>
             )}
           </div>
         </div>

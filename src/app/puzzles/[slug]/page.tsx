@@ -96,7 +96,6 @@ export default async function PuzzlePage({ params }: Props) {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <TierStars difficulty={puzzle.difficulty} />
           {tier && <span>{tier.name}</span>}
-          {puzzle.theme && <span>- {puzzle.theme}</span>}
         </div>
       </div>
 
