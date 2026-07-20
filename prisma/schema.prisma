@@ -667,6 +667,11 @@ model Puzzle {
   theme      String?
   sourcePgn  String?
 
+  // Provenance for bulk-imported puzzles (e.g. the Lichess open database id). Null
+  // for hand-made puzzles from the admin form. Unique so re-running an import skips
+  // puzzles it already added instead of duplicating them.
+  externalId String? @unique
+
   published  Boolean @default(false)
 
   createdAt  DateTime @default(now())
