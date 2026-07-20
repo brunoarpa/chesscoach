@@ -4,7 +4,7 @@ import { Chess } from "chess.js";
 // be able to jump straight to 5 stars. The sequence lives *inside* a tier, where
 // puzzle N+1 unlocks only once N is solved.
 export const PUZZLE_TIERS = [
-  { difficulty: 1, name: "Warm-up", blurb: "One-move tactics. Spot the pattern and play it." },
+  { difficulty: 1, name: "Warm-up", blurb: "Short tactics, a move or two. Spot the pattern and play it." },
   { difficulty: 2, name: "Sharp", blurb: "Short forcing lines where the first move is not the obvious one." },
   { difficulty: 3, name: "Tricky", blurb: "Quiet moves and in-between shots. Calculation starts to matter." },
   { difficulty: 4, name: "Brutal", blurb: "Deep lines with real defensive resources to work around." },

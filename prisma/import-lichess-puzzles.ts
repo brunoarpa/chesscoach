@@ -52,12 +52,16 @@ const PER_TIER = 50;
 // Rating buckets -> difficulty. Shifted up from a beginner spread: the low bands
 // (a sub-1000 mate-in-1 is trivial) made Warm-up and Sharp too obvious. These are
 // Lichess puzzle ratings, which run a touch higher than chess.com player strength.
+//
+// `maxPlies` is the longest solution (in half-moves) a tier accepts. It is a cap,
+// not a target: within a tier the picks are spread across every length up to it, so
+// a tier is a mix of 1-move, 2-move, ... puzzles rather than all the same depth.
 const TIERS: { difficulty: number; min: number; max: number; maxPlies: number }[] = [
-  { difficulty: 1, min: 1200, max: 1500, maxPlies: 2 }, // Warm-up: one move, but not an obvious one
-  { difficulty: 2, min: 1500, max: 1800, maxPlies: 3 }, // Sharp
-  { difficulty: 3, min: 1800, max: 2100, maxPlies: 5 }, // Tricky
-  { difficulty: 4, min: 2100, max: 2400, maxPlies: 7 }, // Brutal
-  { difficulty: 5, min: 2400, max: 10000, maxPlies: 9 }, // Brilliant
+  { difficulty: 1, min: 1200, max: 1500, maxPlies: 3 }, // Warm-up: 1-2 solver moves
+  { difficulty: 2, min: 1500, max: 1800, maxPlies: 5 }, // Sharp: 1-3
+  { difficulty: 3, min: 1800, max: 2100, maxPlies: 7 }, // Tricky: up to 4
+  { difficulty: 4, min: 2100, max: 2400, maxPlies: 9 }, // Brutal: up to 5
+  { difficulty: 5, min: 2400, max: 10000, maxPlies: 11 }, // Brilliant: up to 6
 ];
 
 // Quality gate. Popularity is Lichess's upvote score (-100..100); NbPlays is how
@@ -201,11 +205,17 @@ async function main() {
     process.exit(1);
   }
 
-  // Keep a bounded pool per tier; trim to a healthy multiple of PER_TIER so memory
-  // stays flat across 5 M rows.
-  const POOL_CAP = PER_TIER * 20;
-  const pools = new Map<number, Candidate[]>(TIERS.map((t) => [t.difficulty, []]));
+  // For each tier keep the most-played candidates bucketed by solution length (in
+  // solver moves), so the final pick can spread across lengths instead of being all
+  // one-movers. Bucketing before trimming is what protects the longer puzzles: they
+  // get fewer plays, so a single play-ranked pool would drop them all. Each bucket
+  // is capped so memory stays flat over 6 M rows.
+  const BUCKET_CAP = PER_TIER * 2;
+  const pools = new Map<number, Map<number, Candidate[]>>(
+    TIERS.map((t) => [t.difficulty, new Map<number, Candidate[]>()]),
+  );
   const byPlays = (a: Candidate, b: Candidate) => b.nbPlays - a.nbPlays || b.popularity - a.popularity;
+  const solverMovesOf = (c: Candidate) => Math.ceil(c.derived.solution.length / 2);
 
   let scanned = 0;
   const rl = openLines(path);
@@ -229,11 +239,15 @@ async function main() {
     const derived = derive(row);
     if (!derived) continue;
 
-    const pool = pools.get(tier.difficulty)!;
-    pool.push({ ...row, derived, title: titleFor(row) });
-    if (pool.length > POOL_CAP) {
-      pool.sort(byPlays);
-      pool.length = POOL_CAP;
+    const cand: Candidate = { ...row, derived, title: titleFor(row) };
+    const buckets = pools.get(tier.difficulty)!;
+    const len = solverMovesOf(cand);
+    let bucket = buckets.get(len);
+    if (!bucket) buckets.set(len, (bucket = []));
+    bucket.push(cand);
+    if (bucket.length > BUCKET_CAP) {
+      bucket.sort(byPlays);
+      bucket.length = BUCKET_CAP;
     }
   }
 
@@ -251,11 +265,22 @@ async function main() {
 
   let created = 0;
   for (const tier of TIERS) {
-    const picks = pools
-      .get(tier.difficulty)!
-      .sort(byPlays)
-      .filter((c) => !existing.has(c.id))
-      .slice(0, PER_TIER);
+    // Round-robin across the length buckets (1-move, 2-move, ...), most-played first
+    // within each, so the tier ends up an even mix of lengths rather than all the
+    // shortest. If a length runs dry the others carry the rest.
+    const buckets = pools.get(tier.difficulty)!;
+    const available = new Map(
+      [...buckets].map(([len, arr]) => [
+        len,
+        [...arr].sort(byPlays).filter((c) => !existing.has(c.id)),
+      ]),
+    );
+    const lengths = [...available.keys()].sort((a, b) => a - b);
+    const picks: Candidate[] = [];
+    for (let round = 0; picks.length < PER_TIER && lengths.some((l) => available.get(l)!.length); round++) {
+      const arr = available.get(lengths[round % lengths.length])!;
+      if (arr.length) picks.push(arr.shift()!);
+    }
 
     // Append after whatever is already in the tier so the existing ladder is untouched.
     const last = await prisma.puzzle.findFirst({
