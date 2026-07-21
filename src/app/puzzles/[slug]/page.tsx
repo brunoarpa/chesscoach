@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { tierFor, puzzleDisplayName } from "@/lib/puzzles";
@@ -69,8 +69,17 @@ export default async function PuzzlePage({ params }: Props) {
 
   const userId = session?.user?.id;
 
-  // The next puzzle in the same tier, for the "Next puzzle" button.
-  const [next, solve, position] = await Promise.all([
+  // The neighbouring puzzles in the same tier, for prev/next navigation.
+  const [prev, next, solve, position] = await Promise.all([
+    prisma.puzzle.findFirst({
+      where: {
+        published: true,
+        difficulty: puzzle.difficulty,
+        orderIndex: { lt: puzzle.orderIndex },
+      },
+      orderBy: { orderIndex: "desc" },
+      select: { slug: true },
+    }),
     prisma.puzzle.findFirst({
       where: {
         published: true,
@@ -96,13 +105,47 @@ export default async function PuzzlePage({ params }: Props) {
       {userId && <GuestSolveMerger />}
 
       <div className="space-y-1">
-        <Link
-          href="/puzzles"
-          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center"
-        >
-          <ChevronLeft className="h-4 w-4 mr-0.5" />
-          All puzzles
-        </Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            href="/puzzles"
+            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center"
+          >
+            <ChevronLeft className="h-4 w-4 mr-0.5" />
+            All puzzles
+          </Link>
+          {/* Prev/next puzzle jumps, always available so it is easy to step back
+              after moving on. Disabled at the ends of a tier. */}
+          <div className="flex items-center gap-1 text-sm">
+            {prev ? (
+              <Link
+                href={`/puzzles/${prev.slug}`}
+                className="inline-flex items-center rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4 mr-0.5" />
+                Prev
+              </Link>
+            ) : (
+              <span className="inline-flex items-center px-2 py-1 text-muted-foreground/40">
+                <ChevronLeft className="h-4 w-4 mr-0.5" />
+                Prev
+              </span>
+            )}
+            {next ? (
+              <Link
+                href={`/puzzles/${next.slug}`}
+                className="inline-flex items-center rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-0.5" />
+              </Link>
+            ) : (
+              <span className="inline-flex items-center px-2 py-1 text-muted-foreground/40">
+                Next
+                <ChevronRight className="h-4 w-4 ml-0.5" />
+              </span>
+            )}
+          </div>
+        </div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           {puzzleDisplayName(puzzle.difficulty, position, puzzle.title)}
         </h1>
