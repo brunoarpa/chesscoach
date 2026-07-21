@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Microscope,
   RotateCcw,
   Search,
   Undo2,
@@ -624,6 +625,16 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
                 <Button size="sm" variant="ghost" onClick={revealNext} disabled={!setupDone}>
                   <Eye className="h-3.5 w-3.5 mr-1.5" />
                   Show next move
+                </Button>
+              )}
+              {/* Only once solved: the review board runs the engine, which would
+                  hand the solver the answer if offered before they've found it. */}
+              {solved && (
+                <Button size="sm" variant="ghost" asChild>
+                  <Link href={`/review?fen=${encodeURIComponent(puzzle.fen)}`}>
+                    <Microscope className="h-3.5 w-3.5 mr-1.5" />
+                    Analyze
+                  </Link>
                 </Button>
               )}
             </div>
