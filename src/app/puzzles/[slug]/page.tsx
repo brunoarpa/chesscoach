@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { tierFor, puzzleDisplayName } from "@/lib/puzzles";
 import { PuzzleSolver } from "@/components/puzzles/puzzle-solver";
+import { PuzzleNav } from "@/components/puzzles/puzzle-nav";
 import { TierStars } from "@/components/puzzles/tier-stars";
 import { GuestSolveMerger } from "@/components/puzzles/guest-solve-merger";
 import { SITE_URL } from "@/lib/site";
@@ -113,38 +114,15 @@ export default async function PuzzlePage({ params }: Props) {
             <ChevronLeft className="h-4 w-4 mr-0.5" />
             All puzzles
           </Link>
-          {/* Prev/next puzzle jumps, always available so it is easy to step back
-              after moving on. Disabled at the ends of a tier. */}
-          <div className="flex items-center gap-1 text-sm">
-            {prev ? (
-              <Link
-                href={`/puzzles/${prev.slug}`}
-                className="inline-flex items-center rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <ChevronLeft className="h-4 w-4 mr-0.5" />
-                Prev
-              </Link>
-            ) : (
-              <span className="inline-flex items-center px-2 py-1 text-muted-foreground/40">
-                <ChevronLeft className="h-4 w-4 mr-0.5" />
-                Prev
-              </span>
-            )}
-            {next ? (
-              <Link
-                href={`/puzzles/${next.slug}`}
-                className="inline-flex items-center rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-0.5" />
-              </Link>
-            ) : (
-              <span className="inline-flex items-center px-2 py-1 text-muted-foreground/40">
-                Next
-                <ChevronRight className="h-4 w-4 ml-0.5" />
-              </span>
-            )}
-          </div>
+          {/* Prev is always available; Next stays locked until this puzzle is
+              solved, so it can't be used to skip ahead. */}
+          <PuzzleNav
+            puzzleId={puzzle.id}
+            prevSlug={prev?.slug ?? null}
+            nextSlug={next?.slug ?? null}
+            isLoggedIn={!!userId}
+            alreadySolved={!!solve}
+          />
         </div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           {puzzleDisplayName(puzzle.difficulty, position, puzzle.title)}
