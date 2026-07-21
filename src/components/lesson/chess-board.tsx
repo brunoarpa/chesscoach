@@ -166,6 +166,10 @@ interface Props {
   initialBoardPgn?: string;
   // Persisted variation tree (preferred over the flat PGN when present).
   initialBoardTree?: unknown;
+  // Seed the board with an arbitrary starting position (custom-start tree). Used
+  // by the review page to analyze a puzzle: the board opens on that position with
+  // the engine running instead of the "paste your game" import panel.
+  initialFen?: string;
   // Practice/sandbox mode: one person exploring the board alone. Disables the
   // realtime sync so moves stay local and copy stops referring to a partner.
   local?: boolean;
@@ -216,23 +220,29 @@ function formatLineEval(line: EngineLine): string {
   return "-";
 }
 
-// Seed the initial tree + cursor from a persisted tree (preferred) or PGN.
-function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string): { tree: MoveTree; nodeId: string } {
+// Seed the initial tree + cursor from a persisted tree (preferred), an arbitrary
+// starting FEN, or a PGN.
+function initialTreeState(initialBoardTree: unknown, initialBoardPgn?: string, initialFen?: string): { tree: MoveTree; nodeId: string } {
   const fromTree = sanitizeTree(initialBoardTree);
-  const tree = fromTree ?? (initialBoardPgn ? pgnToTree(initialBoardPgn) : createTree());
+  const fromFen = !fromTree && initialFen ? fenToTree(initialFen) : null;
+  const tree = fromTree ?? fromFen ?? (initialBoardPgn ? pgnToTree(initialBoardPgn) : createTree());
   return { tree, nodeId: endOfLine(tree, tree.rootId) };
 }
 
-export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, local = false, startImportOpen = false, onReport, multiPane = false, leftPanel }: Props) {
+export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initialBoardTree, initialFen, local = false, startImportOpen = false, onReport, multiPane = false, leftPanel }: Props) {
   // Seed tree + cursor from one shared computation. Computing them in two
   // separate useState initializers would call initialTreeState twice - and for an
   // empty/PGN board that means two createTree() calls with *different* random root
   // ids, leaving currentNodeId pointing at a node absent from `tree`. addMove would
   // then find no parent and silently drop every move (pieces snap back).
-  const [seed] = useState(() => initialTreeState(initialBoardTree, initialBoardPgn));
+  const [seed] = useState(() => initialTreeState(initialBoardTree, initialBoardPgn, initialFen));
   const [tree, setTree] = useState<MoveTree>(seed.tree);
   const [currentNodeId, setCurrentNodeId] = useState<string>(seed.nodeId);
-  const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
+  // A custom-start board (e.g. a puzzle handed over for analysis) opens from the
+  // side to move's perspective; a normal game stays white-side-up.
+  const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(
+    seed.tree.startFen?.split(" ")[1] === "b" ? "black" : "white",
+  );
   const [showImport, setShowImport] = useState(startImportOpen);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");

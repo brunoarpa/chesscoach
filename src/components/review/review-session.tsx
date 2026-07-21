@@ -96,8 +96,17 @@ function ReportBreakdown({ report }: { report: ReviewReport | null }) {
   );
 }
 
-export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
+export function ReviewSession({
+  isLoggedIn,
+  initialFen,
+}: {
+  isLoggedIn: boolean;
+  // When present, the board opens directly on this position (a puzzle sent over
+  // from the puzzles page for analysis) instead of the "paste your game" panel.
+  initialFen?: string;
+}) {
   const [report, setReport] = useState<ReviewReport | null>(null);
+  const fromPuzzle = Boolean(initialFen);
 
   // Left column (under the board's report card): move-type table, then the CTA.
   const leftPanel = (
@@ -112,9 +121,11 @@ export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3 px-4 py-2 border-b bg-background flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-base font-semibold">Review your game</h1>
+          <h1 className="text-base font-semibold">
+            {fromPuzzle ? "Analyze the puzzle" : "Review your game"}
+          </h1>
           <span className="text-xs px-2 py-0.5 rounded-full border border-primary/40 bg-primary/5 text-primary">
-            Free, no sign-up
+            {fromPuzzle ? "Engine on" : "Free, no sign-up"}
           </span>
         </div>
         <Button asChild size="sm" variant="outline">
@@ -128,7 +139,8 @@ export function ReviewSession({ isLoggedIn }: { isLoggedIn: boolean }) {
       <div className="flex-1 min-h-0 overflow-y-auto p-3">
         <ChessBoard
           local
-          startImportOpen
+          startImportOpen={!fromPuzzle}
+          initialFen={initialFen}
           multiPane
           lessonId={REVIEW_LESSON_ID}
           userId={REVIEW_USER_ID}
