@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { setUsername } from "@/lib/actions/auth";
+import { track } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
 
 export default function SetupUsernamePage() {
@@ -22,6 +23,15 @@ export default function SetupUsernamePage() {
   // The flow only ever moves forward to the "coach" step once the username has
   // been saved successfully, so the step is derived directly from the action result.
   const step = state?.success ? "coach" : "username";
+
+  // Fire the Google Ads / GA4 signup conversion exactly once, at the moment a
+  // brand-new account is finalised. Every signup method (password and Google
+  // OAuth) is funnelled through this page by the needsUsername redirect, so this
+  // is the single reliable point that captures all new signups. The `sign_up`
+  // GA4 funnel event on the password form stays as-is; this is the ad conversion.
+  useEffect(() => {
+    if (state?.success) track("conversion_event_signup");
+  }, [state?.success]);
 
   if (step === "coach") {
     return (
