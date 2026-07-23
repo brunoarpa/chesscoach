@@ -9,16 +9,17 @@ import { StudentDashboard } from "@/components/dashboard/student-dashboard";
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { CoachScheduleEditor } from "@/components/coach-schedule-editor";
 import { CoachInviteBanner } from "@/components/dashboard/coach-invite-banner";
+import { TrackEvent } from "@/components/analytics/track-event";
 import { expirePendingRequests, autoCompleteLessons, detectNoShows, DISPUTE_WINDOW_MS } from "@/lib/activity";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ setup?: string }>;
+  searchParams: Promise<{ setup?: string; login?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  const { setup } = await searchParams;
+  const { setup, login } = await searchParams;
 
   // Redirect Google users (and anyone without a username) to set up their profile first.
   if (session.user.needsUsername) redirect("/setup-username");
@@ -180,6 +181,9 @@ export default async function DashboardPage({
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <AutoRefresh />
+      {/* Set by the login redirect (?login=1); fires once then strips the flag so
+          a refresh does not re-count it. */}
+      {login && <TrackEvent event="login" cleanupParam="login" />}
       <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
       {currentUser.isSuspended && (

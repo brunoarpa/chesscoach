@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { MOVE_CLASS_STYLE } from "@/components/lesson/move-class-style";
 import { recordSolve } from "@/lib/actions/puzzles";
 import { addGuestSolve } from "@/lib/puzzle-progress";
+import { recordCleanSolve, resetStreak } from "@/lib/puzzle-streak";
 import { isCorrectMove } from "@/lib/puzzles";
+import { track } from "@/lib/analytics";
 import {
   ArrowRight,
   Check,
@@ -105,6 +107,13 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     return () => pending.forEach(clearTimeout);
   }, []);
 
+  // One `puzzle_start` per puzzle. Keyed on the id so it re-fires when the solver
+  // navigates from one puzzle straight to the next (the component stays mounted
+  // and just receives new props).
+  useEffect(() => {
+    track("puzzle_start", { difficulty_tier: puzzle.difficulty });
+  }, [puzzle.id, puzzle.difficulty]);
+
   const later = useCallback((fn: () => void, ms: number) => {
     timers.current.push(setTimeout(fn, ms));
   }, []);
@@ -182,6 +191,18 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     // clears the hint mark. Read the ref, not usedHelp state, which may not have
     // committed yet on a one-move hint-solve.
     const hinted = usedHelpRef.current;
+
+    track("puzzle_solved", { difficulty_tier: puzzle.difficulty, attempts });
+    // A clean, first-try, hint-free solve extends the ladder streak; anything
+    // less (a hint, or a wrong move earlier this puzzle bumped `attempts`) breaks
+    // the run. Fire `puzzle_streak` only when the run crosses a 5-in-a-row mark.
+    if (!hinted && attempts === 1) {
+      const { streak, milestone } = recordCleanSolve();
+      if (milestone) track("puzzle_streak", { streak_count: streak });
+    } else {
+      resetStreak();
+    }
+
     if (isLoggedIn) {
       try {
         await recordSolve(puzzle.id, attempts, hinted);
@@ -192,7 +213,7 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
     } else {
       addGuestSolve(puzzle.id, hinted);
     }
-  }, [attempts, isLoggedIn, puzzle.id, router]);
+  }, [attempts, isLoggedIn, puzzle.id, puzzle.difficulty, router]);
 
   // Advance past the solver's move at `from`, auto-playing the opponent's reply.
   const advance = useCallback(
@@ -250,9 +271,12 @@ export function PuzzleSolver({ puzzle, nextSlug, isLoggedIn, alreadySolved }: Pr
       setStatus("wrong");
       setAttempts((a) => a + 1);
       setWrongMove({ san: played.san, to: played.to });
+      track("puzzle_failed", { difficulty_tier: puzzle.difficulty });
+      // A wrong move ends any clean-solve run.
+      resetStreak();
       return true;
     },
-    [advance, game, progress, puzzle.solution],
+    [advance, game, progress, puzzle.solution, puzzle.difficulty],
   );
 
   const attemptMove = useCallback(

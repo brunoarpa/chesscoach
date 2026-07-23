@@ -55,7 +55,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
                 await signIn("credentials", {
                   email: formData.get("email"),
                   password: formData.get("password"),
-                  redirectTo: "/dashboard",
+                  redirectTo: "/dashboard?login=1",
                 });
               } catch (err) {
                 if (err instanceof CredentialsSignin) {
@@ -114,7 +114,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           <form
             action={async () => {
               "use server";
-              await signIn("google", { redirectTo: "/dashboard" });
+              await signIn("google", { redirectTo: "/dashboard?login=1" });
             }}
           >
             <button

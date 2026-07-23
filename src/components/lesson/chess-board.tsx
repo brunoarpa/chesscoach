@@ -38,6 +38,7 @@ import {
   type GameReviewSummary,
 } from "@/lib/game-review";
 import { MOVE_CLASS_STYLE } from "./move-class-style";
+import { track } from "@/lib/analytics";
 
 // Plain last-move highlight used when the engine is off (chess.com-style yellow),
 // so both players can always see the most recent move and whose turn it is.
@@ -425,6 +426,24 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       summary: reviewSummary,
     });
   }, [reviewActive, gameInfo, reviewSummary, onReport]);
+
+  // `game_review_complete`, fired once per game the moment the whole-game report
+  // is fully computed (reviewSummary goes non-null). The ref guards against the
+  // summary object re-identifying on later eval-map churn. Reset when a new game
+  // is queued (reviewFens changes), so the next review can fire again.
+  const reviewCompleteFiredRef = useRef(false);
+  useEffect(() => {
+    reviewCompleteFiredRef.current = false;
+  }, [reviewFens]);
+  useEffect(() => {
+    if (!local || !reviewActive || !reviewSummary || reviewCompleteFiredRef.current) return;
+    reviewCompleteFiredRef.current = true;
+    track("game_review_complete", {
+      blunders_found: reviewSummary.white.counts.blunder + reviewSummary.black.counts.blunder,
+      mistakes_found: reviewSummary.white.counts.mistake + reviewSummary.black.counts.mistake,
+    });
+  }, [local, reviewActive, reviewSummary]);
+
   // Position editor ("set up position"): a local working board that only syncs to
   // the partner on Apply, so they never see a half-built position. `editBrush` is
   // the selected palette piece ("wQ", ...), "trash" for the eraser, or null.
@@ -693,6 +712,18 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     if (!isRemoteUpdateRef.current) broadcastNavigate(nodeId);
   }, [broadcastNavigate]);
 
+  // A move clicked in the move list / eval graph to inspect it (as opposed to
+  // stepping with the arrows). On the public game review only, this is the
+  // "explored a specific move" signal - deep engagement, not just skimming.
+  const exploreMove = useCallback((nodeId: string) => {
+    if (local && reviewActive) {
+      track("review_move_explored", {
+        move_class: moveClasses.get(nodeId) ?? undefined,
+      });
+    }
+    navigateTo(nodeId);
+  }, [local, reviewActive, moveClasses, navigateTo]);
+
   const goToStart = useCallback(() => {
     navigateTo(tree.rootId);
   }, [navigateTo, tree.rootId]);
@@ -941,7 +972,10 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     setImportError("");
     // Queue the imported game for a background whole-game review (engine only).
     const ids = mainlineNodeIds(nextTree);
-    setReviewFens(engineEnabled && ids.length > 2 ? ids.map((id) => fenAtNode(nextTree, id)) : []);
+    const willReview = engineEnabled && ids.length > 2;
+    setReviewFens(willReview ? ids.map((id) => fenAtNode(nextTree, id)) : []);
+    // The engine pass is about to start - the strongest game-review intent signal.
+    if (local && willReview) track("game_review_start");
     if (!isRemoteUpdateRef.current) broadcastMoves(nextTree, endId);
   }
 
@@ -970,6 +1004,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
       const imported = new Chess();
       imported.loadPgn(text);
       if (imported.history().length > 0) {
+        if (local) track("game_paste", { input_method: "paste" });
         loadTreeFromPgn(text);
         return;
       }
@@ -978,12 +1013,16 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
     }
 
     if (text.includes("lichess.org") || text.includes("chess.com")) {
+      if (local) track("game_paste", { input_method: "link" });
       handleLinkImport(text);
       return;
     }
 
     // A single FEN line sets up an arbitrary starting position with no moves.
-    if (loadTreeFromFen(text)) return;
+    if (loadTreeFromFen(text)) {
+      if (local) track("game_paste", { input_method: "fen" });
+      return;
+    }
 
     setImportError("Could not parse as PGN, FEN, or game link. Paste a valid PGN, FEN, or Lichess/Chess.com game link.");
   }
@@ -1321,7 +1360,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
         <button
           key={nodeId}
           type="button"
-          onClick={() => navigateTo(nodeId)}
+          onClick={() => exploreMove(nodeId)}
           onContextMenu={(e) => {
             e.preventDefault();
             setMoveMenu({ nodeId, x: e.clientX, y: e.clientY });
@@ -1383,7 +1422,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
           key={nodeId}
           type="button"
           data-active={isActive}
-          onClick={() => navigateTo(nodeId)}
+          onClick={() => exploreMove(nodeId)}
           className={`inline-flex items-center gap-1 px-1.5 py-1 rounded shrink-0 text-sm ${isActive ? "bg-primary/20 font-bold" : "hover:bg-muted"}`}
           style={cls ? { color: MOVE_CLASS_STYLE[cls].badge } : undefined}
         >
@@ -1509,7 +1548,7 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
               type="button"
               aria-label={`Go to move ${i}`}
               className="flex-1 h-full cursor-pointer"
-              onClick={() => mainlineIds[i] && navigateTo(mainlineIds[i])}
+              onClick={() => mainlineIds[i] && exploreMove(mainlineIds[i])}
             />
           ))}
         </div>

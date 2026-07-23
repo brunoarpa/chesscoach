@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site";
 import { JsonLd } from "@/components/json-ld";
+import { TrackEvent } from "@/components/analytics/track-event";
 import { auth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -287,6 +288,9 @@ export default async function ProfilePage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {isCoachProfile && !user.isSuspended && !isOwnProfile && (
+        <TrackEvent event="coach_profile_view" params={{ coach_id: user.id }} />
+      )}
       {isCoachProfile && !user.isSuspended && (
         <JsonLd
           data={{

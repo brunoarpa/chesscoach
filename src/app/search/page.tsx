@@ -16,6 +16,7 @@ import { auth } from "@/lib/auth";
 import { filterValidLanguages } from "@/lib/languages";
 import { getEffectiveAvailability } from "@/lib/utils";
 import { JsonLd } from "@/components/json-ld";
+import { TrackEvent } from "@/components/analytics/track-event";
 import { SITE_URL } from "@/lib/site";
 
 interface SearchParams {
@@ -214,6 +215,7 @@ export default async function SearchPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <TrackEvent event="coaches_browse" params={{ result_count: sortedCoaches.length }} />
       {/* Marks the page up as a coach listing. Only the unfiltered page is
           canonical, so this describes the default ranking rather than whatever
           filters happen to be applied. */}

@@ -94,6 +94,12 @@ export function SlotPicker({
   async function handleBook() {
     if (!selectedSlotId) return;
 
+    // The student committed to a slot and hit book - the top of the booking
+    // funnel, fired before the request is sent (and before it can fail).
+    track("lesson_booking_start", {
+      lesson_type: isTrial ? "trial" : commMethod === "CALL" ? "call" : "chat",
+    });
+
     setLoading(true);
     const formData = new FormData();
     formData.set("coachId", coachId);

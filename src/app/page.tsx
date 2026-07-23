@@ -9,6 +9,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
+import { TrackedLink } from "@/components/analytics/tracked-link";
 import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -186,9 +187,11 @@ export default async function Home() {
             cta: "Browse coaches",
           },
         ].map((card) => (
-          <Link
+          <TrackedLink
             key={card.href}
             href={card.href}
+            event="cta_click"
+            eventParams={{ cta_label: card.cta, cta_location: "home_hero" }}
             className="group rounded-lg border p-5 text-left space-y-2 transition-colors hover:bg-accent"
           >
             <card.icon className="h-6 w-6" />
@@ -198,7 +201,7 @@ export default async function Home() {
               {card.cta}
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </span>
-          </Link>
+          </TrackedLink>
         ))}
       </section>
 
