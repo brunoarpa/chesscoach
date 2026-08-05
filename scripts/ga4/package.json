@@ -1,0 +1,13 @@
+{
+  "name": "ga4-report",
+  "private": true,
+  "type": "module",
+  "description": "Standalone GA4 Data API reporting tool for the elochaser property. Reads via impersonation of the ga4-reader service account (no key file).",
+  "bin": {
+    "ga4": "./index.mjs"
+  },
+  "dependencies": {
+    "@google-analytics/data": "^4.12.0",
+    "google-auth-library": "^9.15.0"
+  }
+}
