@@ -244,7 +244,11 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(
     seed.tree.startFen?.split(" ")[1] === "b" ? "black" : "white",
   );
-  const [showImport, setShowImport] = useState(startImportOpen);
+  // Start closed on every device. On desktop the effect below auto-opens the
+  // paste-your-game dialog (unchanged behaviour); on phones we deliberately do
+  // not, because a modal covering the board the instant you land drove ~90% of
+  // mobile review visitors to bounce. They see the board and tap upload instead.
+  const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
   // "Find your Chess.com games" picker state. ccUsername is remembered in
@@ -301,6 +305,20 @@ export function ChessBoard({ lessonId, userId, isCoach, initialBoardPgn, initial
   // now get the engine too, but with a lighter search (fewer lines, shorter time)
   // so the in-browser Stockfish doesn't stutter on a weak CPU.
   const isMobile = useMediaQuery("(max-width: 767px)");
+  // Auto-open the import dialog on desktop only (see showImport above). We open
+  // at most once, and only when both the media-query hook and a direct viewport
+  // check agree it is NOT a phone, so a stale first-render value can never flash
+  // the modal open on mobile - there the board stays visible and the upload
+  // button does the work instead.
+  const autoOpenHandled = useRef(false);
+  useEffect(() => {
+    if (!startImportOpen || autoOpenHandled.current) return;
+    const mobile = isMobile || window.matchMedia("(max-width: 767px)").matches;
+    if (!mobile) {
+      autoOpenHandled.current = true;
+      setShowImport(true);
+    }
+  }, [startImportOpen, isMobile]);
   const engineEnabled = isCoach || local;
   // The Stockfish worker lives in the EvalBar, which is the source of both the
   // eval and the line list. Keep it mounted whenever either toggle is on so the

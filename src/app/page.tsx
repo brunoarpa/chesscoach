@@ -168,9 +168,13 @@ export default async function Home() {
         </p>
       </section>
 
-      {/* The three things the site does, ordered as the funnel rather than as a
-          flat feature menu: diagnose free, drill the pattern, then fix the habit
-          with a coach. Each step motivates the next. */}
+      {/* On desktop these read left-to-right as the funnel: diagnose free, drill
+          the pattern, then fix the habit with a coach (free tools first, coaching
+          as the destination). On mobile the cards stack, and leading with "Review
+          a game" put our worst-converting, highest-bounce page on top while
+          burying coaches, which is what most paid visitors actually came for. So
+          on mobile we flip the stack (via `order-*`) to coach -> puzzles -> review
+          while keeping the desktop order untouched (`md:order-none`). */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-14 max-w-4xl w-full">
         {[
           {
@@ -179,6 +183,7 @@ export default async function Home() {
             title: "Review a game",
             body: "Paste any game and get an instant engine review. Every blunder, mistake, and missed win, with no account needed.",
             cta: "Analyse a game",
+            mobileOrder: "order-3",
           },
           {
             href: "/puzzles",
@@ -186,6 +191,7 @@ export default async function Home() {
             title: "Train tactics",
             body: "Hand-picked puzzles across five difficulty tiers. Work the ladder and drill the patterns you keep missing.",
             cta: "Solve puzzles",
+            mobileOrder: "order-2",
           },
           {
             href: "/search",
@@ -195,6 +201,7 @@ export default async function Home() {
               ? `One-on-one lessons on a live, shared board. Your first ${trialsRemaining} are free.`
               : "One-on-one lessons on a live, shared board with a coach in your rating range.",
             cta: "Browse coaches",
+            mobileOrder: "order-1",
           },
         ].map((card) => (
           <TrackedLink
@@ -202,7 +209,7 @@ export default async function Home() {
             href={card.href}
             event="cta_click"
             eventParams={{ cta_label: card.cta, cta_location: "home_hero" }}
-            className="group rounded-lg border p-5 text-left space-y-2 transition-colors hover:bg-accent"
+            className={`group rounded-lg border p-5 text-left space-y-2 transition-colors hover:bg-accent ${card.mobileOrder} md:order-none`}
           >
             <card.icon className="h-6 w-6" />
             <h2 className="font-semibold">{card.title}</h2>

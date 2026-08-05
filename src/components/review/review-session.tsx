@@ -36,7 +36,7 @@ function CtaCard({ isLoggedIn }: { isLoggedIn: boolean }) {
         </Button>
         {!isLoggedIn && (
           <Button asChild variant="outline" className="w-full">
-            <Link href="/login">
+            <Link href="/signup">
               <UserPlus className="h-4 w-4 mr-1.5" />
               Sign up free
             </Link>
