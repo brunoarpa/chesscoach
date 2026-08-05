@@ -241,31 +241,38 @@ export function SlotPicker({
         {/* Booking type - kept above the times so the student picks free trial
             vs chat/call without scrolling past a long list of slots. */}
         <div className="space-y-3">
-          {/* Trial option */}
+          {/* Trial option - a switch so the on/off state is obvious at a glance,
+              with the "(chat)" detail inline instead of a sentence below. */}
           {freeTrialsRemaining > 0 && coachAcceptingFreeTrials && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setIsTrial(!isTrial);
-                    if (!isTrial) setCommMethod("");
-                  }}
-                  className="bg-green-600 text-white hover:bg-green-700"
-                >
-                  {isTrial ? "Free Trial ✓" : "Use Free Trial"}
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  {freeTrialsRemaining} trial{freeTrialsRemaining !== 1 ? "s" : ""} left
-                </span>
-              </div>
-              {isTrial && (
-                <p className="text-xs text-muted-foreground">
-                  Your free trial is a text (chat) lesson.
-                  {canCall ? " Voice calls unlock when you book a paid lesson." : ""}
-                </p>
-              )}
-            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isTrial}
+              onClick={() => {
+                setIsTrial(!isTrial);
+                if (!isTrial) setCommMethod("");
+              }}
+              className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+            >
+              <span
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  isTrial ? "bg-green-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    isTrial ? "translate-x-[22px]" : "translate-x-0.5"
+                  }`}
+                />
+              </span>
+              <span className="flex-1 text-sm font-medium">
+                Use a free trial{" "}
+                <span className="font-normal text-muted-foreground">(chat)</span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {freeTrialsRemaining} left
+              </span>
+            </button>
           )}
 
           {/* Communication method */}
