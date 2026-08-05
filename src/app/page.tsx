@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   Puzzle,
   ScanSearch,
+  Gift,
 } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
 import { TrackedLink } from "@/components/analytics/tracked-link";
@@ -150,6 +151,15 @@ export default async function Home() {
           sat in the same max-w-2xl and wrapped to two similar-length lines, so
           four near-identical lines stacked up with no hierarchy between them. */}
       <section className="text-center space-y-5 max-w-4xl">
+        {hasTrials && (
+          <Link
+            href="/search"
+            className="inline-flex items-center gap-2.5 rounded-full bg-green-100 px-6 py-3 text-lg sm:text-xl font-semibold text-green-800 transition-colors hover:bg-green-200 dark:bg-green-950 dark:text-green-300 dark:hover:bg-green-900"
+          >
+            <Gift className="h-6 w-6 shrink-0" />
+            {trialsRemaining} free lesson{trialsRemaining === 1 ? "" : "s"} with a real coach, no card needed
+          </Link>
+        )}
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tighter text-balance">
           The fastest way to improve at chess
         </h1>
