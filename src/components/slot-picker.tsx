@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +30,10 @@ interface Props {
   slots: Slot[];
   hasCompletedTrial?: boolean;
   coachAcceptingFreeTrials?: boolean;
+  // When false, the visitor is logged out: they can pick a slot and everything
+  // else, but hitting "Book" sends them to sign in first (deferred auth gate).
+  isAuthenticated?: boolean;
+  coachUsername: string;
 }
 
 type GroupedSlots = Record<string, Slot[]>;
@@ -65,7 +70,10 @@ export function SlotPicker({
   slots,
   hasCompletedTrial = true,
   coachAcceptingFreeTrials = true,
+  isAuthenticated = true,
+  coachUsername,
 }: Props) {
+  const router = useRouter();
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [commMethod, setCommMethod] = useState<string>("");
   const [isTrial, setIsTrial] = useState(false);
@@ -89,7 +97,12 @@ export function SlotPicker({
     return 0;
   })();
 
-  const canBook = selectedSlotId && (commMethod || isTrial) && (isTrial || (hasCompletedTrial && availableBalance >= slotPrice));
+  // Logged-out visitors only need a slot and a type to proceed: the balance and
+  // trial-history gates are checked server-side after they sign in.
+  const canBook =
+    selectedSlotId &&
+    (commMethod || isTrial) &&
+    (!isAuthenticated || isTrial || (hasCompletedTrial && availableBalance >= slotPrice));
 
   async function handleBook() {
     if (!selectedSlotId) return;
@@ -99,6 +112,13 @@ export function SlotPicker({
     track("lesson_booking_start", {
       lesson_type: isTrial ? "trial" : commMethod === "CALL" ? "call" : "chat",
     });
+
+    // Deferred auth: a logged-out visitor has now picked everything. Send them
+    // to sign in, then straight back to this coach to finish booking.
+    if (!isAuthenticated) {
+      router.push(`/login?callbackUrl=/profile/${coachUsername}`);
+      return;
+    }
 
     setLoading(true);
     const formData = new FormData();
@@ -304,17 +324,14 @@ export function SlotPicker({
           <div className="border-t pt-4 space-y-3">
             {/* Message */}
             <div className="space-y-1.5">
-              <Label className="text-sm">What do you want from this lesson?</Label>
+              <Label className="text-sm">What do you want from this lesson? (optional)</Label>
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="e.g. review my recent games, work on endgames, or sharpen tactical and positional thinking. Tell the coach where you want to improve."
+                placeholder="e.g. review my recent games"
                 maxLength={500}
                 rows={3}
               />
-              <p className="text-xs text-muted-foreground">
-                Optional, but it helps your coach prepare. The more specific, the better the lesson.
-              </p>
             </div>
 
             {/* Price summary */}
@@ -331,21 +348,13 @@ export function SlotPicker({
               </div>
             </div>
 
-            <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 p-2.5 text-xs text-amber-800 dark:text-amber-300">
-              <span className="font-medium">⏰ Set yourself a reminder.</span> If you don&apos;t
-              join within 10 minutes of the start time, the lesson counts as a no-show.{" "}
-              {isTrial
-                ? "you forfeit ALL your remaining free trials."
-                : "you're still charged in full and the coach is paid."}
-            </div>
-
-            {!isTrial && !hasCompletedTrial && (
+            {isAuthenticated && !isTrial && !hasCompletedTrial && (
               <p className="text-sm text-amber-700 dark:text-amber-400">
                 This coach hasn&apos;t completed a free trial yet. Book a free trial first to unlock paid lessons with them.
               </p>
             )}
 
-            {!isTrial && commMethod && availableBalance < slotPrice && (
+            {isAuthenticated && !isTrial && commMethod && availableBalance < slotPrice && (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2.5 text-sm space-y-2">
                 <p className="text-destructive">
                   Insufficient balance - you have ${(availableBalance / 100).toFixed(2)}, need ${(slotPrice / 100).toFixed(2)}.
@@ -357,10 +366,6 @@ export function SlotPicker({
                 </Link>
               </div>
             )}
-
-            <p className="text-xs text-muted-foreground text-center">
-              We email your coach the moment you book, so they&apos;ll see your request even if they&apos;re not online right now.
-            </p>
 
             <Button
               onClick={handleBook}

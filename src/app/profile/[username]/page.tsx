@@ -516,30 +516,10 @@ export default async function ProfilePage({
             <ChessComVerificationForm />
           )}
 
-          {/* Sign-in prompt for logged-out visitors looking at a bookable coach */}
+          {/* Lesson booking for other profiles - always slot-based. Logged-out
+              visitors get the full picker too; the sign-in gate is deferred to
+              the "Book" click inside SlotPicker. It renders its own empty state. */}
           {!isOwnProfile &&
-            !session?.user &&
-            isCoachProfile &&
-            effectiveAvailability === "AVAILABLE" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Book a Lesson</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Sign in to book a lesson with {user.username}.
-                  </p>
-                  <Link href={`/login?callbackUrl=/profile/${user.username}`}>
-                    <Button className="w-full">Sign in to book</Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            )}
-
-          {/* Lesson booking for other profiles - always slot-based. SlotPicker
-              renders its own "no slots available" empty state. */}
-          {!isOwnProfile &&
-            session?.user &&
             isCoachProfile &&
             effectiveAvailability === "AVAILABLE" &&
             !isBlocked && (
@@ -550,32 +530,36 @@ export default async function ProfilePage({
                   coachCallPrice={user.coachCallPrice}
                   coachCommunicationPreference={user.communicationPreference}
                   availableBalance={studentAvailableBalance ?? 0}
-                  freeTrialsRemaining={freeTrialsRemaining}
+                  freeTrialsRemaining={session?.user ? freeTrialsRemaining : 3}
                   slots={availableSlots}
                   hasCompletedTrial={hasCompletedTrial}
                   coachAcceptingFreeTrials={user.acceptingFreeTrials}
+                  isAuthenticated={!!session?.user}
+                  coachUsername={user.username ?? ""}
                 />
-                <Card>
-                  <CardContent className="py-4">
-                    <div className="flex items-start gap-2.5">
-                      <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
-                      <div className="flex-1 space-y-2.5">
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">
-                            Not sure {user.username} is the right fit?
-                          </span>{" "}
-                          Message them first to talk through your goals, level, and
-                          schedule before you book.
-                        </p>
-                        <MessageUserButton
-                          userId={user.id}
-                          label={`Message ${user.username}`}
-                          className="w-full"
-                        />
+                {session?.user && (
+                  <Card>
+                    <CardContent className="py-4">
+                      <div className="flex items-start gap-2.5">
+                        <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                        <div className="flex-1 space-y-2.5">
+                          <p className="text-sm text-muted-foreground">
+                            <span className="font-medium text-foreground">
+                              Not sure {user.username} is the right fit?
+                            </span>{" "}
+                            Message them first to talk through your goals, level, and
+                            schedule before you book.
+                          </p>
+                          <MessageUserButton
+                            userId={user.id}
+                            label={`Message ${user.username}`}
+                            className="w-full"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           {!isOwnProfile && isBlocked && session?.user && (
