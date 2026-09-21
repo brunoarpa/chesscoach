@@ -14,8 +14,7 @@ import {
 //
 // Runs as a native Vercel cron (vercel.json), which requires a plan that allows
 // sub-daily schedules (Pro+). Vercel auto-sends the CRON_SECRET as a Bearer
-// token, which the auth check below validates. The GitHub Action of the same
-// name is now a manual-only fallback.
+// token, which the auth check below validates.
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (
